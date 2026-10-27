@@ -438,7 +438,7 @@ def price_map(db: Session, distributor_id: int) -> dict[int, Decimal]:
 def _validate_lines(db: Session, lines: list[dict], distributor_id: int | None = None) -> tuple[list[dict], Decimal]:
     """校验订单明细并返回快照行；金额在服务端统一计算。
 
-    单价留空时取值顺序：经销商专属价 > 商品基础价。
+    单价留空时取值顺序：经销商专属价 > 一级分销价(>0) > 商品基础价。
     """
     if not lines:
         raise ValueError("订单至少需要一条明细")
@@ -460,7 +460,10 @@ def _validate_lines(db: Session, lines: list[dict], distributor_id: int | None =
             raise ValueError(f"第 {index} 行数量必须大于 0")
         raw_price = line.get("unit_price")
         if raw_price in (None, ""):
-            unit_price = overrides.get(product.id, product.base_price)
+            # 下单默认价：经销商专属价 > 一级分销价(>0) > 商品基础价
+            tier1 = Decimal(str(product.tier1_price or 0))
+            default_price = overrides.get(product.id) or (tier1 if tier1 > 0 else product.base_price)
+            unit_price = default_price
         else:
             try:
                 unit_price = Decimal(str(raw_price))
@@ -833,6 +836,27 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
     order.pushed_at = datetime.now()
     db.commit()
     return {"ok": True, "order": _order_view(order)}
+
+
+def create_and_push_order(db: Session, distributor_id: int, lines: list[dict], remark: str = "") -> dict:
+    """下单页一键流程：创建订单 → 自动审核通过 → 推送旺店通。
+
+    推送失败不回滚订单（单据已落库、状态为已审核），把报错带给前端，
+    用户在「分销订单」页修正后可重推。
+    """
+    view = create_order(db, distributor_id, lines, remark)
+    order = db.get(FxOrder, int(view["id"]))
+    transition_order(db, order.id, "submit")
+    transition_order(db, order.id, "approve")
+    pushed = False
+    push_error = ""
+    try:
+        push_order_to_wangdian(db, order.id)
+        pushed = True
+    except ValueError as exc:
+        push_error = str(exc)
+    db.refresh(order)
+    return {"order": _order_view(order), "pushed": pushed, "push_error": push_error}
 
 
 # ---------------------------------------------------------------- 分销商对账单

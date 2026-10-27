@@ -268,3 +268,24 @@ def inventory_summary(db: Session) -> dict[str, Any]:
         "today": today,
         "single_warehouse": True,
     }
+
+
+def stock_overview(db: Session) -> dict[str, Any]:
+    """最新快照的各规格现货数量（按 spec_no），给下单页显示可发货底数。
+
+    无快照返回空表——下单页据此显示「未同步库存」而不是编一个 0。
+    """
+    latest = db.scalar(
+        select(FxStockSnapshot.snap_date)
+        .where(FxStockSnapshot.warehouse == "")
+        .order_by(FxStockSnapshot.snap_date.desc())
+    )
+    if not latest:
+        return {"snap_date": "", "qty": {}}
+    rows = db.execute(
+        select(FxStockSnapshot.spec_no, FxStockSnapshot.qty).where(
+            FxStockSnapshot.snap_date == latest,
+            FxStockSnapshot.warehouse == "",
+        )
+    ).all()
+    return {"snap_date": latest, "qty": {spec: float(qty or 0) for spec, qty in rows}}

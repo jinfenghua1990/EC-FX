@@ -177,6 +177,7 @@ const MENUS = [
     { key: 'prod-stock', label: '商品库存与可供货状态', icon: '📊', url: ph('商品库存与可供货状态', '商品管理', 'P6'), planned: true, phase: 'P6' },
   ]},
   { key: 'order', label: '订单管理', icon: '🧾', children: [
+    { key: 'order-entry', label: '分销下单', icon: '🛒', url: '/distribution?embed=1&tab=entry' },
     { key: 'order-all', label: '分销订单', icon: '🧾', url: '/distribution?embed=1&tab=orders' },
     { key: 'order-pending', label: '待审核订单', icon: '⏳', url: '/distribution?embed=1&tab=orders&status=submitted' },
     { key: 'order-approved', label: '已审核订单', icon: '✅', url: '/distribution?embed=1&tab=orders&status=approved' },

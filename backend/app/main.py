@@ -28,7 +28,7 @@ from .services.adjustments import (
     create_adjustment, effective_stockout_rows, list_adjustments, stockout_adjustment_summary,
 )
 from .services.distribution import (
-    FX_ORDER_STATUSES, STATUS_LABELS, create_distributor, create_order, create_product,
+    FX_ORDER_STATUSES, STATUS_LABELS, create_and_push_order, create_distributor, create_order, create_product,
     delete_price, fx_overview, import_distributors, import_products,
     list_distributors, list_orders, list_prices, list_products, list_statements,
     list_brands,
@@ -50,6 +50,7 @@ from .services.wdt_purchase import (
 from .services.inventory import (
     fulfillment_for_order,
     inventory_summary,
+    stock_overview,
     sync_stock_snapshot,
 )
 
@@ -122,6 +123,8 @@ class FxOrderPayload(BaseModel):
     distributor_id: int
     remark: str = ""
     lines: list[FxOrderLinePayload] = Field(default_factory=list)
+    # 下单页一键模式：创建后自动审核并推送旺店通
+    auto_push: bool = False
 
 
 class FxPricePayload(BaseModel):
@@ -948,6 +951,12 @@ def fx_inventory_summary(db: Session = Depends(get_db)):
     return inventory_summary(db)
 
 
+@app.get("/api/fx/inventory/stock-list")
+def fx_inventory_stock_list(db: Session = Depends(get_db)):
+    """最新快照的各规格现货数量（spec_no → qty），给下单页显示可发货底数。"""
+    return stock_overview(db)
+
+
 @app.post("/api/fx/inventory/sync")
 def fx_inventory_sync(
     snap_date: str = "",
@@ -1028,13 +1037,22 @@ def fx_order_detail(order_id: int, db: Session = Depends(get_db)):
 @app.post("/api/fx/orders")
 def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
     try:
+        if payload.auto_push:
+            # 下单页一键流程：创建 → 自动审核 → 推送旺店通（失败不回滚，返回报错供重推）
+            result = create_and_push_order(
+                db,
+                distributor_id=payload.distributor_id,
+                lines=[line.model_dump() for line in payload.lines],
+                remark=payload.remark,
+            )
+            return {"ok": True, **result}
         row = create_order(
             db,
             distributor_id=payload.distributor_id,
             lines=[line.model_dump() for line in payload.lines],
             remark=payload.remark,
         )
-        return {"ok": True, "order": row}
+        return {"ok": True, "order": row, "pushed": False, "push_error": ""}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
