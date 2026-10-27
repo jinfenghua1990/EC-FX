@@ -103,3 +103,20 @@ def test_order_default_price_prefers_distributor_override(seeded):
     db.commit()
     view = dist.create_order(db, d.id, lines=[{"product_id": p2.id, "quantity": 2}])
     assert Decimal(str(view["lines"][0]["unit_price"])) == Decimal("4.20")
+
+
+def test_next_order_no_uses_max_seq_not_count(seeded):
+    """删单后序号不回绕：取当天最大序号+1，而不是条数+1。"""
+    db, d, p1, _ = seeded
+    from datetime import datetime
+    from app.models import FxOrder
+    prefix = datetime.now().strftime("FX%Y%m%d")
+    db.add_all([
+        FxOrder(order_no=f"{prefix}-0001", distributor_id=d.id, total_amount=Decimal("1")),
+        FxOrder(order_no=f"{prefix}-0003", distributor_id=d.id, total_amount=Decimal("1")),
+    ])
+    db.commit()
+    # 模拟 -0002 被删：按条数会再编 0002 撞唯一约束之外还跳号错乱
+    db.query(FxOrder).filter_by(order_no=f"{prefix}-0001").delete()
+    db.commit()
+    assert dist._next_order_no(db) == f"{prefix}-0004"

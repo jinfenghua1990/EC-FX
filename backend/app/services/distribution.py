@@ -422,9 +422,20 @@ def set_tier1_prices(db: Session, items: list[dict]) -> dict:
 
 # ---------------------------------------------------------------- 分销订单
 def _next_order_no(db: Session) -> str:
+    """订单号自动生成：FX + 日期 + 当天最大序号+1（如 FX20261027-0001）。
+
+    同时作为推送旺店通的 tid（原始单号），两边单号一致便于互查；
+    重推同单走 sales_trade_push 的 tid 更新语义，不会重复建单。
+    取最大序号而非条数，避免删单后序号回绕撞唯一约束。
+    """
     prefix = datetime.now().strftime("FX%Y%m%d")
-    count = db.scalar(select(func.count()).select_from(FxOrder).where(FxOrder.order_no.like(f"{prefix}-%"))) or 0
-    return f"{prefix}-{count + 1:04d}"
+    max_seq = 0
+    for no in db.scalars(select(FxOrder.order_no).where(FxOrder.order_no.like(f"{prefix}-%"))):
+        try:
+            max_seq = max(max_seq, int(str(no).rsplit("-", 1)[1]))
+        except (IndexError, ValueError):
+            continue
+    return f"{prefix}-{max_seq + 1:04d}"
 
 
 def price_map(db: Session, distributor_id: int) -> dict[int, Decimal]:
