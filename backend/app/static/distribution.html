@@ -308,6 +308,7 @@ toast{display:none}
         <select id="entryDist" style="width:190px" onchange="onEntryDistChange()" title="选分销商，价格自动套用专属价/一级价"></select>
         <select id="entryShop" style="width:200px" onchange="onEntryShopChange()" title="推送目标旺店通店铺；选择会记住，下次默认用它"></select>
         <input id="entrySearch" placeholder="搜索 SKU / 名称 / 条码" oninput="renderEntry()" style="width:190px">
+        <select id="entryCategory" style="width:120px" onchange="renderEntry()"></select>
         <select id="entryBrand" style="width:130px" onchange="renderEntry()"></select>
         <span id="entryStockBadge" class="inv-badge" title="现货 = 最新库存快照；未同步时点「分销订单」页的同步按钮">现货：加载中</span>
         <input id="entryRemark" placeholder="备注（选填）" style="width:200px">
@@ -320,9 +321,9 @@ toast{display:none}
       <div class="hint">价格自动取值：<b>经销商专属价 &gt; 一级分销价 &gt; 基础价</b>；数量按盒/基本单位填（箱规见列）。订单号自动生成并作为旺店通单号。<b>推送店铺在下拉里选</b>（会记住上次选择，记在订单上，重推不跑偏）。推送失败时订单仍会保留（已审核），到「分销订单」页可重推。</div>
       <div class="tbl">
         <table class="cols" data-ckey="entry">
-          <colgroup><col style="width:130px"><col style="width:240px"><col style="width:110px"><col style="width:100px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:110px"></colgroup>
+          <colgroup><col style="width:130px"><col style="width:230px"><col style="width:100px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:110px"></colgroup>
           <thead><tr>
-          <th>SKU</th><th>名称</th><th>规格</th><th>品牌</th><th class="num">单价(含税)</th><th class="num" title="最新库存快照数量；未同步显示 —">现货</th><th>箱规</th><th>下单数量</th><th class="num">小计</th>
+          <th>SKU</th><th>名称</th><th>规格</th><th>品牌</th><th>分类</th><th class="num">单价(含税)</th><th class="num" title="最新库存快照数量；未同步显示 —">现货</th><th>箱规</th><th>下单数量</th><th class="num">小计</th>
         </tr></thead><tbody id="entryBody"></tbody></table>
         <div class="empty" id="entryEmpty" style="display:none">没有可下单的商品：先在「商品」页签同步/启用商品，再回到这里下单。</div>
       </div>
@@ -570,6 +571,8 @@ function fillEntrySelects(){
     || `<option value="">（先到「分销商」页新建）</option>`;
   const brands = [...new Set(state.products.filter(p => p.active && p.brand).map(p => p.brand))].sort();
   $("entryBrand").innerHTML = `<option value="">全部品牌</option>` + brands.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join("");
+  const cats = [...new Set(state.products.filter(p => p.active && p.category).map(p => p.category))].sort();
+  $("entryCategory").innerHTML = `<option value="">全部分类</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
 }
 
 async function loadStockOverview(){
@@ -628,9 +631,11 @@ function renderEntry(){
   if (!$("entryBody")) return;
   const kw = ($("entrySearch").value || "").toLowerCase();
   const brand = $("entryBrand").value;
+  const cat = $("entryCategory").value;
   const rows = state.products.filter(p => p.active
     && (!kw || (p.sku + p.name + (p.barcode || "")).toLowerCase().includes(kw))
-    && (!brand || p.brand === brand));
+    && (!brand || p.brand === brand)
+    && (!cat || p.category === cat));
   $("entryEmpty").style.display = rows.length ? "none" : "";
   $("entryBody").innerHTML = rows.map(p => {
     const pr = entryPriceOf(p);
@@ -642,6 +647,7 @@ function renderEntry(){
     <td title="${esc(p.name)}">${esc(p.name)}</td>
     <td>${esc(p.spec) || "-"}</td>
     <td>${esc(p.brand) || "-"}</td>
+    <td>${esc(p.category) || "-"}</td>
     <td class="num">${pr.v > 0 ? pr.v.toFixed(2) : "—"}${pr.tag ? ` <span class="tag mini-tag" title="${pr.tag === "专属" ? "经销商专属价" : "一级分销价"}">${pr.tag}</span>` : ""}</td>
     <td class="num" style="${low ? "color:#e5484d;font-weight:600" : ""}">${stockText}</td>
     <td>${p.pack_qty > 0 ? p.pack_qty + "/" + esc(p.pack_unit || "箱") : "-"}</td>
