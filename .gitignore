@@ -6,7 +6,9 @@ compose.yaml
 
 # 运行数据与备份（含数据库、账单表格，不入库）
 data/
-backups/
+# backups/ 下只保留有历史价值的页面备份，其余运行备份不入库
+backups/*
+!backups/20261027-removed-modules.html
 .deploy/
 *.db
 *.sqlite*
