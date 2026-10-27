@@ -418,7 +418,6 @@ def list_orders(db: Session, status: str = "", distributor_id: int | None = None
         db.query(FxOrder)
         .options(selectinload(FxOrder.lines))
         .order_by(FxOrder.id.desc())
-        .limit(max(1, min(limit, 500)))
     )
     if status:
         if status not in FX_ORDER_STATUSES:
@@ -426,6 +425,7 @@ def list_orders(db: Session, status: str = "", distributor_id: int | None = None
         stmt = stmt.filter(FxOrder.status == status)
     if distributor_id:
         stmt = stmt.filter(FxOrder.distributor_id == int(distributor_id))
+    stmt = stmt.limit(max(1, min(limit, 500)))
     return [_order_view(row, with_lines=False) for row in stmt.all()]
 
 

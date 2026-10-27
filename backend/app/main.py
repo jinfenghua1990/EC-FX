@@ -1053,6 +1053,12 @@ def workbench_page():
     return FileResponse(STATIC_DIR / "workbench.html")
 
 
+@app.get("/coming-soon")
+def coming_soon_page():
+    # 统一占位页：菜单里已规划、但数据模型/接口尚未建立的功能
+    return FileResponse(STATIC_DIR / "coming-soon.html")
+
+
 @app.get("/shipments")
 def shipments_page():
     return FileResponse(STATIC_DIR / "shipments.html")

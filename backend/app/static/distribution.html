@@ -863,14 +863,16 @@ async function runImport(){
 
 $("oDist").onchange = () => refillAutoPrices();
 
+/* 外壳（shell.html）通过 ?tab=... 直接指定打开哪个子页；订单页可带 &status=...
+   不带参数时行为不变，仍默认「分销商」。 */
+const __q = new URLSearchParams(location.search);
+const __tab = __q.get("tab");
+const __status = __q.get("status");
+if (__tab === "orders" && __status) $("orderStatus").value = __status;
+
 loadAll();
 
-/* 外壳（shell.html）通过 ?tab=products 直接指定打开哪个子页；
-   不带参数时行为不变，仍默认「分销商」。 */
-(function () {
-  const t = new URLSearchParams(location.search).get("tab");
-  if (t && ["distributors", "products", "orders"].indexOf(t) >= 0) switchTab(t);
-})();
+if (__tab && ["distributors", "products", "orders", "prices", "statements"].indexOf(__tab) >= 0) switchTab(__tab);
 </script>
 </body>
 </html>

@@ -20,7 +20,7 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 .brand .logo{width:30px;height:30px;border-radius:9px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(36,99,235,.45)}
 .primary{display:flex;align-items:center;gap:2px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
 .primary::-webkit-scrollbar{display:none}
-.pitem{display:flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:9px;color:#c2cddd;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;border:0;background:transparent;font-family:inherit;transition:background .15s,color .15s}
+.pitem{display:flex;align-items:center;gap:6px;height:38px;padding:0 10px;border-radius:9px;color:#c2cddd;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;border:0;background:transparent;font-family:inherit;transition:background .15s,color .15s}
 .pitem:hover{background:var(--top-hover);color:#fff}
 .pitem.active{background:var(--top-active);color:#fff;font-weight:600;box-shadow:0 2px 10px rgba(36,99,235,.35)}
 .pitem .ic{font-size:15px;line-height:1}
@@ -41,6 +41,9 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 .sitem .ic{width:17px;text-align:center;font-size:14.5px;flex-shrink:0}
 .sitem:hover{background:#f2f5fb;color:var(--text)}
 .sitem.active{background:#eaf0fe;color:var(--blue);font-weight:650}
+.sitem .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sitem .badge{flex-shrink:0;margin-left:auto;font-size:10px;line-height:1;color:#98a2b3;background:#f2f4f7;border-radius:5px;padding:3px 5px}
+.sitem .badge.planned{color:#b54708;background:#fffaeb}
 .sitem.active::after{content:"";margin-left:auto;width:5px;height:5px;border-radius:50%;background:var(--blue)}
 .sideEmpty{padding:14px 12px;font-size:12.5px;color:var(--muted);line-height:1.7}
 
@@ -71,10 +74,19 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 .blank .big{font-size:34px;opacity:.35}
 .blank.hide{display:none}
 
+@media(max-width:1250px){
+  .brandname{display:none}
+  .ver{display:none}
+}
 @media(max-width:900px){
   .side{position:absolute;top:var(--top-h);bottom:0;left:0;z-index:15;box-shadow:6px 0 20px rgba(16,24,40,.12)}
   .brand{padding-right:10px}
   .brandname{display:none}
+  .pitem{padding:0 6px;font-size:12.5px;gap:4px}
+  .pitem .ic{display:none}
+}
+@media(max-width:800px){
+  .pitem{padding:0 4px;font-size:12px}
 }
 </style>
 </head>
@@ -120,26 +132,79 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 /* ============================================================
    菜单配置：顶部一级菜单 → 左侧二级菜单
    每点开一个二级菜单，就在标签栏新增一个 TAB（同一个只会开一次，不会重复） */
+/* 未实现功能统一进占位页：说明「待开发」，不建假页面、不放假数据 */
+const ph = (label, top, phase) => '/coming-soon?embed=1&label=' + encodeURIComponent(label)
+  + '&top=' + encodeURIComponent(top) + '&phase=' + encodeURIComponent(phase || '');
+
 const MENUS = [
   { key: 'workbench', label: '工作台', icon: '🏠', children: [
-    { key: 'wb-home', label: '核销工作台', icon: '📊', url: '/workbench?embed=1' },
+    { key: 'wb-overview', label: '经营总览', icon: '📊', url: '/workbench?embed=1' },
+    { key: 'wb-todo', label: '待办任务', icon: '✅', url: ph('待办任务', '工作台', 'P6'), planned: true, phase: 'P6' },
+    { key: 'wb-alerts', label: '异常预警', icon: '⚠️', url: ph('异常预警', '工作台', 'P6'), planned: true, phase: 'P6' },
+    { key: 'wb-recent', label: '最近访问', icon: '🕘', url: ph('最近访问', '工作台', 'P1'), planned: true, phase: 'P1' },
   ]},
-  { key: 'dist', label: '分销', icon: '🤝', children: [
-    { key: 'fx-distributors', label: '分销商', icon: '🏢', url: '/distribution?embed=1&tab=distributors' },
-    { key: 'fx-products', label: '商品', icon: '📦', url: '/distribution?embed=1&tab=products' },
-    { key: 'fx-orders', label: '分销订单', icon: '🧾', url: '/distribution?embed=1&tab=orders' },
+  { key: 'dist', label: '分销管理', icon: '🤝', children: [
+    { key: 'dist-archive', label: '分销商档案', icon: '🏢', url: '/distribution?embed=1&tab=distributors' },
+    { key: 'dist-apply', label: '分销商申请审核', icon: '📝', url: ph('分销商申请审核', '分销管理', 'P3'), planned: true, phase: 'P3' },
+    { key: 'dist-level', label: '分销商等级', icon: '🏅', url: ph('分销商等级', '分销管理', 'P2'), planned: true, phase: 'P2' },
+    { key: 'dist-region', label: '分销区域', icon: '🗺', url: ph('分销区域', '分销管理', 'P2'), planned: true, phase: 'P2' },
+    { key: 'dist-price', label: '分销价格', icon: '💰', url: '/distribution?embed=1&tab=prices' },
+    { key: 'dist-agreement', label: '分销协议', icon: '📄', url: ph('分销协议', '分销管理', 'P3'), planned: true, phase: 'P3' },
+    { key: 'dist-rebate', label: '返利政策', icon: '％', url: ph('返利政策', '分销管理', 'P4'), planned: true, phase: 'P4' },
+    { key: 'dist-statement', label: '对账管理', icon: '📑', url: '/distribution?embed=1&tab=statements' },
   ]},
-  { key: 'recon', label: '核销', icon: '🧮', children: [
-    { key: 'recon-sales', label: '销售出库', icon: '📤', url: '/sales-outbound?embed=1' },
+  { key: 'product', label: '商品管理', icon: '📦', children: [
+    { key: 'prod-archive', label: '商品档案', icon: '📦', url: '/distribution?embed=1&tab=products' },
+    { key: 'prod-category', label: '商品分类', icon: '🏷', url: ph('商品分类', '商品管理', 'P6'), planned: true, phase: 'P6' },
+    { key: 'prod-sku', label: 'SKU 管理', icon: '🔖', url: '/distribution?embed=1&tab=products', badge: '页内' },
+    { key: 'prod-shelf', label: '商品上下架', icon: '🔀', url: '/distribution?embed=1&tab=products', badge: '页内' },
+    { key: 'prod-catalog', label: '分销商品目录', icon: '📚', url: ph('分销商品目录', '商品管理', 'P6'), planned: true, phase: 'P6' },
+    { key: 'prod-stock', label: '商品库存与可供货状态', icon: '📊', url: ph('商品库存与可供货状态', '商品管理', 'P6'), planned: true, phase: 'P6' },
   ]},
-  { key: 'ship', label: '发货', icon: '🚚', children: [
-    { key: 'ship-detail', label: '发货明细', icon: '📦', url: '/shipments?embed=1' },
+  { key: 'order', label: '订单管理', icon: '🧾', children: [
+    { key: 'order-all', label: '分销订单', icon: '🧾', url: '/distribution?embed=1&tab=orders' },
+    { key: 'order-pending', label: '待审核订单', icon: '⏳', url: '/distribution?embed=1&tab=orders&status=submitted' },
+    { key: 'order-approved', label: '已审核订单', icon: '✅', url: '/distribution?embed=1&tab=orders&status=approved' },
+    { key: 'order-abnormal', label: '订单异常', icon: '⚠️', url: ph('订单异常', '订单管理', 'P6'), planned: true, phase: 'P6' },
+    { key: 'order-search', label: '订单查询', icon: '🔎', url: '/distribution?embed=1&tab=orders', badge: '页内' },
   ]},
-  { key: 'report', label: '报表', icon: '📈', children: [
-    { key: 'report-center', label: '报表中心', icon: '📊', url: '/reports?embed=1' },
+  { key: 'purchase', label: '采购与到货', icon: '🚛', children: [
+    { key: 'purchase-demand', label: '采购需求', icon: '📝', url: ph('采购需求', '采购与到货', 'P6'), planned: true, phase: 'P6' },
+    { key: 'purchase-link', label: '采购订单关联', icon: '🔗', url: ph('采购订单关联', '采购与到货', 'P6'), planned: true, phase: 'P6' },
+    { key: 'purchase-arrival', label: '到货登记', icon: '📥', url: ph('到货登记', '采购与到货', 'P6'), planned: true, phase: 'P6' },
+    { key: 'purchase-match', label: '到货匹配', icon: '🧩', url: ph('到货匹配', '采购与到货', 'P6'), planned: true, phase: 'P6' },
+    { key: 'purchase-abnormal', label: '到货异常', icon: '⚠️', url: ph('到货异常', '采购与到货', 'P6'), planned: true, phase: 'P6' },
   ]},
-  { key: 'system', label: '系统', icon: '⚙️', children: [
-    { key: 'system-update', label: '系统更新', icon: '🔄', url: '/workbench?embed=1#update' },
+  { key: 'ship', label: '发货管理', icon: '📮', children: [
+    { key: 'ship-todo', label: '待发货任务', icon: '⏳', url: ph('待发货任务', '发货管理', 'P6'), planned: true, phase: 'P6' },
+    { key: 'ship-outbound', label: '销售出库单', icon: '📤', url: '/sales-outbound?embed=1', badge: '历史' },
+    { key: 'ship-records', label: '发货记录', icon: '📦', url: '/shipments?embed=1', badge: '历史' },
+    { key: 'ship-tracking', label: '物流跟踪', icon: '🚚', url: ph('物流跟踪', '发货管理', 'P6'), planned: true, phase: 'P6' },
+    { key: 'ship-abnormal', label: '发货异常', icon: '⚠️', url: ph('发货异常', '发货管理', 'P6'), planned: true, phase: 'P6' },
+  ]},
+  { key: 'finance', label: '财务对账', icon: '💳', children: [
+    { key: 'fin-reconcile', label: '分销商对账', icon: '📑', url: '/distribution?embed=1&tab=statements' },
+    { key: 'fin-ar', label: '应收账款', icon: '💳', url: ph('应收账款', '财务对账', 'P4'), planned: true, phase: 'P4' },
+    { key: 'fin-rebate', label: '返利核算', icon: '％', url: ph('返利核算', '财务对账', 'P4'), planned: true, phase: 'P4' },
+    { key: 'fin-receipts', label: '收付款记录', icon: '💵', url: ph('收付款记录', '财务对账', 'P4'), planned: true, phase: 'P4' },
+    { key: 'fin-statement', label: '对账单管理', icon: '🗂', url: '/distribution?embed=1&tab=statements', badge: '部分' },
+  ]},
+  { key: 'report', label: '报表中心', icon: '📈', children: [
+    { key: 'report-dist-sales', label: '分销销售报表', icon: '📈', url: ph('分销销售报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
+    { key: 'report-product-sales', label: '商品销售报表', icon: '📦', url: ph('商品销售报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
+    { key: 'report-dist-ops', label: '分销商经营报表', icon: '🏢', url: ph('分销商经营报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
+    { key: 'report-stock-ship', label: '库存与发货报表', icon: '🚚', url: ph('库存与发货报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
+    { key: 'report-finance', label: '财务统计报表', icon: '💳', url: ph('财务统计报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
+    { key: 'report-legacy', label: '核销报表（历史）', icon: '🧮', url: '/reports?embed=1', badge: '历史' },
+  ]},
+  { key: 'system', label: '系统设置', icon: '⚙️', children: [
+    { key: 'sys-users', label: '用户与角色', icon: '👥', url: ph('用户与角色', '系统设置', 'P5'), planned: true, phase: 'P5' },
+    { key: 'sys-perms', label: '权限管理', icon: '🔐', url: ph('权限管理', '系统设置', 'P5'), planned: true, phase: 'P5' },
+    { key: 'sys-approval', label: '审核流程', icon: '🧭', url: ph('审核流程', '系统设置', 'P5'), planned: true, phase: 'P5' },
+    { key: 'sys-params', label: '系统参数', icon: '⚙️', url: ph('系统参数', '系统设置', 'P6'), planned: true, phase: 'P6' },
+    { key: 'sys-logs', label: '操作日志', icon: '📜', url: ph('操作日志', '系统设置', 'P5'), planned: true, phase: 'P5' },
+    { key: 'sys-integration', label: '数据接口配置', icon: '🔌', url: ph('数据接口配置', '系统设置', 'P6'), planned: true, phase: 'P6' },
+    { key: 'sys-update', label: '系统更新', icon: '🔄', url: '/workbench?embed=1#update' },
   ]},
 ];
 
@@ -154,7 +219,7 @@ function save() {
   try {
     sessionStorage.setItem(STORE_KEY, JSON.stringify({
       menu: state.menu, sideOpen: state.sideOpen,
-      tabs: state.tabs.map(t => ({ key: t.key, label: t.label, url: t.url })),
+      tabs: state.tabs.map(t => ({ key: t.key, label: t.label, url: t.url, menuKey: t.menuKey || '' })),
       active: state.active,
     }));
   } catch (e) { /* 隐私模式下忽略 */ }
@@ -167,7 +232,14 @@ function restore() {
     if (saved && typeof saved === 'object') {
       if (MENUS.some(m => m.key === saved.menu)) state.menu = saved.menu;
       state.sideOpen = saved.sideOpen !== false;
-      state.tabs = Array.isArray(saved.tabs) ? saved.tabs.filter(t => t && t.url) : [];
+      state.tabs = Array.isArray(saved.tabs)
+        ? saved.tabs.filter(t => t && t.url).map(t => ({
+            key: t.key || ('t' + Math.random().toString(36).slice(2, 8)),
+            label: t.label || '',
+            url: t.url,
+            menuKey: t.menuKey || '',
+          }))
+        : [];
       state.active = saved.active || '';
     }
   } catch (e) { /* 忽略坏数据 */ }
@@ -184,7 +256,7 @@ function findChild(key, url) {
   }
   return null;
 }
-function normUrl(u) { return String(u || '').split('#')[0]; }
+function normUrl(u) { return String(u || ''); }
 
 /* ---------- 渲染 ---------- */
 function renderPrimary() {
@@ -197,12 +269,16 @@ function renderPrimary() {
 function renderSecondary() {
   const menu = findMenu(state.menu);
   $('sideTitle').textContent = menu.label;
+  const activeTab = state.tabs.find(t => t.key === state.active);
   $('secondaryNav').innerHTML = menu.children.length
     ? menu.children.map(c => {
         const open = state.tabs.some(t => normUrl(t.url) === normUrl(c.url));
-        const active = state.active && state.tabs.some(t => t.key === state.active && normUrl(t.url) === normUrl(c.url));
+        const active = !!activeTab && (activeTab.menuKey ? activeTab.menuKey === c.key : normUrl(activeTab.url) === normUrl(c.url));
+        const badge = c.planned
+          ? `<span class="badge planned" title="计划 ${esc(c.phase || '')}">待开发</span>`
+          : (c.badge ? `<span class="badge">${esc(c.badge)}</span>` : '');
         return `<button class="sitem ${active ? 'active' : ''} ${open ? 'is-open' : ''}" onclick="openChild('${c.key}')">
-                  <span class="ic">${c.icon || '·'}</span>${esc(c.label)}
+                  <span class="ic">${c.icon || '·'}</span><span class="txt">${esc(c.label)}</span>${badge}
                 </button>`;
       }).join('')
     : `<div class="sideEmpty">这个菜单下暂时没有页面</div>`;
@@ -252,7 +328,13 @@ function openUrl(url, label, key) {
   if (!url) return;
   // 已经开过同一个地址 → 只切换，不重开（这是"避免页面反复跳"的核心）
   let tab = state.tabs.find(t => normUrl(t.url) === normUrl(url));
-  if (tab) { activate(tab.key); return; }
+  if (tab) {
+    // 同一页面可能有多个菜单别名（如商品档案 / SKU 管理），记住最后点的那个用于左栏高亮
+    if (key) tab.menuKey = key;
+    if (label) tab.label = label;
+    activate(tab.key);
+    return;
+  }
 
   const child = findChild(key || '', url);
   const id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
@@ -260,6 +342,7 @@ function openUrl(url, label, key) {
     key: id,
     label: label || (child && child.child.label) || guessLabel(url),
     url,
+    menuKey: key || (child && child.child.key) || '',
   };
   state.tabs.push(tab);
   mountFrame(tab);
@@ -268,8 +351,12 @@ function openUrl(url, label, key) {
 
 function guessLabel(url) {
   const path = normUrl(url).split('?')[0].replace(/\/$/, '') || '/';
-  const map = { '/': '首页', '/workbench': '核销工作台', '/distribution': '分销系统',
-                '/shipments': '发货明细', '/reports': '报表中心', '/sales-outbound': '销售出库' };
+  if (path === '/coming-soon') {
+    const q = new URLSearchParams(String(url).split('?')[1] || '');
+    return q.get('label') || '功能规划中';
+  }
+  const map = { '/': '首页', '/workbench': '经营总览', '/distribution': '分销管理',
+                '/shipments': '发货记录', '/reports': '核销报表（历史）', '/sales-outbound': '销售出库单' };
   return map[path] || path;
 }
 
@@ -291,8 +378,8 @@ function activate(key) {
   state.active = key;
   document.querySelectorAll('.frame').forEach(el => el.classList.toggle('active', el.id === 'f_' + key));
   renderTabs(); renderSecondary();
-  // 左菜单跟着高亮到对应一级/二级
-  const hit = findChild('', tab.url);
+  // 左菜单跟着高亮到对应一级/二级（有 menuKey 时以它为准，处理同 URL 的多个别名）
+  const hit = tab.menuKey ? findChild(tab.menuKey, null) : findChild('', tab.url);
   if (hit && hit.menu.key !== state.menu) { state.menu = hit.menu.key; renderPrimary(); renderSecondary(); }
   save();
 }

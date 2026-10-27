@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>功能规划中 · F/X 分销系统</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#f4f6fa;--card:#fff;--line:#e6ebf3;--text:#1c2740;--muted:#7b8798;--blue:#2463eb;--amber:#b54708;--amber-bg:#fffaeb}
+html,body{min-height:100%}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;background:var(--bg);color:var(--text);padding:32px 20px;overflow:auto}
+.card{width:100%;max-width:640px;margin:0 auto;background:var(--card);border:1px solid var(--line);border-radius:16px;padding:34px 36px 30px;box-shadow:0 12px 40px rgba(16,24,40,.06)}
+.icon{width:48px;height:48px;border-radius:14px;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:24px;margin-bottom:16px}
+h1{font-size:21px;letter-spacing:.2px;margin-bottom:8px}
+.path{font-size:13px;color:var(--muted);margin-bottom:18px}
+.path b{color:#475467;font-weight:600}
+.tag{display:inline-flex;align-items:center;gap:6px;font-size:12px;font-weight:600;color:var(--amber);background:var(--amber-bg);border:1px solid #fedf89;border-radius:999px;padding:4px 10px;margin-bottom:16px}
+p{font-size:13.5px;line-height:1.85;color:#475467}
+.note{margin-top:14px;padding:12px 14px;background:#f8fafc;border:1px solid var(--line);border-radius:10px;font-size:12.5px;line-height:1.8;color:var(--muted)}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:22px}
+button{font-family:inherit;font-size:13.5px;font-weight:600;border-radius:9px;padding:9px 16px;cursor:pointer;border:1px solid var(--line);background:#fff;color:#344054}
+button.primary{background:var(--blue);border-color:var(--blue);color:#fff;box-shadow:0 2px 8px rgba(36,99,235,.25)}
+button:hover{filter:brightness(.98)}
+</style>
+</head>
+<body>
+<main class="card">
+  <div class="icon">🗂</div>
+  <h1 id="title">功能规划中</h1>
+  <div class="path" id="path">F/X 分销系统</div>
+  <div class="tag">待开发 · 占位页</div>
+  <p>该菜单已纳入统一规划，但对应的数据模型、接口与页面尚未建立。本页只是占位说明，<b>不代表功能已经完成</b>，也不会展示任何虚构业务数据。</p>
+  <div class="note" id="note">开发阶段：待排期。功能上线后，本页会自动替换为正式页面。</div>
+  <div class="actions">
+    <button class="primary" onclick="go('/workbench?embed=1')">返回经营总览</button>
+    <button onclick="go('/distribution?embed=1&tab=distributors')">打开分销商档案</button>
+  </div>
+</main>
+<script src="/static/embed.js"></script>
+<script>
+(function () {
+  var q = new URLSearchParams(location.search);
+  var label = q.get("label") || "";
+  var top = q.get("top") || "";
+  var phase = q.get("phase") || "";
+  if (label) {
+    document.getElementById("title").textContent = label + " · 功能规划中";
+    document.title = label + " · 功能规划中 · F/X 分销系统";
+  }
+  if (top) {
+    var p = document.getElementById("path");
+    p.textContent = "";
+    var b = document.createElement("b");
+    b.textContent = top;
+    p.appendChild(b);
+    p.appendChild(document.createTextNode(" / " + (label || "未命名功能")));
+  }
+  if (phase) {
+    document.getElementById("note").textContent = "计划阶段：" + phase + "。当前数据模型与接口尚未建立；本页不展示任何业务数据。";
+  }
+})();
+function go(url) {
+  if (typeof window.fxNav === "function") window.fxNav(url);
+  else location.href = url;
+}
+</script>
+</body>
+</html>
