@@ -2,22 +2,30 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>F/X 分销系统</title>
+<title>红盒子供销平台</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
   --top:#1b2735; --top-hover:#26354a; --top-active:#2463eb;
   --bg:#f4f6fa; --card:#fff; --line:#e6ebf3; --line-soft:#eef2f8;
   --text:#1c2740; --muted:#7b8798; --blue:#2463eb; --green:#18a05e;
-  --top-h:56px; --tab-h:40px; --side-w:210px;
+  --top-h:56px; --tab-h:40px; --side-w:232px;
 }
 html,body{height:100%}
 body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
 
 /* ---------- 顶部一级菜单 ---------- */
 .topbar{height:var(--top-h);background:var(--top);display:flex;align-items:center;gap:4px;padding:0 14px 0 16px;flex-shrink:0;position:relative;z-index:20}
-.brand{display:flex;align-items:center;gap:9px;color:#fff;font-size:15.5px;font-weight:700;letter-spacing:.2px;padding-right:22px;white-space:nowrap}
+.brand{display:flex;align-items:center;gap:9px;color:#fff;font-size:15.5px;font-weight:700;letter-spacing:.2px;padding-right:14px;white-space:nowrap}
 .brand .logo{width:30px;height:30px;border-radius:9px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(36,99,235,.45)}
+/* 品牌维度切换：选中的品牌会成为全局上下文，所有标签页都按它过滤 */
+.brandpick{display:flex;align-items:center;gap:6px;height:30px;padding:0 6px 0 9px;margin-right:10px;border-radius:8px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);flex-shrink:0;transition:background .15s,border-color .15s}
+.brandpick:hover{background:rgba(255,255,255,.14)}
+.brandpick.on{background:rgba(36,99,235,.55);border-color:rgba(36,99,235,.75)}
+.brandpick .bp-ic{font-size:12.5px;line-height:1;opacity:.85}
+.brandpick select{background:transparent;border:0;color:#fff;font-size:12.5px;font-family:inherit;font-weight:600;max-width:132px;outline:none;cursor:pointer;padding:0;appearance:none;-webkit-appearance:none}
+.brandpick select option{color:#1c2740;background:#fff;font-weight:500}
+.brandpick .bp-arrow{font-size:9px;color:#a9b7ca;line-height:1;pointer-events:none}
 .primary{display:flex;align-items:center;gap:2px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
 .primary::-webkit-scrollbar{display:none}
 .pitem{display:flex;align-items:center;gap:6px;height:38px;padding:0 10px;border-radius:9px;color:#c2cddd;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;border:0;background:transparent;font-family:inherit;transition:background .15s,color .15s}
@@ -41,7 +49,7 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 .sitem .ic{width:17px;text-align:center;font-size:14.5px;flex-shrink:0}
 .sitem:hover{background:#f2f5fb;color:var(--text)}
 .sitem.active{background:#eaf0fe;color:var(--blue);font-weight:650}
-.sitem .txt{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.sitem .txt{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .sitem .badge{flex-shrink:0;margin-left:auto;font-size:10px;line-height:1;color:#98a2b3;background:#f2f4f7;border-radius:5px;padding:3px 5px}
 .sitem .badge.planned{color:#b54708;background:#fffaeb}
 .sitem.active::after{content:"";margin-left:auto;width:5px;height:5px;border-radius:50%;background:var(--blue)}
@@ -93,7 +101,14 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 <body>
 
 <header class="topbar">
-  <div class="brand"><span class="logo">🤝</span><span class="brandname">F/X 分销系统</span></div>
+  <div class="brand"><span class="logo">🤝</span><span class="brandname">红盒子供销平台</span></div>
+  <div class="brandpick" id="brandPick" title="选择品牌后，所有页面只处理这个品牌的数据">
+    <span class="bp-ic">🏷</span>
+    <select id="brandSelect" onchange="switchBrand(this.value)" aria-label="品牌">
+      <option value="">全部品牌</option>
+    </select>
+    <span class="bp-arrow">▾</span>
+  </div>
   <nav class="primary" id="primaryNav"></nav>
   <div class="topright">
     <span class="ver">v<b id="verText">--</b></span>
@@ -212,7 +227,70 @@ const STORE_KEY = 'fx_shell_state_v1';
 const $ = id => document.getElementById(id);
 const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-let state = { menu: 'workbench', sideOpen: true, tabs: [], active: '' };
+let state = { menu: 'workbench', sideOpen: true, tabs: [], active: '', brand: '' };
+
+/* ---------- 品牌维度：全局上下文 ----------
+   选中的品牌存在 sessionStorage，所有 iframe 打开时自动带上 ?brand=，
+   子页面（distribution / workbench / reports 等）自己按这个参数过滤。
+   tab.url 里始终存"干净地址"，品牌只在挂载 iframe 时拼上去，
+   这样切换品牌不会把标签去重逻辑搞乱。 */
+let brandList = [];
+
+function shortBrand(b) {
+  const s = String(b == null ? '' : b);
+  const i = s.indexOf('/');
+  return i > 0 ? s.slice(0, i) : s;
+}
+
+function withBrand(url, brand) {
+  if (!url) return url;
+  try {
+    const u = new URL(url, location.origin);
+    if (brand) u.searchParams.set('brand', brand);
+    else u.searchParams.delete('brand');
+    return u.pathname + (u.search || '') + (u.hash || '');
+  } catch (e) { return url; }
+}
+
+async function loadBrands() {
+  try {
+    const res = await fetch('/api/fx/brands');
+    const data = await res.json();
+    brandList = Array.isArray(data.brands) ? data.brands : [];
+  } catch (e) { brandList = []; }
+  renderBrandSelect();
+}
+
+function renderBrandSelect() {
+  const sel = $('brandSelect');
+  if (!sel) return;
+  const cur = state.brand || '';
+  sel.innerHTML = '<option value="">全部品牌</option>' + brandList.map(b => {
+    const name = esc(shortBrand(b.brand));
+    const sel0 = b.brand === cur ? ' selected' : '';
+    return `<option value="${esc(b.brand)}"${sel0}>${name}（${b.count}）</option>`;
+  }).join('');
+  // 选中的品牌如果已不在列表里（商品改名/停用），回落到「全部品牌」
+  if (cur && !brandList.some(b => b.brand === cur)) {
+    state.brand = '';
+    sel.value = '';
+    save();
+  }
+  const pick = $('brandPick');
+  if (pick) pick.classList.toggle('on', !!state.brand);
+}
+
+function switchBrand(value) {
+  state.brand = value || '';
+  save();
+  renderBrandSelect();
+  // 已打开的标签全部换到新品牌上下文
+  state.tabs.forEach(t => {
+    const box = $('f_' + t.key);
+    const f = box && box.querySelector('iframe');
+    if (f) f.src = withBrand(t.url, state.brand);
+  });
+}
 
 /* ---------- 存取记忆：刷新页面后标签还在，不迷路 ---------- */
 function save() {
@@ -221,6 +299,7 @@ function save() {
       menu: state.menu, sideOpen: state.sideOpen,
       tabs: state.tabs.map(t => ({ key: t.key, label: t.label, url: t.url, menuKey: t.menuKey || '' })),
       active: state.active,
+      brand: state.brand || '',
     }));
   } catch (e) { /* 隐私模式下忽略 */ }
 }
@@ -237,10 +316,11 @@ function restore() {
             key: t.key || ('t' + Math.random().toString(36).slice(2, 8)),
             label: t.label || '',
             url: t.url,
-            menuKey: t.menuKey || '',
+            menuKey: t.menuKey || (findChild('', t.url) && findChild('', t.url).child.key) || '',
           }))
         : [];
       state.active = saved.active || '';
+      state.brand = typeof saved.brand === 'string' ? saved.brand : '';
     }
   } catch (e) { /* 忽略坏数据 */ }
 }
@@ -277,7 +357,7 @@ function renderSecondary() {
         const badge = c.planned
           ? `<span class="badge planned" title="计划 ${esc(c.phase || '')}">待开发</span>`
           : (c.badge ? `<span class="badge">${esc(c.badge)}</span>` : '');
-        return `<button class="sitem ${active ? 'active' : ''} ${open ? 'is-open' : ''}" onclick="openChild('${c.key}')">
+        return `<button class="sitem ${active ? 'active' : ''} ${open ? 'is-open' : ''}" title="${esc(c.label)}${c.planned ? '（待开发）' : ''}" onclick="openChild('${c.key}')">
                   <span class="ic">${c.icon || '·'}</span><span class="txt">${esc(c.label)}</span>${badge}
                 </button>`;
       }).join('')
@@ -365,7 +445,7 @@ function mountFrame(tab) {
   box.className = 'frame';
   box.id = 'f_' + tab.key;
   const f = document.createElement('iframe');
-  f.src = tab.url;
+  f.src = withBrand(tab.url, state.brand);
   f.setAttribute('loading', 'eager');
   f.title = tab.label;
   box.appendChild(f);
@@ -412,7 +492,7 @@ function reloadActive() {
   if (!tab) return;
   const el = $('f_' + tab.key);
   const f = el && el.querySelector('iframe');
-  if (f) f.src = tab.url;
+  if (f) f.src = withBrand(tab.url, state.brand);
 }
 
 /* ---------- 左侧展开/收起 ---------- */
@@ -457,6 +537,9 @@ $('btnReloadTop').onclick = reloadActive;
 $('btnCloseAll').onclick = closeAll;
 
 window.addEventListener('beforeunload', save);
+
+// 品牌维度：拉取品牌清单填充顶栏切换器（失败不影响其他功能）
+loadBrands();
 
 // 版本号
 fetch('/api/system-update/status', { cache: 'no-store' })

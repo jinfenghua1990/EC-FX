@@ -1,4 +1,4 @@
-"""FX 分销系统（由电商核销中心升级）。
+"""红盒子供销平台：分销业务服务。
 
 第一版范围：
 - 分销商档案（增删改查 / 启停）
@@ -129,11 +129,31 @@ def toggle_distributor(db: Session, distributor_id: int) -> dict:
 
 
 # ---------------------------------------------------------------- 商品
-def list_products(db: Session, include_inactive: bool = True) -> list[dict]:
+def list_products(db: Session, include_inactive: bool = True, brand: str = "") -> list[dict]:
     stmt = select(FxProduct).order_by(FxProduct.id.desc())
     if not include_inactive:
         stmt = stmt.where(FxProduct.active == 1)
+    if brand:
+        stmt = stmt.where(FxProduct.brand == brand)
     return [_product_view(r) for r in db.scalars(stmt).all()]
+
+
+def list_brands(db: Session) -> list[dict]:
+    """按商品档案的品牌聚合，供顶部「品牌维度」切换器使用。
+
+    - 只统计在售商品：停用的历史商品不该在切换器里占一个入口。
+    - 空品牌不进列表：旺店通档案里没填品牌的商品只在「全部品牌」下出现。
+    - 按商品数倒序，同数量时按品牌名排，保证每次刷新顺序稳定。
+    """
+    rows = db.execute(
+        select(FxProduct.brand, func.count(FxProduct.id).label("cnt"))
+        .where(FxProduct.active == 1)
+        .where(FxProduct.brand.is_not(None))
+        .where(FxProduct.brand != "")
+        .group_by(FxProduct.brand)
+        .order_by(func.count(FxProduct.id).desc(), FxProduct.brand)
+    ).all()
+    return [{"brand": brand, "count": cnt} for brand, cnt in rows]
 
 
 def _product_view(row: FxProduct) -> dict:

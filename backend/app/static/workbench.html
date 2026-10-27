@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>核销工作台 · 电商核销中心</title>
+<title>核销工作台 · 红盒子供销平台</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -115,10 +115,10 @@ td .link{color:var(--blue);cursor:pointer;font-size:12.5px}
 <body>
 
 <aside class="sidebar">
-  <div class="brand"><span class="logo">🛒</span>电商核销中心</div>
+  <div class="brand"><span class="logo">🛒</span>红盒子供销平台</div>
   <nav class="nav" id="nav">
     <a class="active" href="/"><span class="ic">🏠</span>工作台</a>
-    <a href="/distribution"><span class="ic">🤝</span>分销系统</a>
+    <a href="/distribution"><span class="ic">🤝</span>分销管理</a>
     <a href="#" data-soon><span class="ic">💰</span>平台收入</a>
     <a href="/shipments"><span class="ic">🚚</span>发货明细</a>
     <a href="#" data-soon><span class="ic">📦</span>采购与库存</a>
@@ -407,6 +407,7 @@ async function updAutoCheck(){
   // 有任务在排队/执行时不打扰，避免覆盖进度信息。
   try{
     const s=await (await fetch('/api/system-update/status',{cache:'no-store'})).json();
+    if(s.github_configured===false){updRefresh();return}
     if(s.state==='queued'||s.state==='running')return;
     await updPost('/api/system-update/check');
     updRefresh();

@@ -23,8 +23,8 @@ def _detect_version() -> str:
 
 
 class Settings(BaseSettings):
-    app_name: str = "电商核销中心"
-    app_port: int = 8010
+    app_name: str = "红盒子供销平台"
+    app_port: int = 8050
     app_version: str = _detect_version()
     database_url: str = "sqlite:///./reconciliation.db"
     wdt_sid: str = ""

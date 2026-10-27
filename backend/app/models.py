@@ -280,7 +280,7 @@ class ManualAdjustment(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
-# --- FX 分销系统：核销中心升级，第一版数据模型 ---
+# --- 红盒子供销平台：分销业务数据模型 ---
 # 状态直接存字符串，展示层负责中文翻译；monetary 全部 Decimal。
 class FxDistributor(Base):
     __tablename__ = "fx_distributors"

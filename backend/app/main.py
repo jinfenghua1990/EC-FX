@@ -37,6 +37,7 @@ from .services.distribution import (
     FX_ORDER_STATUSES, STATUS_LABELS, create_distributor, create_order, create_product,
     delete_price, fx_overview, import_distributors, import_products,
     list_distributors, list_orders, list_prices, list_products, list_statements,
+    list_brands,
     order_detail, push_order_to_wangdian, set_price, statement_excel_bytes,
     transition_order, toggle_distributor, toggle_product, update_distributor,
     update_order, update_product,
@@ -130,6 +131,8 @@ def healthz():
 @app.get("/api/system-update/status")
 def system_update_status():
     data = get_update_status(current_version=settings.app_version, data_root=settings.system_update_data_root)
+    # 本地离线副本没有配置 GitHub 时，前端不要自动发起 check（否则每次打开更新中心都有 400 噪音）
+    data["github_configured"] = bool(settings.github_repo and settings.github_token)
     return data
 
 
@@ -807,7 +810,7 @@ def data_rebate_calculate(month: str = Query(pattern=r"^\d{4}-\d{2}$"), db: Sess
     return calculate_purchase_rebate(db, month)
 
 
-# ============ FX 分销系统（由核销中心升级） ============
+# ============ 红盒子供销平台（原分销系统） ============
 @app.get("/api/fx/overview")
 def fx_system_overview(db: Session = Depends(get_db)):
     return fx_overview(db)
@@ -844,8 +847,14 @@ def fx_distributor_toggle(distributor_id: int, db: Session = Depends(get_db)):
 
 
 @app.get("/api/fx/products")
-def fx_products(include_inactive: int = 1, db: Session = Depends(get_db)):
-    return {"products": list_products(db, include_inactive=bool(include_inactive))}
+def fx_products(include_inactive: int = 1, brand: str = "", db: Session = Depends(get_db)):
+    return {"products": list_products(db, include_inactive=bool(include_inactive), brand=brand)}
+
+
+@app.get("/api/fx/brands")
+def fx_brands(db: Session = Depends(get_db)):
+    """顶部「品牌维度」切换器的数据源：品牌名 + 在售商品数。"""
+    return {"brands": list_brands(db)}
 
 
 @app.post("/api/fx/products")
@@ -1076,7 +1085,7 @@ def sales_outbound_page():
 
 @app.get("/distribution")
 def distribution_page():
-    # FX 分销系统（升级中的主模块）
+    # 红盒子供销平台：分销管理主模块
     return FileResponse(STATIC_DIR / "distribution.html")
 
 

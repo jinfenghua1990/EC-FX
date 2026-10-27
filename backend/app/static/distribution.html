@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>分销系统 · F/X</title>
+<title>分销管理 · 红盒子供销平台</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -109,10 +109,10 @@ toast{display:none}
 <body>
 
 <aside class="sidebar">
-  <div class="brand"><span class="logo">🤝</span>F/X 分销系统</div>
+  <div class="brand"><span class="logo">🤝</span>红盒子供销平台</div>
   <nav class="nav" id="nav">
     <a href="/"><span class="ic">🏠</span>工作台</a>
-    <a class="active" href="/distribution"><span class="ic">🤝</span>分销系统</a>
+    <a class="active" href="/distribution"><span class="ic">🤝</span>分销管理</a>
     <a href="/shipments"><span class="ic">🚚</span>发货明细</a>
     <a href="/sales-outbound"><span class="ic">📤</span>销售出库</a>
     <a href="/reports"><span class="ic">📊</span>报表中心</a>
@@ -121,7 +121,7 @@ toast{display:none}
 
 <div class="main">
   <div class="topbar">
-    <div class="crumbs">F/X 分销系统&nbsp;/&nbsp;<b id="crumbTab">分销商</b></div>
+    <div class="crumbs">红盒子供销平台&nbsp;/&nbsp;<b id="crumbTab">分销商</b></div>
     <div class="topright">
       <span>端口 <b>8050</b></span>
       <span>版本 <b id="topVersion">--</b></span>
@@ -130,8 +130,8 @@ toast{display:none}
   </div>
 
   <div class="content">
-    <h1 class="page">分销系统</h1>
-    <div class="subtitle">由电商核销中心升级而来 · 分销商 — 商品 — 订单审核，后续继续在此扩建</div>
+    <h1 class="page">分销管理</h1>
+    <div class="subtitle">红盒子供销平台 · 分销商 — 商品 — 订单审核，后续继续在此扩建</div>
 
     <div class="stats" id="stats"></div>
 
@@ -160,15 +160,15 @@ toast{display:none}
     <!-- 商品 -->
     <div class="card" id="panel-products" style="display:none">
       <div class="head">
-        <h3>商品目录（基础价）</h3>
-        <input id="prodSearch" placeholder="搜索 SKU / 名称 / 条码" oninput="renderProducts()" style="width:200px">
+        <h3>商品目录（基础价）<span id="prodBrandTag" class="tag" style="display:none;margin-left:8px"></span></h3>
+        <input id="prodSearch" placeholder="搜索 SKU / 名称 / 条码 / 品牌" oninput="renderProducts()" style="width:220px">
         <button class="btn" id="btnWdtSync" onclick="syncWdtProducts()" title="从旺店通商品档案拉取货品与规格">⟳ 从旺店通同步</button>
         <button class="btn" onclick="openImportModal('prod')">⇪ 批量导入</button>
         <button class="btn primary" onclick="openProdModal()">＋ 新建商品</button>
       </div>
       <div class="hint" id="wdtSyncHint" style="display:none"></div>
       <table><thead><tr>
-        <th>SKU</th><th>名称</th><th>规格</th><th>分类</th><th>条码</th><th>单位</th><th>基础价</th><th>来源</th><th>状态</th><th style="width:130px">操作</th>
+        <th>SKU</th><th>名称</th><th>规格</th><th>品牌</th><th>分类</th><th>条码</th><th>单位</th><th>基础价</th><th>来源</th><th>状态</th><th style="width:130px">操作</th>
       </tr></thead><tbody id="prodBody"></tbody></table>
       <div class="empty" id="prodEmpty" style="display:none">还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。</div>
     </div>
@@ -314,7 +314,9 @@ toast{display:none}
 "use strict";
 const state = { distributors: [], products: [], orders: [], overview: null, tab: "distributors",
   distEditId: null, prodEditId: null, orderEditId: null,
-  prices: [], statement: null, priceCache: {} };
+  prices: [], statement: null, priceCache: {},
+  // 品牌维度：由外壳顶栏的品牌切换器通过 iframe 地址传入，空值表示「全部品牌」
+  brand: new URLSearchParams(location.search).get("brand") || "" };
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -416,12 +418,24 @@ async function toggleDist(id){
 /* ---------- 商品 ---------- */
 function renderProducts(){
   const kw = ($("prodSearch").value || "").toLowerCase();
-  const body = $("prodBody"), empty = $("prodEmpty");
-  const rows = state.products.filter(p => !kw ||
-    ((p.sku||"") + (p.name||"") + (p.spec||"") + (p.barcode||"") + (p.category||"")).toLowerCase().includes(kw));
+  const body = $("prodBody"), empty = $("prodEmpty"), tag = $("prodBrandTag");
+  // 品牌维度：顶栏选了品牌就只展示该品牌商品，并在标题旁标出来
+  if (tag) {
+    if (state.brand) { tag.style.display = ""; tag.textContent = "品牌：" + state.brand; }
+    else { tag.style.display = "none"; tag.textContent = ""; }
+  }
+  const rows = state.products.filter(p => {
+    if (state.brand && (p.brand || "") !== state.brand) return false;
+    if (!kw) return true;
+    return ((p.sku||"") + (p.name||"") + (p.spec||"") + (p.barcode||"") + (p.category||"") + (p.brand||"")).toLowerCase().includes(kw);
+  });
   empty.style.display = rows.length ? "none" : "";
+  empty.textContent = state.brand
+    ? `「${state.brand}」下没有符合条件的商品。点顶栏品牌切换器选「全部品牌」可看全部 ${state.products.length} 个商品。`
+    : "还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。";
   body.innerHTML = rows.map(p => `<tr>
     <td><b>${esc(p.sku)}</b></td><td>${esc(p.name)}</td><td>${esc(p.spec) || "-"}</td>
+    <td>${esc(p.brand) || "-"}</td>
     <td>${esc(p.category) || "-"}</td><td>${esc(p.barcode) || "-"}</td><td>${esc(p.unit)}</td>
     <td class="num">${money(p.base_price)}</td>
     <td>${p.source === "wdt" ? '<span class="tag on">旺店通</span>' : '<span class="tag">手工</span>'}</td>
