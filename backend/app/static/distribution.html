@@ -109,6 +109,27 @@ table.cols tbody tr.dirty td:last-child{background:#fff8e7}
 .colgrip::after{content:"";position:absolute;top:0;right:0;width:2px;height:100%;background:transparent}
 .colgrip:hover::after,.colgrip.on::after{background:#3b6ef6}
 body.col-resizing{cursor:col-resize;user-select:none}
+/* 列拖动排序：拖表头整格 = 换位置（拖最右边的细把手 = 改列宽，两边互不干扰） */
+table.cols th.col-drag{cursor:grab}
+table.cols th.col-dragging{opacity:.4;background:#eef4ff}
+table.cols th.drop-l{box-shadow:inset 3px 0 0 #2463eb,inset -1px 0 0 #e8edf6,inset 0 -1px 0 var(--line)}
+table.cols th.drop-r{box-shadow:inset -3px 0 0 #2463eb,inset -1px 0 0 #e8edf6,inset 0 -1px 0 var(--line)}
+/* 列顺序换过之后「操作」不一定是最后一列了，按实际最后一列固定右侧 */
+table.cols th.col-last,table.cols td.col-last{position:sticky;right:0;z-index:4}
+table.cols td.col-last{background:#fff;box-shadow:inset 1px 0 0 var(--line)}
+table.cols th.col-last{background:#f7f9fc;box-shadow:inset 1px 0 0 var(--line),inset 0 -1px 0 var(--line)}
+table.cols tbody tr:hover td.col-last{background:#fafbfe}
+table.cols tbody tr.dirty td.col-last{background:#fff8e7}
+/* 列设置面板：显示/隐藏 + 上下移动 */
+.colset-row{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed #eef1f6}
+.colset-row:last-child{border-bottom:0}
+.colset-row .nm{flex:1;font-size:13px}
+.colset-row .nm.off{color:#b6bfcc;text-decoration:line-through}
+.colset-row .mv{display:inline-flex;gap:4px}
+.colset-row button{width:28px;min-height:26px;padding:0;border:1px solid #d8dee9;border-radius:6px;background:#fff;color:#5b6778;font-size:12px;cursor:pointer}
+.colset-row button:hover{border-color:#2463eb;color:#2463eb}
+.colset-row button:disabled{opacity:.3;cursor:default;border-color:#e6eaf1;color:#b6bfcc}
+.colset-row input{width:15px;height:15px;accent-color:#2463eb;cursor:pointer}
 .tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
 .mini-tag{padding:1px 6px;font-size:10px;background:#eef4ff;color:#2463eb;margin-left:4px;vertical-align:1px}
 .tag.draft{background:#eef1f6;color:#5b6778}
@@ -261,7 +282,7 @@ toast{display:none}
         <table class="cols" data-ckey="dist">
           <colgroup><col style="width:110px"><col style="width:240px"><col style="width:90px"><col style="width:135px"><col style="width:120px"><col style="width:80px"><col style="width:140px"></colgroup>
           <thead><tr>
-          <th>编码</th><th>名称</th><th>联系人</th><th>电话</th><th>区域</th><th>状态</th><th>操作</th>
+          <th data-col="code">编码</th><th data-col="name">名称</th><th data-col="contact">联系人</th><th data-col="phone">电话</th><th data-col="region">区域</th><th data-col="status">状态</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="distBody"></tbody></table>
         <div class="empty" id="distEmpty" style="display:none">还没有分销商，点右上角「新建分销商」开始</div>
       </div>
@@ -293,10 +314,10 @@ toast{display:none}
       <div class="needbar" id="prodNeed" style="display:none"></div>
       <div class="tbl">
         <table class="cols" data-ckey="prod">
-          <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:120px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:60px"><col style="width:130px"></colgroup>
+          <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:110px"><col style="width:120px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:80px"><col style="width:60px"><col style="width:130px"></colgroup>
           <thead><tr>
-          <th title="勾选后用上方「按标价×折扣设一级价」批量定价"><input type="checkbox" id="prodSelAll" onchange="toggleAllProd(this)"></th>
-          <th>SKU</th><th>名称</th><th class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">品牌标价(含税)</th><th class="num">采购价(含税)</th><th>一级分销价(含税)</th><th class="num" title="一级分销箱价 = 一级分销价 × 箱规；未定价或没箱规显示 —">一级箱价(含税)</th><th>品牌</th><th>分类</th><th>条码</th><th>单位</th><th>箱规</th><th>状态</th><th>操作</th>
+          <th data-col="ck" title="勾选后用上方「按标价×折扣设一级价」批量定价"><input type="checkbox" id="prodSelAll" onchange="toggleAllProd(this)"></th>
+          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="list" class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">品牌标价(含税)</th><th data-col="purchase" class="num">采购价(含税)</th><th data-col="tier1">一级分销价(含税)</th><th data-col="tierbox" class="num" title="一级分销箱价 = 一级分销价 × 箱规；未定价或没箱规显示 —">一级箱价(含税)</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="barcode">条码</th><th data-col="unit">单位</th><th data-col="pack">箱规</th><th data-col="source" title="这个商品是哪儿来的：旺店通同步 / 手工建 / 导入">来源</th><th data-col="status">状态</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="prodBody"></tbody></table>
         <div class="empty" id="prodEmpty" style="display:none">还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。</div>
       </div>
@@ -324,7 +345,7 @@ toast{display:none}
         <table class="cols" data-ckey="entry">
           <colgroup><col style="width:130px"><col style="width:230px"><col style="width:100px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:110px"></colgroup>
           <thead><tr>
-          <th>SKU</th><th>名称</th><th>规格</th><th>品牌</th><th>分类</th><th class="num">单价(含税)</th><th class="num" title="最新库存快照数量；未同步显示 —">现货</th><th>箱规</th><th>下单数量</th><th class="num">小计</th>
+          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="price" class="num">单价(含税)</th><th data-col="stock" class="num" title="最新库存快照数量；未同步显示 —">现货</th><th data-col="pack">箱规</th><th data-col="qty">下单数量</th><th data-col="amount" class="num">小计</th>
         </tr></thead><tbody id="entryBody"></tbody></table>
         <div class="empty" id="entryEmpty" style="display:none">没有可下单的商品：先在「商品」页签同步/启用商品，再回到这里下单。</div>
       </div>
@@ -350,7 +371,7 @@ toast{display:none}
         <table class="cols" data-ckey="order">
           <colgroup><col style="width:170px"><col style="width:240px"><col style="width:90px"><col style="width:110px"><col style="width:70px"><col style="width:150px"><col style="width:190px"></colgroup>
           <thead><tr>
-          <th>订单号</th><th>分销商</th><th>状态</th><th class="num">金额</th><th class="num">明细</th><th>下单时间</th><th>操作</th>
+          <th data-col="tid">订单号</th><th data-col="dist">分销商</th><th data-col="status">状态</th><th data-col="amount" class="num">金额</th><th data-col="lines" class="num">明细</th><th data-col="date">下单时间</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="orderBody"></tbody></table>
         <div class="empty" id="orderEmpty" style="display:none">还没有订单</div>
       </div>
@@ -368,7 +389,7 @@ toast{display:none}
         <table class="cols" data-ckey="price">
           <colgroup><col style="width:130px"><col style="width:220px"><col style="width:100px"><col style="width:58px"><col style="width:120px"><col style="width:112px"><col style="width:120px"><col style="width:150px"><col style="width:90px"></colgroup>
           <thead><tr>
-          <th>SKU</th><th>名称</th><th>规格</th><th>单位</th><th class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">标价(含税)</th><th class="num">采购价(含税)</th><th class="num">一级分销价(含税)</th><th>经销商专属价</th><th></th>
+          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="spec">规格</th><th data-col="unit">单位</th><th data-col="list" class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">标价(含税)</th><th data-col="purchase" class="num">采购价(含税)</th><th data-col="tier1" class="num">一级分销价(含税)</th><th data-col="dealer">经销商专属价</th><th data-col="ops"></th>
         </tr></thead><tbody id="priceBody"></tbody></table>
         <div class="empty" id="priceEmpty" style="display:none">请先在上方选择分销商（分销商或商品为空时，先到对应标签页创建）</div>
       </div>
@@ -486,6 +507,19 @@ toast{display:none}
   <div class="mf">
     <button class="btn" onclick="closeModal('importModal')">取消</button>
     <button class="btn primary" onclick="runImport()">导入</button>
+  </div>
+</div></div>
+
+<!-- 列设置：顺序 + 显示/隐藏 -->
+<div class="backdrop" id="colModal"><div class="modal sm">
+  <div class="mh"><h2>调整列 · <span id="colModalTitle"></span></h2><button class="btn" onclick="closeModal('colModal')">✕</button></div>
+  <div class="mb">
+    <div class="hint">勾选 = 显示这一列；↑↓ = 挪位置。也可以直接<b>按住表头左右拖动</b>换位置。设置记在这台电脑上，下次打开还在。</div>
+    <div id="colModalBody"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="resetColSettings()">恢复默认</button>
+    <button class="btn primary" onclick="closeModal('colModal')">完成</button>
   </div>
 </div></div>
 
@@ -641,6 +675,7 @@ function renderEntry(){
     <td class="num sub">—</td>
   </tr>`;
   }).join("");
+  applyColOrder(tableOf("entry"));
   entryRecalc();
 }
 
@@ -701,6 +736,7 @@ function renderDistributors(){
       <button class="btn mini" onclick='openDistModal(${d.id})'>编辑</button>
       <button class="btn mini ${d.active ? "danger" : ""}" onclick="toggleDist(${d.id})">${d.active ? "停用" : "启用"}</button>
     </td></tr>`).join("");
+  applyColOrder(tableOf("dist"));
 }
 
 function openDistModal(id){
@@ -861,9 +897,11 @@ function renderProducts(){
       <span class="tier-margin ${m.cls}" title="${m.tip}">${m.text}</span>${rateCell}
     </td>
     <td class="num tier-box-cell">${boxCell}</td>
+    <td title="${esc(p.spec)}">${esc(p.spec) || "-"}</td>
     <td>${esc(p.brand) || "-"}</td>
     <td>${esc(p.category) || "-"}</td><td>${esc(p.barcode) || "-"}</td><td>${esc(p.unit)}</td>
     <td>${esc(p.pack_spec) || "—"}</td>
+    <td title="${esc(p.source) || ""}">${sourceLabel(p.source)}</td>
     <td>${p.cost_status === "pending"
       ? `<span class="tag warn" title="${esc(p.cost_note || "采购价存疑，待核对")}">待核对</span>`
       : `<span class="tag ${p.active ? "on" : "off"}">${p.active ? "在售" : "停用"}</span>`}</td>
@@ -875,7 +913,13 @@ function renderProducts(){
   refreshTierDirty();
   // 重新渲染后勾选已清空，把「已选 N」工具条同步回隐藏，避免挂着旧数字
   onProdCheck();
+  applyColOrder(tableOf("prod"));  // 行重建了，把列的顺序/显隐重新套一遍
 }
+
+/* 来源列：库里存的是英文 key（wdt=旺店通同步 / manual=手工建 / import=导入），
+   页面显示中文，悬浮保留原值方便排查。默认隐藏，在「⚙ 列」里可以勾回来。 */
+const SOURCE_LABELS = { wdt: "旺店通同步", wdt_api: "旺店通同步", manual: "手工建", import: "导入", excel: "导入" };
+function sourceLabel(s){ const k = (s || "").trim(); return SOURCE_LABELS[k] || (k || "—"); }
 
 /* 采购价单元格：真实付款价（含税/基本单位），来自旺店通采购单。
    用户口径：采购单价格 = 开盘价，上下 1 元属于正常浮动，超过 1 元才算真差异。
@@ -1373,6 +1417,7 @@ function renderOrders(){
       <td class="num">${o.line_count}</td><td>${esc(o.order_date)}</td>
       <td class="ops">${ops.join("")}</td></tr>`;
   }).join("");
+  applyColOrder(tableOf("order"));
 }
 
 function addLineRow(data){
@@ -1612,6 +1657,7 @@ async function loadPrices(){
       <td class="ops">${orig ? `<button class="btn mini" onclick="clearPrice(${p.id})">恢复品标价</button>` : ""}</td>
     </tr>`;
   }).join("");
+  applyColOrder(tableOf("price"));
 }
 
 function markDirtyRow(input){
@@ -1753,41 +1799,124 @@ async function runImport(){
   } catch (e) { showError("importErr", e.message); }
 }
 
-/* ---------- 列宽：拖表头分隔线调整 + 记住设置 ---------- */
-/* key 带版本号：列顺序调整过（价格列前移），旧的列宽记录不再对应，v2 重新记 */
-const COLW_KEY = "fx_colw_v2";
-let colwStore = {};
-try { colwStore = JSON.parse(localStorage.getItem(COLW_KEY) || "{}") || {}; } catch (e) { colwStore = {}; }
+/* ---------- 表格列：拖动换位置 / 显示隐藏 / 拖宽度，设置都会记住 ---------- */
+/* 三套设置全部按「列名」存，不按下标存 —— 列一动下标就错位，按列名存才不会串。 */
+const COLW_KEY = "fx_colw_v3";     // 列宽：{表名: {列名: 像素}}
+const COLO_KEY = "fx_colorder_v1"; // 列顺序：{表名: [列名...]}
+const COLH_KEY = "fx_colhide_v1";  // 隐藏的列：{表名: [列名...]}
+/* 默认不显示的列（数据在后端都在，页面上收起来，需要时自己在「⚙ 列」里勾回来） */
+const DEFAULT_HIDE = { prod: ["spec", "source"] };
+const COLSET_NAMES = { prod: "商品目录", entry: "分销下单", order: "分销订单", dist: "分销商", price: "经销商价格" };
+let colwStore = {}, colOrderStore = {}, colHideStore = {};
+try {
+  colwStore = JSON.parse(localStorage.getItem(COLW_KEY) || "{}") || {};
+  colOrderStore = JSON.parse(localStorage.getItem(COLO_KEY) || "{}") || {};
+  colHideStore = JSON.parse(localStorage.getItem(COLH_KEY) || "{}") || {};
+} catch (e) { colwStore = {}; colOrderStore = {}; colHideStore = {}; }
 const saveColw = () => { try { localStorage.setItem(COLW_KEY, JSON.stringify(colwStore)); } catch (e) {} };
+const saveColOrder = () => { try { localStorage.setItem(COLO_KEY, JSON.stringify(colOrderStore)); } catch (e) {} };
+const saveColHide = () => { try { localStorage.setItem(COLH_KEY, JSON.stringify(colHideStore)); } catch (e) {} };
+
 const colEls = table => [...table.querySelectorAll("colgroup > col")];
+const thEls = table => [...table.querySelectorAll("thead th")];
+const ckeyOf = table => table.dataset.ckey || "";
+const keyOf = (th, i) => (th && th.dataset ? (th.dataset.col || "") : "") || ("c" + i);
+const pxOf = v => parseFloat(v) || 0;
+const tableOf = ckey => document.querySelector(`table.cols[data-ckey="${ckey}"]`);
+function domKeys(table){ return thEls(table).map(keyOf); }
+function hiddenSet(table){
+  const ckey = ckeyOf(table), saved = colHideStore[ckey];
+  return new Set(Array.isArray(saved) ? saved : (DEFAULT_HIDE[ckey] || []));
+}
+
+/* 按记住的顺序重排：表头、colgroup、每一行的数据格必须一起动，否则列就错位了 */
+function applyColOrder(table){
+  const ckey = ckeyOf(table); if (!ckey) return;
+  const ths = thEls(table); if (!ths.length) return;
+  const keys = ths.map(keyOf);
+  let saved = colOrderStore[ckey];
+  if (!Array.isArray(saved) || !saved.length) saved = (table.dataset.order0 || "").split(",").filter(Boolean);
+  let perm = keys.map((_, i) => i);
+  if (saved.length) {
+    const idx = new Map(keys.map((k, i) => [k, i]));
+    const seen = new Set(), p = [];
+    saved.forEach(k => { if (idx.has(k) && !seen.has(k)) { seen.add(k); p.push(idx.get(k)); } });
+    keys.forEach((k, i) => { if (!seen.has(k)) { seen.add(k); p.push(i); } }); // 后加的新列排在末尾
+    perm = p;
+  }
+  if (perm.some((v, i) => v !== i)) {
+    const cols = colEls(table), headRow = table.querySelector("thead tr"), cg = table.querySelector("colgroup");
+    perm.forEach(i => headRow.appendChild(ths[i]));
+    if (cg && cols.length === ths.length) perm.forEach(i => cg.appendChild(cols[i]));
+    table.querySelectorAll("tbody tr").forEach(tr => {
+      const tds = [...tr.children];
+      if (tds.length !== ths.length) return;
+      perm.forEach(i => tr.appendChild(tds[i]));
+    });
+  }
+  applyColVis(table);
+}
+
+/* 隐藏列：表头与数据格都藏掉，对应 col 宽度归零 */
+function applyColVis(table){
+  const ths = thEls(table), cols = colEls(table), hide = hiddenSet(table);
+  ths.forEach((th, i) => {
+    const off = hide.has(keyOf(th, i));
+    th.style.display = off ? "none" : "";
+    if (cols[i]) cols[i].style.width = off ? "0px" : (cols[i].dataset.w || cols[i].style.width || "");
+  });
+  table.querySelectorAll("tbody tr").forEach(tr => {
+    [...tr.children].forEach((td, i) => { td.style.display = hide.has(keyOf(ths[i], i)) ? "none" : ""; });
+  });
+  markLastCol(table);
+  applySavedWidths(table);
+}
+
+/* 最后一列（可见的）固定在右侧，横向滚动时操作按钮不会被盖住 */
+function markLastCol(table){
+  const ths = thEls(table), hide = hiddenSet(table);
+  ths.forEach(th => th.classList.remove("col-last"));
+  table.querySelectorAll("tbody tr").forEach(tr => [...tr.children].forEach(td => td.classList.remove("col-last")));
+  for (let i = ths.length - 1; i >= 0; i--) {
+    if (hide.has(keyOf(ths[i], i))) continue;
+    ths[i].classList.add("col-last");
+    table.querySelectorAll("tbody tr").forEach(tr => { if (tr.children[i]) tr.children[i].classList.add("col-last"); });
+    break;
+  }
+}
 
 function setColWidths(table, widths){
-  const cols = colEls(table), w = widths.map(v => Math.max(48, Math.round(v)));
-  cols.forEach((c, i) => { if (w[i]) c.style.width = w[i] + "px"; });
-  const total = w.reduce((a, b) => a + b, 0);
+  const cols = colEls(table), ths = thEls(table), hide = hiddenSet(table);
+  let total = 0;
+  ths.forEach((th, i) => {
+    if (!cols[i]) return;
+    const k = keyOf(th, i), w = Math.max(48, Math.round(widths[i] || 0));
+    if (hide.has(k)) { cols[i].style.width = "0px"; return; }
+    cols[i].style.width = w + "px"; total += w;
+  });
   // 一旦手工调过，就按像素定宽：拖谁就是谁，不会再被容器按比例拉伸
   table.style.width = total + "px";
   table.style.minWidth = total + "px";
 }
 
 function applySavedWidths(table){
-  const saved = colwStore[table.dataset.ckey];
-  if (saved && saved.length === colEls(table).length) setColWidths(table, saved);
+  const saved = colwStore[ckeyOf(table)];
+  if (!saved || typeof saved !== "object") return;  // 没手工调过就保持自适应 100%
+  const ths = thEls(table), cols = colEls(table);
+  setColWidths(table, ths.map((th, i) => saved[keyOf(th, i)] || pxOf(cols[i] && cols[i].dataset.w) || 100));
 }
 
 function resetColWidths(table){
-  delete colwStore[table.dataset.ckey];
-  saveColw();
+  delete colwStore[ckeyOf(table)]; saveColw();
   table.style.width = ""; table.style.minWidth = "";
   colEls(table).forEach(c => { if (c.dataset.w) c.style.width = c.dataset.w; });
 }
 
-function thWidths(table){
-  return [...table.querySelectorAll("thead th")].map(th => th.getBoundingClientRect().width);
-}
+function thWidths(table){ return thEls(table).map(th => th.getBoundingClientRect().width); }
 
-function startColDrag(ev, table, idx, grip){
+function startColDrag(ev, table, th, grip){
   ev.preventDefault(); ev.stopPropagation();
+  const idx = thEls(table).indexOf(th);
   const widths = thWidths(table), startX = ev.clientX, startW = widths[idx] || 100;
   grip.classList.add("on"); document.body.classList.add("col-resizing");
   const move = e => { widths[idx] = Math.max(48, startW + (e.clientX - startX)); setColWidths(table, widths); };
@@ -1795,27 +1924,151 @@ function startColDrag(ev, table, idx, grip){
     grip.classList.remove("on"); document.body.classList.remove("col-resizing");
     document.removeEventListener("mousemove", move);
     document.removeEventListener("mouseup", up);
-    colwStore[table.dataset.ckey] = widths.map(v => Math.round(v));
-    saveColw();
+    const obj = {};
+    thEls(table).forEach((t, i) => { obj[keyOf(t, i)] = Math.round(widths[i] || 0); });
+    colwStore[ckeyOf(table)] = obj; saveColw();
   };
   document.addEventListener("mousemove", move);
   document.addEventListener("mouseup", up);
 }
 
+/* ---------- 拖表头换位置 ---------- */
+let dragTh = null;
+function clearDropMarks(table){ thEls(table).forEach(t => t.classList.remove("drop-l", "drop-r")); }
+
+function moveColTo(table, fromKey, toKey, before){
+  const order = domKeys(table).filter(k => k !== fromKey);
+  const ti = order.indexOf(toKey);
+  if (ti < 0) return;
+  order.splice(before ? ti : ti + 1, 0, fromKey);
+  colOrderStore[ckeyOf(table)] = order; saveColOrder();
+  applyColOrder(table);
+  if (colModalFor === ckeyOf(table)) renderColModal();
+}
+
+function initColMove(table, th){
+  // 右边细把手是改列宽、格子里有勾选框/按钮时不触发拖动，避免抢了正事
+  th.addEventListener("mousedown", e => {
+    th.draggable = !e.target.closest(".colgrip,input,button,select,a");
+  });
+  th.addEventListener("dragstart", e => {
+    dragTh = th; th.classList.add("col-dragging");
+    e.dataTransfer.effectAllowed = "move";
+    try { e.dataTransfer.setData("text/plain", th.dataset.col || ""); } catch (err) {}
+  });
+  th.addEventListener("dragend", () => {
+    th.classList.remove("col-dragging"); clearDropMarks(table); dragTh = null;
+  });
+  th.addEventListener("dragover", e => {
+    if (!dragTh || dragTh === th) return;
+    e.preventDefault(); e.dataTransfer.dropEffect = "move";
+    const r = th.getBoundingClientRect();
+    clearDropMarks(table);
+    th.classList.add(e.clientX < r.left + r.width / 2 ? "drop-l" : "drop-r");
+  });
+  th.addEventListener("dragleave", () => th.classList.remove("drop-l", "drop-r"));
+  th.addEventListener("drop", e => {
+    if (!dragTh || dragTh === th) return;
+    e.preventDefault();
+    const r = th.getBoundingClientRect();
+    moveColTo(table, dragTh.dataset.col, th.dataset.col, e.clientX < r.left + r.width / 2);
+    clearDropMarks(table);
+  });
+}
+
+/* ---------- 「⚙ 列」设置面板：勾选显示 + ↑↓ 挪位置 ---------- */
+let colModalFor = "";
+function openColModal(ckey){
+  colModalFor = ckey;
+  const t = tableOf(ckey); if (!t) return;
+  $("colModalTitle").textContent = COLSET_NAMES[ckey] || "表格";
+  renderColModal();
+  openModal("colModal");
+}
+function colName(th, i){
+  const k = th.dataset.col || "";
+  if (k === "ck") return "勾选框";
+  const t = (th.textContent || "").trim();
+  return t || "（空列）";
+}
+function renderColModal(){
+  const table = tableOf(colModalFor); if (!table) return;
+  const hide = hiddenSet(table), keys = domKeys(table);
+  $("colModalBody").innerHTML = keys.map((k, i) => {
+    const th = thEls(table)[i];
+    const on = !hide.has(k);
+    // ↑↓ 只在可见列之间跳，隐藏的列不参与排队
+    const vis = keys.filter(x => !hide.has(x));
+    const pi = vis.indexOf(k);
+    const upOff = !on || pi <= 0, dnOff = !on || pi < 0 || pi >= vis.length - 1;
+    return `<div class="colset-row">
+      <input type="checkbox" ${on ? "checked" : ""} onchange="toggleCol('${k}',this.checked)">
+      <span class="nm${on ? "" : " off"}">${esc(colName(th, i))}</span>
+      <span class="mv">
+        <button ${upOff ? "disabled" : ""} onclick="moveColStep('${k}',-1)" title="上移">↑</button>
+        <button ${dnOff ? "disabled" : ""} onclick="moveColStep('${k}',1)" title="下移">↓</button>
+      </span>
+    </div>`;
+  }).join("");
+}
+function toggleCol(k, on){
+  const table = tableOf(colModalFor); if (!table) return;
+  const set = new Set(hiddenSet(table));
+  if (on) set.delete(k); else set.add(k);
+  colHideStore[colModalFor] = [...set]; saveColHide();
+  applyColOrder(table); renderColModal();
+}
+function moveColStep(k, dir){
+  const table = tableOf(colModalFor); if (!table) return;
+  const hide = hiddenSet(table);
+  let order = (Array.isArray(colOrderStore[colModalFor]) && colOrderStore[colModalFor].length)
+    ? colOrderStore[colModalFor].slice() : domKeys(table);
+  const i = order.indexOf(k); if (i < 0) return;
+  let j = i + dir;
+  while (j >= 0 && j < order.length && hide.has(order[j])) j += dir;
+  if (j < 0 || j >= order.length) return;
+  const tmp = order[i]; order[i] = order[j]; order[j] = tmp;
+  colOrderStore[colModalFor] = order; saveColOrder();
+  applyColOrder(table); renderColModal();
+}
+function resetColSettings(){
+  const table = tableOf(colModalFor); if (!table) return;
+  delete colOrderStore[colModalFor]; delete colHideStore[colModalFor]; delete colwStore[colModalFor];
+  saveColOrder(); saveColHide(); saveColw();
+  table.style.width = ""; table.style.minWidth = "";
+  colEls(table).forEach(c => { if (c.dataset.w) c.style.width = c.dataset.w; });
+  applyColOrder(table); renderColModal();
+}
+
 function initColumnResize(){
   document.querySelectorAll("table.cols").forEach(table => {
     colEls(table).forEach(c => { c.dataset.w = c.style.width; });
-    applySavedWidths(table);
-    [...table.querySelectorAll("thead th")].forEach((th, idx) => {
+    table.dataset.order0 = domKeys(table).join(",");  // 记下出厂顺序，「恢复默认」时用它
+    applyColOrder(table);
+    thEls(table).forEach(th => {
+      th.classList.add("col-drag");
       const grip = document.createElement("div");
       grip.className = "colgrip";
       grip.title = "左右拖动调整列宽 · 双击恢复默认";
       th.appendChild(grip);
-      grip.addEventListener("mousedown", e => startColDrag(e, table, idx, grip));
+      grip.addEventListener("mousedown", e => startColDrag(e, table, th, grip));
       grip.addEventListener("dblclick", e => { e.preventDefault(); e.stopPropagation(); resetColWidths(table); });
+      initColMove(table, th);
     });
+    // 每张表右上自动带一个「⚙ 列」按钮，不用逐个页面改 HTML
+    const head = table.closest(".card") && table.closest(".card").querySelector(".head");
+    if (head && !head.querySelector(".colbtn")) {
+      const b = document.createElement("button");
+      b.className = "btn colbtn"; b.textContent = "⚙ 列";
+      b.title = "调整列的顺序、显示或隐藏（按住表头直接拖也能换位置）";
+      b.onclick = () => openColModal(ckeyOf(table));
+      head.appendChild(b);
+    }
   });
 }
+
+/* 表格重画之后（搜索、切筛选、刷新）列顺序会回到 HTML 的原始顺序，必须重新套一次设置 */
+function applyAllCols(){ document.querySelectorAll("table.cols").forEach(applyColOrder); }
 
 initColumnResize();
 
