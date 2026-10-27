@@ -120,3 +120,48 @@ def test_next_order_no_uses_max_seq_not_count(seeded):
     db.query(FxOrder).filter_by(order_no=f"{prefix}-0001").delete()
     db.commit()
     assert dist._next_order_no(db) == f"{prefix}-0004"
+
+
+def test_push_uses_order_shop_over_default(seeded, monkeypatch):
+    """订单上记的店铺优先于系统默认配置（推送报文里应是订单的店铺）。"""
+    db, d, p1, _ = seeded
+    monkeypatch.setattr(dist.settings, "wdt_shop_no", "DEFAULT-SHOP")
+    seen: dict = {}
+
+    class _Spy(_FakeClient):
+        def sales_trade_push(self, trade):
+            seen.update(trade)
+            return {"code": 0, "tid": "WDT-1", "message": "ok"}
+
+    monkeypatch.setattr(dist, "WangdianClient", lambda: _Spy())
+    result = create_and_push_order(db, d.id, lines=[{"product_id": p1.id, "quantity": 1}], wdt_shop_no="hhz-xxqd")
+    assert result["pushed"] is True
+    assert seen["shop_no"] == "hhz-xxqd"
+
+
+def test_push_falls_back_to_default_shop(seeded, monkeypatch):
+    """订单没记店铺时回退系统默认配置。"""
+    db, d, p1, _ = seeded
+    monkeypatch.setattr(dist.settings, "wdt_shop_no", "DEFAULT-SHOP")
+    seen: dict = {}
+
+    class _Spy(_FakeClient):
+        def sales_trade_push(self, trade):
+            seen.update(trade)
+            return {"code": 0, "tid": "WDT-2", "message": "ok"}
+
+    monkeypatch.setattr(dist, "WangdianClient", lambda: _Spy())
+    result = create_and_push_order(db, d.id, lines=[{"product_id": p1.id, "quantity": 1}])
+    assert result["pushed"] is True
+    assert seen["shop_no"] == "DEFAULT-SHOP"
+
+
+def test_push_without_any_shop_fails_clearly(seeded, monkeypatch):
+    """两边都没店铺：明确报错，订单保留可补选后重推。"""
+    db, d, p1, _ = seeded
+    monkeypatch.setattr(dist.settings, "wdt_shop_no", "")
+    monkeypatch.setattr(dist, "WangdianClient", lambda: _FakeClient())
+    result = create_and_push_order(db, d.id, lines=[{"product_id": p1.id, "quantity": 1}])
+    assert result["pushed"] is False
+    assert "未选择推送店铺" in result["push_error"]
+    assert result["order"]["status"] == "approved"

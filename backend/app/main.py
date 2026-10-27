@@ -125,6 +125,8 @@ class FxOrderPayload(BaseModel):
     lines: list[FxOrderLinePayload] = Field(default_factory=list)
     # 下单页一键模式：创建后自动审核并推送旺店通
     auto_push: bool = False
+    # 推送目标店铺号（如 hhz-xxqd）；留空回退 .env 的 WDT_SHOP_NO
+    wdt_shop_no: str = ""
 
 
 class FxPricePayload(BaseModel):
@@ -957,6 +959,28 @@ def fx_inventory_stock_list(db: Session = Depends(get_db)):
     return stock_overview(db)
 
 
+@app.get("/api/fx/wdt/shops")
+def fx_wdt_shops():
+    """旺店通店铺列表（shop.php 只读查询），给下单页选推送店铺。
+
+    拉取失败不报 500——返回空表，前端保留上次的输入框回退方案。
+    """
+    client = WangdianClient()
+    if not client.configured:
+        return {"ok": False, "shops": [], "message": "旺店通密钥未配置"}
+    try:
+        rows = (client.test_connection().get("shoplist") or [])
+    except Exception as exc:  # 网络失败不影响下单，只影响选店
+        return {"ok": False, "shops": [], "message": str(exc)[:200]}
+    shops = [
+        {"shop_no": str(r.get("shop_no") or ""), "shop_name": str(r.get("shop_name") or "")}
+        for r in rows
+        if str(r.get("is_disabled") or "0") != "1"
+    ]
+    shops.sort(key=lambda s: s["shop_name"])
+    return {"ok": True, "shops": shops, "default_shop_no": settings.wdt_shop_no}
+
+
 @app.post("/api/fx/inventory/sync")
 def fx_inventory_sync(
     snap_date: str = "",
@@ -1044,6 +1068,7 @@ def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
                 distributor_id=payload.distributor_id,
                 lines=[line.model_dump() for line in payload.lines],
                 remark=payload.remark,
+                wdt_shop_no=payload.wdt_shop_no,
             )
             return {"ok": True, **result}
         row = create_order(
@@ -1051,6 +1076,7 @@ def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
             distributor_id=payload.distributor_id,
             lines=[line.model_dump() for line in payload.lines],
             remark=payload.remark,
+            wdt_shop_no=payload.wdt_shop_no,
         )
         return {"ok": True, "order": row, "pushed": False, "push_error": ""}
     except ValueError as exc:

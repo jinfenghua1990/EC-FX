@@ -318,6 +318,8 @@ class FxOrder(Base):
     remark: Mapped[str] = mapped_column(String(1000), default="")
     # 预留：未来推送旺店通时的原始单号 tid
     wdt_tid: Mapped[str] = mapped_column(String(120), default="")
+    # 推送目标店铺：下单时选定（如 hhz-xxqd=红盒子-格力高-分销渠道）；空 = 用系统默认配置
+    wdt_shop_no: Mapped[str] = mapped_column(String(40), default="")
     # 推送旺店通的记录："" 未推送 / sent 已推送 / failed 失败，message 存最后一次结果
     push_status: Mapped[str] = mapped_column(String(16), default="")
     push_message: Mapped[str] = mapped_column(String(500), default="")

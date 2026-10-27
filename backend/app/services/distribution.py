@@ -513,6 +513,7 @@ def _order_view(row: FxOrder, with_lines: bool = True) -> dict:
         "total_amount": str(_money(row.total_amount)),
         "remark": row.remark or "",
         "wdt_tid": row.wdt_tid or "",
+        "wdt_shop_no": row.wdt_shop_no or "",
         "push_status": row.push_status or "",
         "push_message": row.push_message or "",
         "pushed_at": row.pushed_at.strftime("%Y-%m-%d %H:%M:%S") if row.pushed_at else "",
@@ -536,7 +537,7 @@ def _order_view(row: FxOrder, with_lines: bool = True) -> dict:
     return data
 
 
-def create_order(db: Session, distributor_id: int, lines: list[dict], remark: str = "") -> dict:
+def create_order(db: Session, distributor_id: int, lines: list[dict], remark: str = "", wdt_shop_no: str = "") -> dict:
     distributor = db.get(FxDistributor, int(distributor_id or 0))
     if not distributor:
         raise ValueError("分销商不存在")
@@ -549,6 +550,7 @@ def create_order(db: Session, distributor_id: int, lines: list[dict], remark: st
         status="draft",
         total_amount=total,
         remark=(remark or "").strip(),
+        wdt_shop_no=(wdt_shop_no or "").strip(),
     )
     row.lines = [
         FxOrderLine(
@@ -772,14 +774,14 @@ def import_products(db: Session, items: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------- 推送旺店通
-def _build_sales_trade(order: FxOrder, distributor: FxDistributor) -> dict:
+def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str) -> dict:
     """把分销订单组装成旺店通销售单报文。
 
     字段口径按旺店通 openapi2 sales_trade_push.php；未配置的写空字符串，
     实际字段以联调返回为准（推送框架先行，密钥配置后一次实测即可校准）。
     """
     trade: dict = {
-        "shop_no": settings.wdt_shop_no,
+        "shop_no": shop_no,
         "tid": order.order_no,  # 原始单号用分销订单号，便于两边互查
         "trade_time": order.order_date.strftime("%Y-%m-%d %H:%M:%S") if order.order_date else "",
         "pay_status": 2,  # 已付款
@@ -823,10 +825,12 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
     if not client.configured:
         missing = client.missing
         raise ValueError(f"旺店通未配置，请在 .env 补齐后重启：{'、'.join(missing)}")
-    if not settings.wdt_shop_no:
-        raise ValueError("旺店通店铺号未配置，请在 .env 增加 WDT_SHOP_NO=店铺编号 后重启")
+    # 店铺：订单上记的优先（下单时选定），否则回退系统默认配置
+    shop_no = order.wdt_shop_no or settings.wdt_shop_no
+    if not shop_no:
+        raise ValueError("未选择推送店铺：下单时请选择店铺，或在 .env 配置 WDT_SHOP_NO")
 
-    trade = _build_sales_trade(order, distributor)
+    trade = _build_sales_trade(order, distributor, shop_no)
     try:
         result = client.sales_trade_push(trade)
     except Exception as exc:
@@ -849,13 +853,15 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
     return {"ok": True, "order": _order_view(order)}
 
 
-def create_and_push_order(db: Session, distributor_id: int, lines: list[dict], remark: str = "") -> dict:
+def create_and_push_order(
+    db: Session, distributor_id: int, lines: list[dict], remark: str = "", wdt_shop_no: str = ""
+) -> dict:
     """下单页一键流程：创建订单 → 自动审核通过 → 推送旺店通。
 
     推送失败不回滚订单（单据已落库、状态为已审核），把报错带给前端，
     用户在「分销订单」页修正后可重推。
     """
-    view = create_order(db, distributor_id, lines, remark)
+    view = create_order(db, distributor_id, lines, remark, wdt_shop_no=wdt_shop_no)
     order = db.get(FxOrder, int(view["id"]))
     transition_order(db, order.id, "submit")
     transition_order(db, order.id, "approve")
