@@ -1,0 +1,24 @@
+电商核销中心 V0.8.4 — 直接覆盖快速版
+
+用途：
+- 直接在群晖 File Station 打开：docker/ecommerce-reconciliation
+- 把本 ZIP 解压到这个目录
+- 选择“覆盖已有文件”
+- 不要删除 .env、data、backups
+
+本安装包本身不包含：.env、data、backups，因此不会覆盖你的密钥、业务数据、数据库备份。
+
+第一次使用本“快速覆盖模式”后：
+1. 在 DSM Container Manager → 项目 → ecommerce-reconciliation
+2. 对项目执行一次“重建 / 重新创建”（不要删除数据库卷）
+3. 以后普通代码/UI/算法更新：直接覆盖文件后，只需重新创建 app 容器，无需重新 build Python 依赖。
+
+SSH 可选快速命令（非必须）：
+cd /volume1/docker/ecommerce-reconciliation
+sh scripts/fast-restart.sh
+
+重要：
+- 如果以后更新 requirements.txt、Dockerfile 或底层 Python 依赖，仍需完整 Build。
+- 如果 migrations 有新版本，app 重启时会自动运行 Alembic 迁移；正式结构变更仍建议先备份数据库。
+- 当前数据库目标版本：0004_standardization_pipeline
+- 端口保持：8010

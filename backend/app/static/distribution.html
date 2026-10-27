@@ -1,0 +1,876 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>分销系统 · F/X</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar:#1b2735; --sidebar-hover:#24334a; --active:#2463eb;
+  --bg:#f4f6fa; --card:#fff; --line:#e8ecf3; --muted:#7b8798;
+  --text:#1c2740; --blue:#2463eb; --green:#18a05e; --orange:#f59e0b; --red:#e5484d;
+}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.sidebar{width:216px;background:var(--sidebar);color:#c6d0de;display:flex;flex-direction:column;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;font-size:16px;font-weight:700;color:#fff}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav{flex:1;padding:6px 10px}
+.nav a{display:flex;align-items:center;gap:10px;padding:11px 12px;margin:2px 0;border-radius:9px;color:#aab6c8;text-decoration:none;font-size:14px}
+.nav a .ic{width:18px;text-align:center;font-size:15px}
+.nav a:hover{background:var(--sidebar-hover);color:#fff}
+.nav a.active{background:var(--active);color:#fff;font-weight:600}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;flex-shrink:0}
+.crumbs{font-size:13px;color:var(--muted)}
+.crumbs b{color:var(--text);font-weight:600}
+.topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted)}
+.btn{border:1px solid #d6dce6;background:#fff;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500}
+.btn:hover{border-color:#b9c4d4}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{background:#1d54cf}
+.btn.mini{padding:3px 9px;font-size:12px;border-radius:7px}
+.btn.danger{color:var(--red);border-color:#f2c6c8}
+.btn.danger:hover{border-color:var(--red)}
+.content{padding:20px 24px 40px;overflow:auto}
+h1.page{font-size:22px;margin-bottom:4px}
+.subtitle{font-size:13px;color:var(--muted);margin-bottom:16px}
+/* 统计卡片 */
+.stats{display:grid;grid-template-columns:repeat(6,1fr);gap:14px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;display:flex;gap:12px;align-items:flex-start}
+.stat .ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0}
+.stat .k{font-size:12px;color:var(--muted);margin-bottom:5px}
+.stat .v{font-size:18px;font-weight:750;letter-spacing:-.3px}
+.stat .s{font-size:11.5px;color:var(--muted);margin-top:3px}
+.ico.blue{background:#e8effd;color:var(--blue)}
+.ico.green{background:#e5f6ee;color:var(--green)}
+.ico.amber{background:#fdf3df;color:#d97706}
+.ico.red{background:#fdeaea;color:var(--red)}
+.ico.teal{background:#e0f4f3;color:#0e9f9a}
+.ico.purple{background:#f0ebfb;color:#7c5cd6}
+/* 标签页 */
+.tabs{display:flex;gap:8px;margin-bottom:14px}
+.tab{border:1px solid #d6dce6;background:#fff;border-radius:9px;padding:9px 18px;font-size:13.5px;cursor:pointer;font-weight:500;color:var(--muted)}
+.tab.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
+/* 卡片与表格 */
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap}
+.card h3{font-size:14.5px;display:flex;align-items:center;gap:8px}
+.card h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--blue)}
+.card input,.card select{min-height:32px;border:1px solid #d8dee9;border-radius:8px;background:#fff;padding:5px 10px;font-size:13px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f7f9fc;text-align:left;padding:9px 10px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;color:#5b6778}
+td{padding:9px 10px;border-bottom:1px solid #f0f3f8;white-space:nowrap}
+tr:hover td{background:#fafbfe}
+tr.dirty td{background:#fff8e7}
+td.num{font-variant-numeric:tabular-nums}
+.ops{display:flex;gap:6px}
+.tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
+.tag.draft{background:#eef1f6;color:#5b6778}
+.tag.submitted{background:#fdf1dc;color:#b45309}
+.tag.approved{background:#e5f6ee;color:var(--green)}
+.tag.cancelled{background:#fdeaea;color:var(--red)}
+.tag.on{background:#e5f6ee;color:var(--green)}
+.tag.off{background:#eef1f6;color:#5b6778}
+.empty{padding:40px 0;text-align:center;color:var(--muted);font-size:13px}
+.hint{padding:9px 12px;margin:0 0 10px;border-radius:8px;background:#f7f9fc;border:1px solid var(--line);color:#5b6778;font-size:12.5px;line-height:1.5;word-break:break-all}
+/* 弹窗 */
+.backdrop{position:fixed;inset:0;background:rgba(16,24,40,.45);display:none;align-items:center;justify-content:center;z-index:99;padding:20px}
+.backdrop.show{display:flex}
+.modal{background:#fff;border-radius:14px;width:min(720px,96vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(16,24,40,.25)}
+.modal.sm{width:min(460px,96vw)}
+.modal .mh{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px 10px;border-bottom:1px solid var(--line)}
+.modal .mh h2{font-size:16px}
+.modal .mb{padding:14px 20px}
+.modal .mf{display:flex;gap:8px;justify-content:flex-end;padding:6px 20px 18px}
+.modal label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 5px}
+.modal label:first-child{margin-top:0}
+.modal input,.modal select,.modal textarea{width:100%;min-height:36px;border:1px solid #d8dee9;border-radius:8px;padding:7px 10px;font-size:13.5px;font-family:inherit}
+.modal textarea{min-height:64px;resize:vertical}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+/* 订单明细编辑 */
+.line-box{border:1px solid var(--line);border-radius:10px;margin-top:12px}
+.line-head{display:flex;gap:8px;align-items:center;background:#f7f9fc;padding:8px 10px;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
+.line-head b{font-size:12.5px;color:#5b6778;flex:1}
+.line-row{display:grid;grid-template-columns:2.4fr 1fr 1.1fr 1.2fr 28px;gap:8px;align-items:center;padding:7px 10px;border-bottom:1px dashed #eef1f6;font-size:12.5px}
+.line-row:last-child{border-bottom:0}
+.line-row select,.line-row input{min-height:30px;border:1px solid #d8dee9;border-radius:7px;padding:4px 8px;font-size:12.5px;width:100%}
+.line-row .sub{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
+.line-row .del{border:0;background:transparent;color:var(--red);font-size:15px;cursor:pointer}
+.line-total{display:flex;justify-content:flex-end;gap:16px;padding:10px;font-size:13px}
+.line-total b{font-size:15px;font-variant-numeric:tabular-nums}
+.err{background:#fdeaea;color:var(--red);font-size:12.5px;border-radius:8px;padding:8px 12px;margin-top:10px;display:none}
+.err.show{display:block}
+toast{display:none}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1c2740;color:#fff;font-size:13px;padding:10px 18px;border-radius:10px;opacity:0;transition:opacity .25s;z-index:120;pointer-events:none}
+#toast.show{opacity:.95}
+</style>
+<script src="/static/embed.js"></script>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><span class="logo">🤝</span>F/X 分销系统</div>
+  <nav class="nav" id="nav">
+    <a href="/"><span class="ic">🏠</span>工作台</a>
+    <a class="active" href="/distribution"><span class="ic">🤝</span>分销系统</a>
+    <a href="/shipments"><span class="ic">🚚</span>发货明细</a>
+    <a href="/sales-outbound"><span class="ic">📤</span>销售出库</a>
+    <a href="/reports"><span class="ic">📊</span>报表中心</a>
+  </nav>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="crumbs">F/X 分销系统&nbsp;/&nbsp;<b id="crumbTab">分销商</b></div>
+    <div class="topright">
+      <span>端口 <b>8050</b></span>
+      <span>版本 <b id="topVersion">--</b></span>
+      <button class="btn" onclick="loadAll()">刷新</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <h1 class="page">分销系统</h1>
+    <div class="subtitle">由电商核销中心升级而来 · 分销商 — 商品 — 订单审核，后续继续在此扩建</div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="tabs">
+      <button class="tab active" data-tab="distributors" onclick="switchTab('distributors')">分销商</button>
+      <button class="tab" data-tab="products" onclick="switchTab('products')">商品</button>
+      <button class="tab" data-tab="orders" onclick="switchTab('orders')">分销订单</button>
+      <button class="tab" data-tab="prices" onclick="switchTab('prices')">价格</button>
+      <button class="tab" data-tab="statements" onclick="switchTab('statements')">对账单</button>
+    </div>
+
+    <!-- 分销商 -->
+    <div class="card" id="panel-distributors">
+      <div class="head">
+        <h3>分销商档案</h3>
+        <input id="distSearch" placeholder="搜索编码 / 名称" oninput="renderDistributors()" style="width:200px">
+        <button class="btn" onclick="openImportModal('dist')">⇪ 批量导入</button>
+        <button class="btn primary" onclick="openDistModal()">＋ 新建分销商</button>
+      </div>
+      <table><thead><tr>
+        <th>编码</th><th>名称</th><th>联系人</th><th>电话</th><th>区域</th><th>状态</th><th style="width:130px">操作</th>
+      </tr></thead><tbody id="distBody"></tbody></table>
+      <div class="empty" id="distEmpty" style="display:none">还没有分销商，点右上角「新建分销商」开始</div>
+    </div>
+
+    <!-- 商品 -->
+    <div class="card" id="panel-products" style="display:none">
+      <div class="head">
+        <h3>商品目录（基础价）</h3>
+        <input id="prodSearch" placeholder="搜索 SKU / 名称 / 条码" oninput="renderProducts()" style="width:200px">
+        <button class="btn" id="btnWdtSync" onclick="syncWdtProducts()" title="从旺店通商品档案拉取货品与规格">⟳ 从旺店通同步</button>
+        <button class="btn" onclick="openImportModal('prod')">⇪ 批量导入</button>
+        <button class="btn primary" onclick="openProdModal()">＋ 新建商品</button>
+      </div>
+      <div class="hint" id="wdtSyncHint" style="display:none"></div>
+      <table><thead><tr>
+        <th>SKU</th><th>名称</th><th>规格</th><th>分类</th><th>条码</th><th>单位</th><th>基础价</th><th>来源</th><th>状态</th><th style="width:130px">操作</th>
+      </tr></thead><tbody id="prodBody"></tbody></table>
+      <div class="empty" id="prodEmpty" style="display:none">还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。</div>
+    </div>
+
+    <!-- 订单 -->
+    <div class="card" id="panel-orders" style="display:none">
+      <div class="head">
+        <h3>分销订单</h3>
+        <select id="orderStatus" style="width:140px" onchange="loadOrders()">
+          <option value="">全部状态</option>
+          <option value="draft">草稿</option>
+          <option value="submitted">已提交待审核</option>
+          <option value="approved">已审核</option>
+          <option value="cancelled">已取消</option>
+        </select>
+        <select id="orderDist" style="width:180px" onchange="renderOrders()"></select>
+        <button class="btn primary" onclick="openOrderModal()">＋ 新建订单</button>
+      </div>
+      <table><thead><tr>
+        <th>订单号</th><th>分销商</th><th>状态</th><th class="num">金额</th><th class="num">明细</th><th>下单时间</th><th style="width:200px">操作</th>
+      </tr></thead><tbody id="orderBody"></tbody></table>
+      <div class="empty" id="orderEmpty" style="display:none">还没有订单</div>
+    </div>
+
+    <!-- 价格 -->
+    <div class="card" id="panel-prices" style="display:none">
+      <div class="head">
+        <h3>经销商价格体系</h3>
+        <select id="priceDist" style="width:240px" onchange="loadPrices()"></select>
+        <button class="btn primary" onclick="saveDirtyPrices()">保存修改</button>
+      </div>
+      <div class="hint">专属价只对选定的分销商生效：<b>留空 = 使用商品基础价</b>；填了数字 = 该经销商的协议价。下单时不手填价格，会自动套用这里的专属价。</div>
+      <table><thead><tr>
+        <th>SKU</th><th>名称</th><th>规格</th><th>单位</th><th class="num">基础价</th><th>经销商专属价</th><th style="width:120px"></th>
+      </tr></thead><tbody id="priceBody"></tbody></table>
+      <div class="empty" id="priceEmpty" style="display:none">请先在上方选择分销商（分销商或商品为空时，先到对应标签页创建）</div>
+    </div>
+
+    <!-- 对账单 -->
+    <div class="card" id="panel-statements" style="display:none">
+      <div class="head">
+        <h3>分销商对账单（按已审核订单）</h3>
+        <select id="stmtDist" style="width:220px" onchange="loadStatements()"></select>
+        <input id="stmtMonth" type="month" onchange="loadStatements()" style="width:170px">
+        <button class="btn" onclick="exportStatement()">导出 Excel</button>
+      </div>
+      <div class="hint">不选月份 = 看各月汇总（点月份可下钻）；选定月份 = 显示该月已审核订单明细。「导出 Excel」需同时选好分销商与月份，导出为逐商品明细对账单。</div>
+      <div class="line-total" style="justify-content:flex-start" id="stmtSummary"></div>
+      <table><thead id="stmtHead"></thead><tbody id="stmtBody"></tbody></table>
+      <div class="empty" id="stmtEmpty" style="display:none">当前筛选下没有已审核订单</div>
+    </div>
+  </div>
+</div>
+
+<!-- 分销商弹窗 -->
+<div class="backdrop" id="distModal"><div class="modal sm">
+  <div class="mh"><h2 id="distModalTitle">新建分销商</h2><button class="btn" onclick="closeModal('distModal')">✕</button></div>
+  <div class="mb">
+    <div class="form-grid">
+      <div><label>编码 *</label><input id="dCode" placeholder="如 FX001"></div>
+      <div><label>名称 *</label><input id="dName"></div>
+      <div><label>联系人</label><input id="dContact"></div>
+      <div><label>电话</label><input id="dPhone"></div>
+      <div><label>邮箱</label><input id="dEmail"></div>
+      <div><label>区域</label><input id="dRegion"></div>
+    </div>
+    <label>备注</label><textarea id="dNote"></textarea>
+    <div class="err" id="distErr"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="closeModal('distModal')">取消</button>
+    <button class="btn primary" onclick="saveDist()">保存</button>
+  </div>
+</div></div>
+
+<!-- 商品弹窗 -->
+<div class="backdrop" id="prodModal"><div class="modal sm">
+  <div class="mh"><h2 id="prodModalTitle">新建商品</h2><button class="btn" onclick="closeModal('prodModal')">✕</button></div>
+  <div class="mb">
+    <div class="form-grid">
+      <div><label>SKU *</label><input id="pSku" placeholder="如 GL001"></div>
+      <div><label>名称 *</label><input id="pName"></div>
+      <div><label>规格</label><input id="pSpec" placeholder="如 24×100g"></div>
+      <div><label>单位</label><input id="pUnit" value="箱"></div>
+      <div><label>基础价（元/单位）</label><input id="pPrice" type="number" step="0.01" min="0" value="0"></div>
+    </div>
+    <label>备注</label><textarea id="pNote"></textarea>
+    <div class="err" id="prodErr"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="closeModal('prodModal')">取消</button>
+    <button class="btn primary" onclick="saveProd()">保存</button>
+  </div>
+</div></div>
+
+<!-- 订单弹窗 -->
+<div class="backdrop" id="orderModal"><div class="modal">
+  <div class="mh"><h2 id="orderModalTitle">新建分销订单</h2><button class="btn" onclick="closeModal('orderModal')">✕</button></div>
+  <div class="mb">
+    <div class="form-grid">
+      <div><label>分销商 *</label><select id="oDist"></select></div>
+      <div><label>备注</label><input id="oRemark"></div>
+    </div>
+    <div class="line-box">
+      <div class="line-head"><b>订单明细（商品 · 数量 · 单价）</b>
+        <button class="btn mini" onclick="addLineRow()">＋ 加一行</button>
+      </div>
+      <div id="lineRows"></div>
+      <div class="line-total">合计：<b id="lineTotal">¥0.00</b></div>
+    </div>
+    <div class="err" id="orderErr"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="closeModal('orderModal')">取消</button>
+    <button class="btn primary" onclick="saveOrder()">保存草稿</button>
+  </div>
+</div></div>
+
+<!-- 订单详情弹窗 -->
+<div class="backdrop" id="detailModal"><div class="modal">
+  <div class="mh"><h2 id="detailTitle">订单详情</h2><button class="btn" onclick="closeModal('detailModal')">✕</button></div>
+  <div class="mb" id="detailBody"></div>
+  <div class="mf"><button class="btn" onclick="closeModal('detailModal')">关闭</button></div>
+</div></div>
+
+<!-- 批量导入弹窗 -->
+<div class="backdrop" id="importModal"><div class="modal">
+  <div class="mh"><h2 id="importTitle">批量导入</h2><button class="btn" onclick="closeModal('importModal')">✕</button></div>
+  <div class="mb">
+    <div class="hint" id="importHint"></div>
+    <textarea id="importText" style="min-height:190px" placeholder="每行一条记录，直接粘贴"></textarea>
+    <div class="err" id="importErr"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="closeModal('importModal')">取消</button>
+    <button class="btn primary" onclick="runImport()">导入</button>
+  </div>
+</div></div>
+
+<div id="toast"></div>
+
+<script>
+"use strict";
+const state = { distributors: [], products: [], orders: [], overview: null, tab: "distributors",
+  distEditId: null, prodEditId: null, orderEditId: null,
+  prices: [], statement: null, priceCache: {} };
+
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const money = v => { const n = parseFloat(v); return isNaN(n) ? "-" : "¥" + n.toLocaleString("zh-CN", {minimumFractionDigits:2, maximumFractionDigits:2}); };
+function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2200); }
+function openModal(id){ $(id).classList.add("show"); }
+function closeModal(id){ $(id).classList.remove("show"); }
+function showError(id, msg){ const e = $(id); e.textContent = msg; e.classList.toggle("show", !!msg); if (msg) e.scrollIntoView({block:"nearest"}); }
+
+async function api(path, options){
+  const res = await fetch(path, Object.assign({ headers: {"Content-Type":"application/json"} }, options || {}));
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || res.statusText);
+  return data;
+}
+
+async function loadAll(){
+  try {
+    const [ov, dist, prod] = await Promise.all([
+      api("/api/fx/overview"), api("/api/fx/distributors"), api("/api/fx/products")]);
+    state.overview = ov; state.distributors = dist.distributors; state.products = prod.products;
+    await loadOrders();
+    renderStats(); renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
+    $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
+  } catch (e) { toast("加载失败: " + e.message); }
+}
+
+function renderStats(){
+  const s = $("stats");
+  if (!state.overview) { s.innerHTML = ""; return; }
+  const labels = { "draft": "草稿", "submitted": "已提交待审核", "approved": "已审核", "cancelled": "已取消" };
+  const icons = { "draft": "blue", "submitted": "amber", "approved": "green", "cancelled": "red" };
+  const items = state.overview.statuses.map(x =>
+    `<div class="stat"><div class="ico ${icons[x.key]}">🧾</div><div><div class="k">${labels[x.key]}</div>
+     <div class="v num">${x.count}</div><div class="s">${money(x.amount)}</div></div></div>`);
+  items.push(`<div class="stat"><div class="ico teal">🤝</div><div><div class="k">启用分销商</div>
+    <div class="v">${state.overview.active_distributors}</div><div class="s">档案</div></div></div>`);
+  items.push(`<div class="stat"><div class="ico purple">📦</div><div><div class="k">在售商品</div>
+    <div class="v">${state.overview.active_products}</div><div class="s">SKU</div></div></div>`);
+  s.innerHTML = items.join("");
+}
+
+function switchTab(name){
+  state.tab = name;
+  document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
+  ["distributors","products","orders","prices","statements"].forEach(p => {
+    $("panel-" + p).style.display = p === name ? "" : "none";
+  });
+  const names = { distributors: "分销商", products: "商品", orders: "分销订单", prices: "经销商价格", statements: "对账单" };
+  $("crumbTab").textContent = names[name];
+  if (name === "orders") loadOrders();
+  if (name === "prices") loadPrices();
+  if (name === "statements") loadStatements();
+}
+
+/* ---------- 分销商 ---------- */
+function renderDistributors(){
+  const kw = ($("distSearch").value || "").toLowerCase();
+  const body = $("distBody"), empty = $("distEmpty");
+  const rows = state.distributors.filter(d => !kw || (d.code + d.name + d.contact + d.region).toLowerCase().includes(kw));
+  empty.style.display = rows.length ? "none" : "";
+  body.innerHTML = rows.map(d => `<tr>
+    <td><b>${esc(d.code)}</b></td><td>${esc(d.name)}</td><td>${esc(d.contact) || "-"}</td>
+    <td>${esc(d.phone) || "-"}</td><td>${esc(d.region) || "-"}</td>
+    <td><span class="tag ${d.active ? "on" : "off"}">${d.active ? "启用" : "停用"}</span></td>
+    <td class="ops">
+      <button class="btn mini" onclick='openDistModal(${d.id})'>编辑</button>
+      <button class="btn mini ${d.active ? "danger" : ""}" onclick="toggleDist(${d.id})">${d.active ? "停用" : "启用"}</button>
+    </td></tr>`).join("");
+}
+
+function openDistModal(id){
+  state.distEditId = id || null;
+  const d = id ? state.distributors.find(x => x.id === id) : null;
+  $("distModalTitle").textContent = d ? "编辑分销商 · " + d.name : "新建分销商";
+  ["dCode","dName","dContact","dPhone","dEmail","dRegion","dNote"].forEach(k => $(k).value = "");
+  if (d) { $("dCode").value = d.code; $("dName").value = d.name; $("dContact").value = d.contact;
+    $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dRegion").value = d.region; $("dNote").value = d.note; }
+  showError("distErr", ""); openModal("distModal");
+  setTimeout(() => $(d ? "dName" : "dCode").focus(), 50);
+}
+
+async function saveDist(){
+  const body = { code: $("dCode").value.trim(), name: $("dName").value.trim(),
+    contact: $("dContact").value.trim(), phone: $("dPhone").value.trim(),
+    email: $("dEmail").value.trim(), region: $("dRegion").value.trim(), note: $("dNote").value.trim() };
+  try {
+    if (state.distEditId) await api("/api/fx/distributors/" + state.distEditId, { method: "PUT", body: JSON.stringify(body) });
+    else await api("/api/fx/distributors", { method: "POST", body: JSON.stringify(body) });
+    closeModal("distModal"); toast("已保存"); loadAll();
+  } catch (e) { showError("distErr", e.message); }
+}
+
+async function toggleDist(id){
+  try { await api(`/api/fx/distributors/${id}/toggle`, { method: "POST" }); loadAll(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- 商品 ---------- */
+function renderProducts(){
+  const kw = ($("prodSearch").value || "").toLowerCase();
+  const body = $("prodBody"), empty = $("prodEmpty");
+  const rows = state.products.filter(p => !kw ||
+    ((p.sku||"") + (p.name||"") + (p.spec||"") + (p.barcode||"") + (p.category||"")).toLowerCase().includes(kw));
+  empty.style.display = rows.length ? "none" : "";
+  body.innerHTML = rows.map(p => `<tr>
+    <td><b>${esc(p.sku)}</b></td><td>${esc(p.name)}</td><td>${esc(p.spec) || "-"}</td>
+    <td>${esc(p.category) || "-"}</td><td>${esc(p.barcode) || "-"}</td><td>${esc(p.unit)}</td>
+    <td class="num">${money(p.base_price)}</td>
+    <td>${p.source === "wdt" ? '<span class="tag on">旺店通</span>' : '<span class="tag">手工</span>'}</td>
+    <td><span class="tag ${p.active ? "on" : "off"}">${p.active ? "在售" : "停用"}</span></td>
+    <td class="ops">
+      <button class="btn mini" onclick='openProdModal(${p.id})'>编辑</button>
+      <button class="btn mini ${p.active ? "danger" : ""}" onclick="toggleProd(${p.id})">${p.active ? "停用" : "启用"}</button>
+    </td></tr>`).join("");
+}
+
+async function syncWdtProducts(){
+  const btn = $("btnWdtSync"), hint = $("wdtSyncHint");
+  const show = (msg, ok) => { hint.style.display = ""; hint.textContent = msg; hint.style.color = ok === false ? "#c0392b" : ""; };
+  try {
+    btn.disabled = true; btn.textContent = "同步中…";
+    const st = await api("/api/fx/products/wdt-status");
+    if (!st.configured) {
+      show(`旺店通凭证未配置，缺少：${(st.missing || []).join(" / ")}。请在 .env 填写后重启服务。`, false);
+      toast("旺店通未配置");
+      return;
+    }
+    // 先 dry-run 预览，确认字段与条数再落库
+    const preview = await api("/api/fx/products/sync-wdt?dry_run=1", { method: "POST" });
+    if (!preview.total_specs) {
+      show("旺店通返回 0 个规格。原始字段：" + JSON.stringify(preview.raw_fields || {}), false);
+      toast("未拉到商品");
+      return;
+    }
+    const msg = `旺店通货品 ${preview.goods_count} 个 / 规格 ${preview.total_specs} 个：新增 ${preview.created}、更新 ${preview.updated}。确认导入？`;
+    if (!confirm(msg)) { show("已取消，未写入任何数据。"); return; }
+    btn.textContent = "写入中…";
+    const res = await api("/api/fx/products/sync-wdt", { method: "POST" });
+    show(`同步完成：新增 ${res.created}、更新 ${res.updated}，补价 ${res.price_filled}、保留原价 ${res.price_kept}。`);
+    toast("商品同步完成");
+    if (res.raw_fields && (!res.created && !res.updated)) {
+      show("未写入任何商品。旺店通原始字段：" + JSON.stringify(res.raw_fields), false);
+    }
+    await loadAll();
+  } catch (e) {
+    show("同步失败：" + e.message, false);
+    toast("同步失败");
+  } finally {
+    btn.disabled = false; btn.textContent = "⟳ 从旺店通同步";
+  }
+}
+
+function openProdModal(id){
+  state.prodEditId = id || null;
+  const p = id ? state.products.find(x => x.id === id) : null;
+  $("prodModalTitle").textContent = p ? "编辑商品 · " + p.name : "新建商品";
+  ["pSku","pName","pSpec","pPrice","pNote"].forEach(k => $(k).value = "");
+  $("pUnit").value = "箱";
+  if (p) { $("pSku").value = p.sku; $("pName").value = p.name; $("pSpec").value = p.spec;
+    $("pUnit").value = p.unit || "箱"; $("pPrice").value = p.base_price; $("pNote").value = p.note; }
+  showError("prodErr", ""); openModal("prodModal");
+  setTimeout(() => $(p ? "pName" : "pSku").focus(), 50);
+}
+
+async function saveProd(){
+  const body = { sku: $("pSku").value.trim(), name: $("pName").value.trim(), spec: $("pSpec").value.trim(),
+    unit: $("pUnit").value.trim() || "箱", base_price: $("pPrice").value || "0", note: $("pNote").value.trim() };
+  try {
+    if (state.prodEditId) await api("/api/fx/products/" + state.prodEditId, { method: "PUT", body: JSON.stringify(body) });
+    else await api("/api/fx/products", { method: "POST", body: JSON.stringify(body) });
+    closeModal("prodModal"); toast("已保存"); loadAll();
+  } catch (e) { showError("prodErr", e.message); }
+}
+
+async function toggleProd(id){
+  try { await api(`/api/fx/products/${id}/toggle`, { method: "POST" }); loadAll(); }
+  catch (e) { toast(e.message); }
+}
+
+/* ---------- 订单 ---------- */
+async function loadOrders(){
+  try {
+    const status = $("orderStatus").value || "";
+    const data = await api("/api/fx/orders" + (status ? "?status=" + status : ""));
+    state.orders = data.orders;
+  } catch (e) { state.orders = []; toast("订单加载失败: " + e.message); }
+  renderOrders();
+}
+
+function fillOrderSelects(){
+  // 订单筛选下拉 + 新建弹窗的下拉都只放启用的分销商
+  $("orderDist").innerHTML = `<option value="">全部分销商</option>` +
+    state.distributors.filter(d => d.active).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
+  $("oDist").innerHTML = state.distributors.filter(d => d.active)
+    .map(d => `<option value="${d.id}">${esc(d.name)}（${esc(d.code)}）</option>`).join("");
+  // 价格页：选定分销商看它的专属价
+  $("priceDist").innerHTML = `<option value="">选择分销商…</option>` +
+    state.distributors.filter(d => d.active).map(d => `<option value="${d.id}">${esc(d.name)}（${esc(d.code)}）</option>`).join("");
+  // 对账单页：可全量，也可按分销商筛
+  $("stmtDist").innerHTML = `<option value="">全部分销商</option>` +
+    state.distributors.filter(d => d.active).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
+}
+
+function renderOrders(){
+  const distId = $("orderDist").value;
+  const rows = state.orders.filter(o => !distId || String(o.distributor_id) === distId);
+  $("orderEmpty").style.display = rows.length ? "none" : "";
+  $("orderBody").innerHTML = rows.map(o => {
+    const ops = [];
+    if (o.status === "draft") ops.push(`<button class="btn mini" onclick="editOrder(${o.id})">编辑</button>`,
+      `<button class="btn mini" onclick="action(${o.id},'submit')">提交</button>`,
+      `<button class="btn mini danger" onclick="action(${o.id},'cancel')">取消</button>`);
+    else if (o.status === "submitted") ops.push(`<button class="btn mini" onclick="action(${o.id},'approve')">审核通过</button>`,
+      `<button class="btn mini" onclick="action(${o.id},'reject')">驳回</button>`,
+      `<button class="btn mini danger" onclick="action(${o.id},'cancel')">取消</button>`);
+    else if (o.status === "approved" && o.push_status !== "sent") ops.push(`<button class="btn mini primary" onclick="pushOrder(${o.id})">推送旺店通</button>`);
+    ops.splice(0, 0, `<button class="btn mini" onclick="viewOrder(${o.id})">查看</button>`);
+    const pushed = o.push_status === "sent" ? '<span class="tag on" title="已推送旺店通">已推WDT</span> ' : (o.push_status === "failed" ? '<span class="tag cancelled" title="旺店通推送失败，详情见订单详情">推失败</span> ' : "");
+    return `<tr>
+      <td><b>${esc(o.order_no)}</b></td><td>${esc(o.distributor_name)}</td>
+      <td>${pushed}<span class="tag ${o.status}">${esc(o.status_label)}</span></td>
+      <td class="num"><b>${money(o.total_amount)}</b></td>
+      <td class="num">${o.line_count}</td><td>${esc(o.order_date)}</td>
+      <td class="ops">${ops.join("")}</td></tr>`;
+  }).join("");
+}
+
+function addLineRow(data){
+  const wrap = document.createElement("div");
+  wrap.className = "line-row";
+  const distPrice = state.priceCache[$("oDist").value] || {};
+  const dflt = p => distPrice[p.id] ?? p.base_price;
+  wrap.innerHTML = `
+    <select class="lr-prod">${state.products.filter(p => p.active)
+      .map(p => `<option value="${p.id}" data-price="${dflt(p)}">${esc(p.sku)} · ${esc(p.name)}</option>`).join("")}</select>
+    <input class="lr-qty" type="number" min="0" step="1" placeholder="数量">
+    <input class="lr-price" type="number" min="0" step="0.01" placeholder="单价">
+    <div class="sub">¥0.00</div>
+    <button class="del" title="删除本行">✕</button>`;
+  wrap.dataset.auto = "1"; // 初始单价是系统自动填的，分销商切换时要跟着刷新
+  wrap.querySelector(".del").onclick = () => { wrap.remove(); recalcLines(); };
+  wrap.querySelector(".lr-prod").onchange = () => {
+    const opt = wrap.querySelector(".lr-prod").selectedOptions[0];
+    if (opt) wrap.querySelector(".lr-price").value = parseFloat(opt.dataset.price || 0);
+    recalcLines();
+  };
+  ["lr-qty"].forEach(cls => wrap.querySelector("." + cls).oninput = recalcLines);
+  wrap.querySelector(".lr-price").oninput = () => { wrap.dataset.auto = ""; recalcLines(); };
+  if (data) {
+    if (data.product_id) { const sel = wrap.querySelector(".lr-prod");
+      [...sel.options].forEach(o => { if (o.value === String(data.product_id)) sel.value = o.value; }); }
+    wrap.querySelector(".lr-qty").value = data.quantity ?? "";
+    wrap.querySelector(".lr-price").value = data.unit_price ?? "";
+    wrap.dataset.auto = data.auto ? "1" : ""; // 草稿里的价格视为人工确认过的
+  } else {
+    const opt = wrap.querySelector(".lr-prod").selectedOptions[0];
+    if (opt) wrap.querySelector(".lr-price").value = parseFloat(opt.dataset.price || 0);
+  }
+  $("lineRows").appendChild(wrap);
+  recalcLines();
+}
+
+function collectLines(){
+  return [...$("lineRows").querySelectorAll(".line-row")].map(row => ({
+    product_id: parseInt(row.querySelector(".lr-prod").value, 10),
+    quantity: row.querySelector(".lr-qty").value,
+    // 自动价的行传空字符串：服务端按「专属价 > 基础价」实时取价，避免弹窗里的旧值
+    unit_price: row.dataset.auto === "1" ? "" : row.querySelector(".lr-price").value,
+  })).filter(l => l.quantity !== "" && l.quantity !== null);
+}
+
+async function loadDistPrices(distId){
+  if (!distId) return {};
+  if (!state.priceCache[distId]) {
+    const data = await api("/api/fx/prices?distributor_id=" + distId);
+    state.priceCache[distId] = Object.fromEntries(data.prices.map(p => [p.product_id, p.price]));
+  }
+  return state.priceCache[distId];
+}
+
+async function refillAutoPrices(){
+  try { await loadDistPrices($("oDist").value); } catch (e) { /* 价格加载失败不拦下单，服务端会兜底 */ }
+  const map = state.priceCache[$("oDist").value] || {};
+  $("lineRows").querySelectorAll(".line-row").forEach(row => {
+    if (row.dataset.auto !== "1") return;
+    const sel = row.querySelector(".lr-prod");
+    const prod = state.products.find(p => p.id === parseInt(sel.value, 10));
+    const price = map[parseInt(sel.value, 10)] ?? (prod ? prod.base_price : "");
+    row.querySelector(".lr-price").value = price === "" || price == null ? "" : parseFloat(price);
+    [...sel.options].forEach(o => { if (o.value === sel.value) o.dataset.price = price ?? ""; });
+    row.querySelector(".lr-price").dataset.price = price ?? "";
+  });
+  recalcLines();
+}
+
+function recalcLines(){
+  let total = 0;
+  $("lineRows").querySelectorAll(".line-row").forEach(row => {
+    const q = parseFloat(row.querySelector(".lr-qty").value || 0);
+    const p = parseFloat(row.querySelector(".lr-price").value || 0);
+    const s = Math.round((q * p) * 100) / 100;
+    row.querySelector(".sub").textContent = "¥" + s.toLocaleString("zh-CN", {minimumFractionDigits: 2});
+    total += s;
+  });
+  $("lineTotal").textContent = "¥" + total.toLocaleString("zh-CN", {minimumFractionDigits: 2, maximumFractionDigits: 2});
+}
+
+function openOrderModal(){
+  state.orderEditId = null;
+  $("orderModalTitle").textContent = "新建分销订单";
+  $("oDist").value = ""; $("oRemark").value = "";
+  $("lineRows").innerHTML = ""; showError("orderErr", "");
+  if (!state.distributors.some(d => d.active)) { toast("请先在「分销商」标签页里新建分销商"); return; }
+  if (!state.products.some(p => p.active)) { toast("请先在 商品 tab 里新建商品"); return; }
+  addLineRow();
+  openModal("orderModal");
+  refillAutoPrices(); // 按所选分销商套用专属价（无则基础价）
+}
+
+async function editOrder(id){
+  try {
+    const detail = await api("/api/fx/orders/" + id);
+    state.orderEditId = id;
+    $("orderModalTitle").textContent = "编辑草稿 · " + detail.order_no;
+    $("oDist").value = String(detail.distributor_id);
+    $("oRemark").value = detail.remark || "";
+    $("lineRows").innerHTML = "";
+    detail.lines.forEach(l => addLineRow({ product_id: l.product_id, quantity: l.quantity, unit_price: l.unit_price }));
+    if (!detail.lines.length) addLineRow();
+    showError("orderErr", ""); openModal("orderModal");
+  } catch (e) { toast(e.message); }
+}
+
+async function saveOrder(){
+  const payload = { distributor_id: parseInt($("oDist").value, 10),
+    remark: $("oRemark").value.trim(), lines: collectLines() };
+  if (!payload.distributor_id) { showError("orderErr", "请选择分销商"); return; }
+  try {
+    if (state.orderEditId) await api("/api/fx/orders/" + state.orderEditId, { method: "PUT", body: JSON.stringify(payload) });
+    else await api("/api/fx/orders", { method: "POST", body: JSON.stringify(payload) });
+    closeModal("orderModal"); toast("草稿已保存"); loadAll();
+  } catch (e) { showError("orderErr", e.message); }
+}
+
+async function action(id, act){
+  const tips = { submit: "提交后订单锁定，等待运营审核，确认提交？",
+    approve: "确认审核通过该订单？", reject: "驳回后订单回到草稿，可继续修改，确认？",
+    cancel: "取消后订单不可恢复，确认？" };
+  if (!confirm(tips[act] || "确认执行？")) return;
+  try { await api(`/api/fx/orders/${id}/${act}`, { method: "POST" }); toast("已执行"); loadAll(); }
+  catch (e) { toast(e.message); }
+}
+
+async function pushOrder(id){
+  if (!confirm("确认把该已审核订单推送为旺店通销售单？\n（原始单号=分销订单号，重推会更新原单不会重复）")) return;
+  try {
+    await api(`/api/fx/orders/${id}/push-wdt`, { method: "POST" });
+    toast("已推送旺店通");
+    loadAll();
+  } catch (e) { toast(e.message); }
+}
+
+async function viewOrder(id){
+  try {
+    const d = await api("/api/fx/orders/" + id);
+    $("detailTitle").textContent = "订单详情 · " + d.order_no;
+    $("detailBody").innerHTML = `
+      <table>
+        <tr><th style="width:110px">分销商</th><td>${esc(d.distributor_name)}（${esc(d.distributor_code)}）</td></tr>
+        <tr><th>状态</th><td><span class="tag ${d.status}">${esc(d.status_label)}</span></td></tr>
+        <tr><th>下单时间</th><td>${esc(d.order_date)}</td></tr>
+        <tr><th>备注</th><td>${esc(d.remark) || "-"}</td></tr>
+        <tr><th>旺店通单号</th><td>${esc(d.wdt_tid) || "（未推送）"}</td></tr>
+        <tr><th>推送状态</th><td>${d.push_status === "sent"
+          ? `已推送${d.pushed_at ? " · " + esc(d.pushed_at) : ""}`
+          : d.push_status === "failed"
+            ? `<span style="color:#e5484d">失败：${esc(d.push_message) || "（无报错详情）"}</span>`
+            : "未推送"}</td></tr>
+      </table>
+      <table style="margin-top:12px"><thead><tr><th>商品</th><th>编号</th><th class="num">数量</th>
+        <th class="num">单价</th><th class="num">小计</th></tr></thead>
+        <tbody>${d.lines.map(l => `<tr><td>${esc(l.goods_name)} ${l.spec_name ? "(" + esc(l.spec_name) + ")" : ""}</td>
+          <td>${esc(l.goods_no)}</td><td class="num">${l.quantity}</td>
+          <td class="num">${money(l.unit_price)}</td><td class="num"><b>${money(l.subtotal)}</b></td></tr>`).join("")}
+        </tbody></table>
+      <div class="line-total">订单合计：<b style="font-size:17px">${money(d.total_amount)}</b></div>`;
+    openModal("detailModal");
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- 经销商价格体系 ---------- */
+async function loadPrices(){
+  const distId = $("priceDist").value;
+  const body = $("priceBody"), empty = $("priceEmpty");
+  if (!distId) { body.innerHTML = ""; empty.style.display = ""; return; }
+  try {
+    const data = await api("/api/fx/prices?distributor_id=" + distId);
+    state.prices = data.prices;
+  } catch (e) { state.prices = []; toast("价格加载失败: " + e.message); }
+  const map = Object.fromEntries(state.prices.map(p => [p.product_id, p]));
+  const rows = state.products.filter(p => p.active);
+  empty.style.display = rows.length ? "none" : "";
+  body.innerHTML = rows.map(p => {
+    const ov = map[p.id];
+    const orig = ov ? ov.price : "";
+    return `<tr data-product="${p.id}">
+      <td><b>${esc(p.sku)}</b></td><td>${esc(p.name)}</td><td>${esc(p.spec) || "-"}</td><td>${esc(p.unit)}</td>
+      <td class="num">${money(p.base_price)}</td>
+      <td><input class="price-in" type="number" min="0" step="0.01" style="width:110px"
+            value="${orig}" data-orig="${orig}" placeholder="${p.base_price}" oninput="markDirtyRow(this)">
+          ${orig ? '<span class="tag on">专属</span>' : ""}</td>
+      <td class="ops">${orig ? `<button class="btn mini" onclick="clearPrice(${p.id})">恢复基础价</button>` : ""}</td>
+    </tr>`;
+  }).join("");
+}
+
+function markDirtyRow(input){
+  const row = input.closest("tr");
+  row.classList.toggle("dirty", input.value !== (input.dataset.orig ?? ""));
+}
+
+async function saveDirtyPrices(){
+  const distId = $("priceDist").value;
+  if (!distId) { toast("请先选择分销商"); return; }
+  const rows = [...$("priceBody").querySelectorAll("tr")];
+  const dirty = rows.filter(r => { const inp = r.querySelector(".price-in"); return inp && inp.value !== (inp.dataset.orig ?? ""); });
+  if (!dirty.length) { toast("没有需要保存的修改"); return; }
+  let ok = 0;
+  try {
+    for (const r of dirty) {
+      const pid = parseInt(r.dataset.product, 10);
+      const inp = r.querySelector(".price-in");
+      if (inp.value === "") {
+        if (inp.dataset.orig !== "") await api(`/api/fx/prices/${distId}/${pid}`, { method: "DELETE" }); // 清空=回退基础价
+      } else {
+        await api("/api/fx/prices", { method: "POST", body: JSON.stringify({ distributor_id: parseInt(distId, 10), product_id: pid, price: inp.value }) });
+      }
+      ok += 1;
+    }
+    toast(`价格已保存（${ok} 行）`);
+    state.priceCache = {}; // 下一次下单按最新价
+    await loadAll();
+    switchTab("prices");
+  } catch (e) {
+    toast("保存失败: " + e.message);
+    loadPrices();
+  }
+}
+
+async function clearPrice(pid){
+  const distId = $("priceDist").value;
+  if (!distId) return;
+  try {
+    await api(`/api/fx/prices/${distId}/${pid}`, { method: "DELETE" });
+    toast("已恢复基础价");
+    state.priceCache = {};
+    await loadAll();
+    switchTab("prices");
+  } catch (e) { toast(e.message); }
+}
+
+/* ---------- 分销商对账单 ---------- */
+async function loadStatements(){
+  try {
+    const params = new URLSearchParams();
+    if ($("stmtDist").value) params.set("distributor_id", $("stmtDist").value);
+    if ($("stmtMonth").value) params.set("month", $("stmtMonth").value);
+    state.statement = await api("/api/fx/statements" + (params.toString() ? "?" + params.toString() : ""));
+    renderStatements();
+  } catch (e) { toast(e.message); }
+}
+
+function renderStatements(){
+  const d = state.statement;
+  if (!d) return;
+  const head = $("stmtHead"), body = $("stmtBody"), empty = $("stmtEmpty"), summary = $("stmtSummary");
+  if (d.month) {
+    head.innerHTML = "<tr><th>订单号</th><th>下单时间</th><th>分销商</th><th>状态</th><th class='num'>明细</th><th class='num'>金额</th><th>操作</th></tr>";
+    body.innerHTML = d.orders.map(o => `<tr>
+      <td><b>${esc(o.order_no)}</b></td><td>${esc(o.order_date)}</td><td>${esc(o.distributor_name)}</td>
+      <td><span class="tag ${o.status}">${esc(o.status_label)}</span></td>
+      <td class="num">${o.line_count}</td><td class="num"><b>${money(o.total_amount)}</b></td>
+      <td class="ops"><button class="btn mini" onclick="viewOrder(${o.id})">查看</button></td></tr>`).join("");
+    empty.style.display = d.orders.length ? "none" : "";
+    summary.innerHTML = `<span>${esc(d.month)}：已审核订单 <b>${d.orders.length}</b> 张 · 合计 <b>${money(d.total_amount)}</b></span>`;
+  } else {
+    head.innerHTML = "<tr><th>月份</th><th class='num'>订单数</th><th class='num'>金额</th></tr>";
+    body.innerHTML = d.months.map(m => `<tr style="cursor:pointer" onclick="pickMonth('${m.month}')">
+      <td><b>${esc(m.month)}</b></td><td class="num">${m.order_count}</td><td class="num"><b>${money(m.total_amount)}</b></td></tr>`).join("");
+    empty.style.display = d.months.length ? "none" : "";
+    summary.innerHTML = `<span>点月份行可下钻到该月明细 · 合计 <b>${money(d.total_amount)}</b></span>`;
+  }
+}
+
+function pickMonth(month){
+  $("stmtMonth").value = month;
+  loadStatements();
+}
+
+function exportStatement(){
+  const distId = $("stmtDist").value, month = $("stmtMonth").value;
+  if (!distId) { toast("请先选择分销商"); return; }
+  if (!month) { toast("请先选择月份"); return; }
+  window.open(`/api/fx/statements/export?distributor_id=${distId}&month=${encodeURIComponent(month)}`, "_blank");
+}
+
+/* ---------- 批量导入（粘贴文本） ---------- */
+let importKind = "dist";
+function openImportModal(kind){
+  importKind = kind;
+  const isDist = kind === "dist";
+  $("importTitle").textContent = isDist ? "批量导入分销商" : "批量导入商品";
+  $("importHint").innerHTML = isDist
+    ? `每行一个分销商，逗号分隔：<b>编码, 名称, 联系人, 电话, 区域, 备注</b><br>例如：<code>FX001, 上海xx商贸, 王经理, 13800000000, 华东, 月结30天</code><br>已存在的编码自动跳过，不会重复。`
+    : `每行一个商品，逗号分隔：<b>SKU, 名称, 规格, 单位, 基础价, 备注</b><br>例如：<code>GL001, 巧克力礼盒, 24×100g, 箱, 168.00,</code><br>已存在的 SKU 自动跳过，不会重复。`;
+  $("importText").value = "";
+  showError("importErr", "");
+  openModal("importModal");
+}
+
+function parseImportLines(text){
+  return text.split(/\r?\n/).map(l => l.trim()).filter(Boolean)
+    .filter(l => !/^(编码|代码|sku|名称)$/i.test(l.split(/[\t,，、]+/)[0].trim()))
+    .map(l => l.split(/[\t,，、]+/).map(f => f.trim()));
+}
+
+async function runImport(){
+  const rows = parseImportLines($("importText").value);
+  if (!rows.length) { showError("importErr", "没有可导入的内容（每行一条，字段用逗号分隔）"); return; }
+  const items = importKind === "dist"
+    ? rows.map(f => ({ code: f[0] || "", name: f[1] || "", contact: f[2] || "", phone: f[3] || "", region: f[4] || "", note: f[5] || "" }))
+    : rows.map(f => ({ sku: f[0] || "", name: f[1] || "", spec: f[2] || "", unit: f[3] || "箱", base_price: f[4] || "0", note: f[5] || "" }));
+  try {
+    const res = importKind === "dist"
+      ? await api("/api/fx/distributors/import", { method: "POST", body: JSON.stringify({ items }) })
+      : await api("/api/fx/products/import", { method: "POST", body: JSON.stringify({ items }) });
+    const errs = (res.errors || []).map(e => `第 ${e.row} 行：${e.message}`);
+    closeModal("importModal");
+    toast(`导入完成：新增 ${res.created}，跳过重复 ${res.skipped}${errs.length ? "，失败 " + errs.length : ""}`);
+    if (errs.length) setTimeout(() => alert("以下行导入失败：\n" + errs.join("\n")), 120);
+    state.priceCache = {};
+    loadAll();
+  } catch (e) { showError("importErr", e.message); }
+}
+
+$("oDist").onchange = () => refillAutoPrices();
+
+loadAll();
+
+/* 外壳（shell.html）通过 ?tab=products 直接指定打开哪个子页；
+   不带参数时行为不变，仍默认「分销商」。 */
+(function () {
+  const t = new URLSearchParams(location.search).get("tab");
+  if (t && ["distributors", "products", "orders"].indexOf(t) >= 0) switchTab(t);
+})();
+</script>
+</body>
+</html>

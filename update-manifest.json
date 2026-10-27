@@ -1,0 +1,38 @@
+{
+  "app": "ecommerce-reconciliation",
+  "version": "2026.1027.1619",
+  "channel": "stable",
+  "description": "2026.1027.1619 移除「核销模块」页面（/modules）：删除路由与首页外壳、各页侧栏入口（核销任务 / 返利核销 / 系统设置三个菜单项一并下线）；模块页原文件备份在 backups/20261027-removed-modules.html。模块后台 API 保留（报表/发货/销售出库页仍在用）。上一版功能不变：经销商价格体系、批量导入、推送旺店通、对账单导出、旺店通商品同步。数据库 head=0007。",
+  "update_source": "github-api",
+  "database_revision": "0007_wdt_product_sync",
+  "preserve": [
+    ".env",
+    "data",
+    "backups",
+    ".deploy",
+    ".git"
+  ],
+  "managed_paths": [
+    "backend",
+    "scripts",
+    "migrations",
+    "docs",
+    ".github",
+    "Dockerfile",
+    "alembic.ini",
+    "Makefile",
+    "README.md",
+    "VERSION",
+    "update-manifest.json",
+    "docker-compose.yml",
+    "compose.synology.yml",
+    ".dockerignore",
+    ".gitignore",
+    ".env.example",
+    "compose.yaml",
+    "直接覆盖说明.txt",
+    "V0.8.4-启动修复说明.txt"
+  ],
+  "install_profile": "direct_overwrite_fast",
+  "requires_rebuild_for_this_release": false
+}

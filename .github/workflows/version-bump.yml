@@ -1,0 +1,66 @@
+name: 自动版本号
+
+# 每次推送到 main，自动把版本号改成「当前时间」格式：年.月日.时分，例如 2026.1027.1155。
+# 版本号同时写入 VERSION 与 update-manifest.json，两者必须一致，否则更新包校验会失败。
+# 群晖上的自动升级按这个版本号判断是否有新版，所以日常只需要在 GitHub 上改代码。
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - "VERSION"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: version-bump
+  cancel-in-progress: false
+
+jobs:
+  bump:
+    # 跳过本工作流自己产生的提交，避免无限循环。
+    if: "!contains(github.event.head_commit.message, '[skip version]')"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: 生成时间版本号并同步清单
+        shell: bash
+        run: |
+          set -euo pipefail
+          NEW_VERSION="$(TZ=Asia/Shanghai date +%Y.%m%d.%H%M)"
+          echo "新版本号：${NEW_VERSION}"
+          printf '%s\n' "$NEW_VERSION" > VERSION
+          NEW_VERSION="$NEW_VERSION" python3 - <<'PY'
+          import json
+          import os
+          import pathlib
+
+          version = os.environ["NEW_VERSION"]
+          path = pathlib.Path("update-manifest.json")
+          data = json.loads(path.read_text(encoding="utf-8"))
+          data["version"] = version
+          path.write_text(
+              json.dumps(data, ensure_ascii=False, indent=2) + "\n",
+              encoding="utf-8",
+          )
+          PY
+          echo "NEW_VERSION=$NEW_VERSION" >> "$GITHUB_ENV"
+
+      - name: 提交并推送
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add VERSION update-manifest.json
+          if git diff --cached --quiet; then
+            echo "版本号无变化（同一分钟内多次提交），跳过。"
+            exit 0
+          fi
+          git commit -m "chore(release): ${NEW_VERSION} [skip ci] [skip version]"
+          git push

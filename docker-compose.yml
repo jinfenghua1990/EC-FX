@@ -1,0 +1,59 @@
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: reconciliation
+      POSTGRES_USER: recon
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-recon}
+    # 数据库不发布宿主机端口：应用通过 compose 内部网络 db:5432 访问。
+    # 需要本机排查时用：docker compose exec db psql -U recon -d reconciliation
+    volumes:
+      - recon_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U recon -d reconciliation"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    restart: unless-stopped
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        PIP_INDEX_URL: ${PIP_INDEX_URL:-https://pypi.tuna.tsinghua.edu.cn/simple}
+        PIP_DEFAULT_TIMEOUT: ${PIP_DEFAULT_TIMEOUT:-120}
+        PIP_RETRIES: ${PIP_RETRIES:-10}
+    image: ecommerce-reconciliation:${APP_IMAGE_TAG:-local}
+    # DSM File Station 解压 ZIP 可能丢失可执行位；始终交给 /bin/sh 执行启动脚本。
+    command: ["/bin/sh", "/app/scripts/container-start.sh"]
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql+psycopg://recon:${POSTGRES_PASSWORD:-recon}@db:5432/reconciliation
+    ports:
+      - "8010:8010"
+    volumes:
+      - ./data:/app/data
+      # 快速覆盖模式：代码直接从群晖项目目录挂载到容器。
+      # 以后普通 UI / Python / 算法更新只需覆盖文件后重建 app 容器，无需 docker build。
+      - ./backend:/app/backend:ro
+      - ./migrations:/app/migrations:ro
+      - ./alembic.ini:/app/alembic.ini:ro
+      - ./update-manifest.json:/app/update-manifest.json:ro
+      - ./VERSION:/app/VERSION:ro
+      - ./scripts/container-start.sh:/app/scripts/container-start.sh:ro
+      - ./scripts/migrate.py:/app/scripts/migrate.py:ro
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8010/healthz', timeout=5).read()"]
+      interval: 10s
+      timeout: 6s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
+volumes:
+  recon_pg:

@@ -1,0 +1,381 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>F/X 分销系统</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --top:#1b2735; --top-hover:#26354a; --top-active:#2463eb;
+  --bg:#f4f6fa; --card:#fff; --line:#e6ebf3; --line-soft:#eef2f8;
+  --text:#1c2740; --muted:#7b8798; --blue:#2463eb; --green:#18a05e;
+  --top-h:56px; --tab-h:40px; --side-w:210px;
+}
+html,body{height:100%}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;color:var(--text);background:var(--bg);overflow:hidden}
+
+/* ---------- 顶部一级菜单 ---------- */
+.topbar{height:var(--top-h);background:var(--top);display:flex;align-items:center;gap:4px;padding:0 14px 0 16px;flex-shrink:0;position:relative;z-index:20}
+.brand{display:flex;align-items:center;gap:9px;color:#fff;font-size:15.5px;font-weight:700;letter-spacing:.2px;padding-right:22px;white-space:nowrap}
+.brand .logo{width:30px;height:30px;border-radius:9px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(36,99,235,.45)}
+.primary{display:flex;align-items:center;gap:2px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
+.primary::-webkit-scrollbar{display:none}
+.pitem{display:flex;align-items:center;gap:7px;height:38px;padding:0 15px;border-radius:9px;color:#c2cddd;font-size:14px;font-weight:500;cursor:pointer;white-space:nowrap;border:0;background:transparent;font-family:inherit;transition:background .15s,color .15s}
+.pitem:hover{background:var(--top-hover);color:#fff}
+.pitem.active{background:var(--top-active);color:#fff;font-weight:600;box-shadow:0 2px 10px rgba(36,99,235,.35)}
+.pitem .ic{font-size:15px;line-height:1}
+.topright{display:flex;align-items:center;gap:10px;padding-left:14px;flex-shrink:0}
+.ver{font-size:12px;color:#8b98ab;white-space:nowrap}
+.ver b{color:#c9d4e2;font-weight:600}
+
+/* ---------- 主体 ---------- */
+.body{display:flex;height:calc(100% - var(--top-h));min-height:0}
+
+/* 左侧二级菜单 */
+.side{width:var(--side-w);background:var(--card);border-right:1px solid var(--line);display:flex;flex-direction:column;flex-shrink:0;transition:width .18s ease;overflow:hidden}
+.side.hidden{width:0;border-right:0}
+.sideInner{width:var(--side-w);display:flex;flex-direction:column;height:100%}
+.sideTitle{padding:16px 18px 10px;font-size:11.5px;font-weight:700;color:var(--muted);letter-spacing:1.2px;text-transform:uppercase;white-space:nowrap}
+.secondary{flex:1;overflow-y:auto;padding:2px 10px 12px}
+.sitem{display:flex;align-items:center;gap:10px;padding:10px 12px;margin:2px 0;border-radius:9px;color:#4a5568;font-size:13.5px;text-decoration:none;cursor:pointer;white-space:nowrap;border:0;background:transparent;font-family:inherit;width:100%;text-align:left;transition:background .13s,color .13s}
+.sitem .ic{width:17px;text-align:center;font-size:14.5px;flex-shrink:0}
+.sitem:hover{background:#f2f5fb;color:var(--text)}
+.sitem.active{background:#eaf0fe;color:var(--blue);font-weight:650}
+.sitem.active::after{content:"";margin-left:auto;width:5px;height:5px;border-radius:50%;background:var(--blue)}
+.sideEmpty{padding:14px 12px;font-size:12.5px;color:var(--muted);line-height:1.7}
+
+/* 右侧主区 */
+.main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0}
+
+/* 标签页 */
+.tabbar{height:var(--tab-h);background:#eef2f8;border-bottom:1px solid var(--line);display:flex;align-items:center;padding:0 8px 0 6px;flex-shrink:0;gap:6px}
+.menutoggle{width:28px;height:28px;border:0;background:transparent;color:#5b6778;font-size:15px;cursor:pointer;border-radius:7px;flex-shrink:0}
+.menutoggle:hover{background:#e2e8f3;color:var(--text)}
+.tabstrip{display:flex;align-items:center;gap:5px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none;padding:3px 0}
+.tabstrip::-webkit-scrollbar{display:none}
+.tab{display:flex;align-items:center;gap:7px;height:30px;padding:0 8px 0 12px;border-radius:8px;font-size:13px;color:#5b6778;cursor:pointer;white-space:nowrap;background:transparent;border:1px solid transparent;flex-shrink:0;transition:background .13s}
+.tab:hover{background:#e3e9f4}
+.tab.active{background:#fff;border-color:var(--line);color:var(--text);font-weight:650;box-shadow:0 1px 2px rgba(16,24,40,.05)}
+.tab .x{width:16px;height:16px;border:0;background:transparent;color:#9aa6b6;font-size:14px;line-height:1;cursor:pointer;border-radius:4px;padding:0;display:flex;align-items:center;justify-content:center}
+.tab .x:hover{background:#e6ebf3;color:#c0392b}
+.tabtools{display:flex;align-items:center;gap:4px;flex-shrink:0;padding-left:4px}
+.iconbtn{width:28px;height:28px;border:0;background:transparent;color:#5b6778;font-size:14px;cursor:pointer;border-radius:7px}
+.iconbtn:hover{background:#e3e9f4;color:var(--text)}
+
+/* 标签内容 */
+.frames{position:relative;flex:1;min-height:0;background:var(--bg)}
+.frame{position:absolute;inset:0;display:none}
+.frame.active{display:block}
+.frame iframe{width:100%;height:100%;border:0;display:block;background:var(--bg)}
+.blank{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:10px;color:var(--muted);font-size:13.5px}
+.blank .big{font-size:34px;opacity:.35}
+.blank.hide{display:none}
+
+@media(max-width:900px){
+  .side{position:absolute;top:var(--top-h);bottom:0;left:0;z-index:15;box-shadow:6px 0 20px rgba(16,24,40,.12)}
+  .brand{padding-right:10px}
+  .brandname{display:none}
+}
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="brand"><span class="logo">🤝</span><span class="brandname">F/X 分销系统</span></div>
+  <nav class="primary" id="primaryNav"></nav>
+  <div class="topright">
+    <span class="ver">v<b id="verText">--</b></span>
+    <button class="iconbtn" id="btnReloadTop" title="刷新当前标签页" style="color:#c2cddd">↻</button>
+  </div>
+</header>
+
+<div class="body">
+  <aside class="side" id="side">
+    <div class="sideInner">
+      <div class="sideTitle" id="sideTitle">菜单</div>
+      <nav class="secondary" id="secondaryNav"></nav>
+    </div>
+  </aside>
+
+  <main class="main">
+    <div class="tabbar">
+      <button class="menutoggle" id="btnMenu" title="展开 / 收起左侧菜单">☰</button>
+      <div class="tabstrip" id="tabStrip"></div>
+      <div class="tabtools">
+        <button class="iconbtn" id="btnReload" title="刷新当前页">↻</button>
+        <button class="iconbtn" id="btnCloseAll" title="关闭全部标签">✕</button>
+      </div>
+    </div>
+    <div class="frames" id="frames">
+      <div class="blank" id="blank">
+        <div class="big">🗂</div>
+        <div>还没有打开任何页面</div>
+        <div style="font-size:12.5px">从顶部菜单选择，或在左侧二级菜单里点开</div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+/* ============================================================
+   菜单配置：顶部一级菜单 → 左侧二级菜单
+   每点开一个二级菜单，就在标签栏新增一个 TAB（同一个只会开一次，不会重复） */
+const MENUS = [
+  { key: 'workbench', label: '工作台', icon: '🏠', children: [
+    { key: 'wb-home', label: '核销工作台', icon: '📊', url: '/workbench?embed=1' },
+  ]},
+  { key: 'dist', label: '分销', icon: '🤝', children: [
+    { key: 'fx-distributors', label: '分销商', icon: '🏢', url: '/distribution?embed=1&tab=distributors' },
+    { key: 'fx-products', label: '商品', icon: '📦', url: '/distribution?embed=1&tab=products' },
+    { key: 'fx-orders', label: '分销订单', icon: '🧾', url: '/distribution?embed=1&tab=orders' },
+  ]},
+  { key: 'recon', label: '核销', icon: '🧮', children: [
+    { key: 'recon-sales', label: '销售出库', icon: '📤', url: '/sales-outbound?embed=1' },
+  ]},
+  { key: 'ship', label: '发货', icon: '🚚', children: [
+    { key: 'ship-detail', label: '发货明细', icon: '📦', url: '/shipments?embed=1' },
+  ]},
+  { key: 'report', label: '报表', icon: '📈', children: [
+    { key: 'report-center', label: '报表中心', icon: '📊', url: '/reports?embed=1' },
+  ]},
+  { key: 'system', label: '系统', icon: '⚙️', children: [
+    { key: 'system-update', label: '系统更新', icon: '🔄', url: '/workbench?embed=1#update' },
+  ]},
+];
+
+const STORE_KEY = 'fx_shell_state_v1';
+const $ = id => document.getElementById(id);
+const esc = s => String(s == null ? '' : s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+let state = { menu: 'workbench', sideOpen: true, tabs: [], active: '' };
+
+/* ---------- 存取记忆：刷新页面后标签还在，不迷路 ---------- */
+function save() {
+  try {
+    sessionStorage.setItem(STORE_KEY, JSON.stringify({
+      menu: state.menu, sideOpen: state.sideOpen,
+      tabs: state.tabs.map(t => ({ key: t.key, label: t.label, url: t.url })),
+      active: state.active,
+    }));
+  } catch (e) { /* 隐私模式下忽略 */ }
+}
+function restore() {
+  try {
+    const raw = sessionStorage.getItem(STORE_KEY);
+    if (!raw) return;
+    const saved = JSON.parse(raw);
+    if (saved && typeof saved === 'object') {
+      if (MENUS.some(m => m.key === saved.menu)) state.menu = saved.menu;
+      state.sideOpen = saved.sideOpen !== false;
+      state.tabs = Array.isArray(saved.tabs) ? saved.tabs.filter(t => t && t.url) : [];
+      state.active = saved.active || '';
+    }
+  } catch (e) { /* 忽略坏数据 */ }
+}
+
+/* ---------- 菜单查找 ---------- */
+function findMenu(key) { return MENUS.find(m => m.key === key) || MENUS[0]; }
+function findChild(key, url) {
+  for (const m of MENUS) {
+    for (const c of m.children) {
+      if (key && c.key === key) return { menu: m, child: c };
+      if (!key && url && normUrl(c.url) === normUrl(url)) return { menu: m, child: c };
+    }
+  }
+  return null;
+}
+function normUrl(u) { return String(u || '').split('#')[0]; }
+
+/* ---------- 渲染 ---------- */
+function renderPrimary() {
+  $('primaryNav').innerHTML = MENUS.map(m =>
+    `<button class="pitem ${m.key === state.menu ? 'active' : ''}" data-menu="${m.key}" onclick="pickMenu('${m.key}')">
+       <span class="ic">${m.icon}</span>${esc(m.label)}
+     </button>`).join('');
+}
+
+function renderSecondary() {
+  const menu = findMenu(state.menu);
+  $('sideTitle').textContent = menu.label;
+  $('secondaryNav').innerHTML = menu.children.length
+    ? menu.children.map(c => {
+        const open = state.tabs.some(t => normUrl(t.url) === normUrl(c.url));
+        const active = state.active && state.tabs.some(t => t.key === state.active && normUrl(t.url) === normUrl(c.url));
+        return `<button class="sitem ${active ? 'active' : ''} ${open ? 'is-open' : ''}" onclick="openChild('${c.key}')">
+                  <span class="ic">${c.icon || '·'}</span>${esc(c.label)}
+                </button>`;
+      }).join('')
+    : `<div class="sideEmpty">这个菜单下暂时没有页面</div>`;
+}
+
+function renderTabs() {
+  const strip = $('tabStrip');
+  strip.innerHTML = state.tabs.map(t =>
+    `<div class="tab ${t.key === state.active ? 'active' : ''}" onclick="activate('${t.key}')" title="${esc(t.label)}">
+       <span>${esc(t.label)}</span>
+       <button class="x" title="关闭" onclick="event.stopPropagation();closeTab('${t.key}')">×</button>
+     </div>`).join('');
+  const blank = $('blank');
+  if (blank) blank.classList.toggle('hide', state.tabs.length > 0);
+}
+
+/* ---------- 打开 / 切换 / 关闭 ---------- */
+function pickMenu(key) {
+  const menu = findMenu(key);
+  // 再点一次当前一级菜单 = 收起/展开左侧
+  if (state.menu === key && state.sideOpen) {
+    state.sideOpen = false;
+    applySide();
+    state.menu = key;
+    renderPrimary();
+    save();
+    return;
+  }
+  state.menu = key;
+  state.sideOpen = true;
+  renderPrimary(); renderSecondary(); applySide();
+  // 只有一个子菜单时直接打开，省一次点击
+  if (menu.children.length === 1) openChild(menu.children[0].key);
+  save();
+}
+
+function openChild(key) {
+  const hit = findChild(key, null);
+  if (!hit) return;
+  openUrl(hit.child.url, hit.child.label, key);
+}
+
+/** 供子页面调用：favicon 一样的小跳转，统一走标签，不整页跳走 */
+window.__fxOpen = function (url, label) { openUrl(url, label, ''); };
+
+function openUrl(url, label, key) {
+  if (!url) return;
+  // 已经开过同一个地址 → 只切换，不重开（这是"避免页面反复跳"的核心）
+  let tab = state.tabs.find(t => normUrl(t.url) === normUrl(url));
+  if (tab) { activate(tab.key); return; }
+
+  const child = findChild(key || '', url);
+  const id = 't' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
+  tab = {
+    key: id,
+    label: label || (child && child.child.label) || guessLabel(url),
+    url,
+  };
+  state.tabs.push(tab);
+  mountFrame(tab);
+  activate(tab.key);
+}
+
+function guessLabel(url) {
+  const path = normUrl(url).split('?')[0].replace(/\/$/, '') || '/';
+  const map = { '/': '首页', '/workbench': '核销工作台', '/distribution': '分销系统',
+                '/shipments': '发货明细', '/reports': '报表中心', '/sales-outbound': '销售出库' };
+  return map[path] || path;
+}
+
+function mountFrame(tab) {
+  const box = document.createElement('div');
+  box.className = 'frame';
+  box.id = 'f_' + tab.key;
+  const f = document.createElement('iframe');
+  f.src = tab.url;
+  f.setAttribute('loading', 'eager');
+  f.title = tab.label;
+  box.appendChild(f);
+  $('frames').appendChild(box);
+}
+
+function activate(key) {
+  const tab = state.tabs.find(t => t.key === key);
+  if (!tab) return;
+  state.active = key;
+  document.querySelectorAll('.frame').forEach(el => el.classList.toggle('active', el.id === 'f_' + key));
+  renderTabs(); renderSecondary();
+  // 左菜单跟着高亮到对应一级/二级
+  const hit = findChild('', tab.url);
+  if (hit && hit.menu.key !== state.menu) { state.menu = hit.menu.key; renderPrimary(); renderSecondary(); }
+  save();
+}
+
+function closeTab(key) {
+  const idx = state.tabs.findIndex(t => t.key === key);
+  if (idx < 0) return;
+  const el = $('f_' + key);
+  if (el) el.remove();
+  state.tabs.splice(idx, 1);
+  if (state.active === key) {
+    const next = state.tabs[idx] || state.tabs[idx - 1];
+    state.active = next ? next.key : '';
+    if (next) {
+      document.querySelectorAll('.frame').forEach(x => x.classList.toggle('active', x.id === 'f_' + next.key));
+    }
+  }
+  renderTabs(); renderSecondary(); save();
+}
+
+function closeAll() {
+  if (!state.tabs.length) return;
+  state.tabs.forEach(t => { const el = $('f_' + t.key); if (el) el.remove(); });
+  state.tabs = []; state.active = '';
+  renderTabs(); renderSecondary(); save();
+}
+
+function reloadActive() {
+  const tab = state.tabs.find(t => t.key === state.active);
+  if (!tab) return;
+  const el = $('f_' + tab.key);
+  const f = el && el.querySelector('iframe');
+  if (f) f.src = tab.url;
+}
+
+/* ---------- 左侧展开/收起 ---------- */
+function applySide() {
+  $('side').classList.toggle('hidden', !state.sideOpen);
+}
+
+/* ---------- 启动 ---------- */
+restore();
+
+/* 支持直接链接：/?menu=dist&open=fx-products
+   —— 方便收藏某个页面，也让外部系统能一键跳到指定标签 */
+const qs = new URLSearchParams(location.search);
+const wantMenu = qs.get('menu');
+const wantOpen = qs.get('open');
+if (wantMenu && MENUS.some(m => m.key === wantMenu)) {
+  state.menu = wantMenu;
+  state.sideOpen = true;
+}
+
+renderPrimary();
+renderSecondary();
+applySide();
+
+// 恢复上次的标签（重建 iframe，地址不变）
+state.tabs.forEach(t => mountFrame(t));
+if (state.active && state.tabs.some(t => t.key === state.active)) {
+  activate(state.active);
+} else if (state.tabs.length) {
+  activate(state.tabs[state.tabs.length - 1].key);
+} else {
+  // 首次进来：默认打开核销工作台
+  openChild(MENUS[0].children[0].key);
+}
+
+// 深链接指定的页面优先
+if (wantOpen) openChild(wantOpen);
+
+$('btnMenu').onclick = () => { state.sideOpen = !state.sideOpen; applySide(); save(); };
+$('btnReload').onclick = reloadActive;
+$('btnReloadTop').onclick = reloadActive;
+$('btnCloseAll').onclick = closeAll;
+
+window.addEventListener('beforeunload', save);
+
+// 版本号
+fetch('/api/system-update/status', { cache: 'no-store' })
+  .then(r => r.json())
+  .then(d => { $('verText').textContent = d.current_version || '--'; })
+  .catch(() => { $('verText').textContent = '--'; });
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+V0.8.4 群晖全量可覆盖包
+
+直接解压到：/volume1/docker/ecommerce-reconciliation/
+DSM File Station 中选择“覆盖已有文件”。
+
+本包包含全部可安全覆盖内容：
+- backend/ 完整后端、网页、算法、测试
+- migrations/ 全部数据库迁移 0001~0004
+- scripts/ 全部部署、迁移、更新、备份、回滚脚本
+- docs/ 文档
+- Dockerfile
+- docker-compose.yml
+- compose.yaml
+- compose.synology.yml
+- alembic.ini
+- Makefile
+- VERSION
+- update-manifest.json
+- .dockerignore / .gitignore / .env.example
+- .github/workflows/ci.yml
+
+本包故意不包含、不会覆盖：
+- .env（旺店通/GitHub Token/本机配置）
+- data/（业务上传和运行数据）
+- backups/（备份）
+- .deploy/（运行时更新状态）
+- .git/（Git 仓库元数据）
+- PostgreSQL Docker volume（数据库实际数据）
+
+V0.8.4 已修复 Synology File Station 解压导致 shell 执行位丢失的问题：
+app 使用 /bin/sh /app/scripts/container-start.sh 启动。
+
+覆盖完成后：
+1. 在 Container Manager 中对 ecommerce-reconciliation 项目执行“重新创建/重建/启动”。
+2. 等待 app 与 db 均变绿。
+3. 打开 http://192.168.3.55:8010

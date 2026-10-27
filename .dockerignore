@@ -1,0 +1,14 @@
+.git
+.github
+.env
+.env.*
+!.env.example
+backups/
+data/
+.deploy/
+**/__pycache__/
+**/.pytest_cache/
+**/*.pyc
+*.zip
+*.xlsx
+*.xls

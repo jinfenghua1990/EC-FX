@@ -1,0 +1,13 @@
+电商核销中心 V0.8.4 — 群晖直接覆盖启动修复
+
+修复原因：
+DSM File Station 解压 ZIP 时，Shell 脚本的 Linux 可执行权限可能变成普通文件权限。
+V0.8.3 又把 scripts/container-start.sh 直接 bind mount 到容器，覆盖了镜像内已 chmod +x 的版本，导致 app 容器启动时可能出现 Permission denied 并退出。
+
+修复：
+compose.yaml / docker-compose.yml / compose.synology.yml 明确使用：
+command: ["/bin/sh", "/app/scripts/container-start.sh"]
+因此即使宿主机脚本不是可执行文件，也可以正常启动。
+
+保留：
+.env、data、backups 不在直接覆盖包中；端口仍为 8010；数据库 revision 仍为 0004_standardization_pipeline。

@@ -1,0 +1,27 @@
+# 环境与密钥（务必保留 .env.example 作为模板）
+.env
+.env.*
+!.env.example
+compose.yaml
+
+# 运行数据与备份（含数据库、账单表格，不入库）
+data/
+backups/
+.deploy/
+*.db
+*.sqlite*
+*.xlsx
+*.xls
+*.csv
+*.zip
+
+# Python 虚拟环境与缓存
+.venv/
+venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# 系统杂项
+.DS_Store
+Thumbs.db

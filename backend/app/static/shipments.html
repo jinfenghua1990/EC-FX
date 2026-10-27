@@ -1,0 +1,265 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>发货明细 · 电商核销中心</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar:#1b2735; --sidebar-hover:#24334a; --active:#2463eb;
+  --bg:#f4f6fa; --card:#fff; --line:#e8ecf3; --muted:#7b8798;
+  --text:#1c2740; --blue:#2463eb; --green:#18a05e; --orange:#f59e0b; --red:#e5484d; --teal:#0e9f9a;
+}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.sidebar{width:216px;background:var(--sidebar);color:#c6d0de;display:flex;flex-direction:column;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;font-size:16px;font-weight:700;color:#fff}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav{flex:1;padding:6px 10px}
+.nav a{display:flex;align-items:center;gap:10px;padding:11px 12px;margin:2px 0;border-radius:9px;color:#aab6c8;text-decoration:none;font-size:14px;position:relative}
+.nav a .ic{width:18px;text-align:center;font-size:15px}
+.nav a:hover{background:var(--sidebar-hover);color:#fff}
+.nav a.active{background:var(--active);color:#fff;font-weight:600}
+.nav a.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:2px;background:#5b8bef}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;flex-shrink:0}
+.crumbs{font-size:13px;color:var(--muted)}
+.crumbs b{color:var(--text);font-weight:600}
+.topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:5px}
+.btn{border:1px solid #d6dce6;background:#fff;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500}
+.btn:hover{border-color:#b9c4d4}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{background:#1d54cf}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.content{padding:20px 24px 40px;overflow:auto}
+h1.page{font-size:22px;margin-bottom:16px}
+.filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px}
+.filterbar select,.filterbar input{min-height:34px;border:1px solid #d8dee9;border-radius:8px;background:#fff;padding:6px 10px;font-size:13px;color:var(--text)}
+.filterbar .search{flex:1;min-width:200px}
+.stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;gap:12px;align-items:flex-start}
+.stat .ico{width:40px;height:40px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:18px;flex-shrink:0}
+.stat .k{font-size:12.5px;color:var(--muted);margin-bottom:6px}
+.stat .v{font-size:19px;font-weight:750;letter-spacing:-.3px}
+.stat .s{font-size:11.5px;color:var(--muted);margin-top:4px}
+.ico.blue{background:#e8effd;color:var(--blue)}
+.ico.green{background:#e5f6ee;color:var(--green)}
+.ico.amber{background:#fdf3df;color:#d97706}
+.ico.teal{background:#e0f4f3;color:var(--teal)}
+.ico.red{background:#fdeaea;color:var(--red)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h3{font-size:14.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--blue)}
+.card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card .head h3{margin:0}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f7f9fc;text-align:left;padding:9px 10px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;color:#5b6778}
+td{padding:9px 10px;border-bottom:1px solid #f0f3f8;white-space:nowrap}
+tr:hover td{background:#fafbfe}
+td.num{font-variant-numeric:tabular-nums}
+.tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
+.tag.ok{background:#e5f6ee;color:var(--green)}
+.tag.wait{background:#fdf1dc;color:#b45309}
+.tag.off{background:#fdeaea;color:var(--red)}
+.tag.adj{background:#e8effd;color:var(--blue)}
+.tag.mut{background:#f1f3f6;color:#687386}
+.pager{display:flex;gap:8px;align-items:center;justify-content:flex-end;margin-top:12px;font-size:13px;color:var(--muted)}
+.pager .btn{padding:5px 12px}
+.empty{padding:48px 0;text-align:center;color:var(--muted);font-size:13.5px}
+.empty .big{font-size:34px;margin-bottom:10px}
+#detailMask{position:fixed;inset:0;background:rgba(18,26,40,.45);display:none;align-items:flex-start;justify-content:center;z-index:50;padding:60px 20px}
+#detailMask.show{display:flex}
+#detailBox{background:#fff;border-radius:14px;max-width:860px;width:100%;max-height:80vh;overflow:auto;padding:20px}
+#detailBox h3{margin-bottom:12px}
+#detailBox .close{float:right;cursor:pointer;border:none;background:none;font-size:16px;color:var(--muted)}
+</style>
+<script src="/static/embed.js"></script>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><span class="logo">🛒</span>电商核销中心</div>
+  <nav class="nav">
+    <a href="/workbench"><span class="ic">🏠</span>工作台</a>
+    <a href="#" data-soon><span class="ic">💰</span>平台收入</a>
+    <a class="active" href="/shipments"><span class="ic">🚚</span>发货明细</a>
+    <a href="#" data-soon><span class="ic">📦</span>采购与库存</a>
+    <a href="#" data-soon><span class="ic">🧾</span>费用管理</a>
+    <a href="/reports"><span class="ic">📊</span>报表中心</a>
+  </nav>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="crumbs">核销管理&nbsp;/&nbsp;<b>发货明细</b></div>
+    <div class="topright">
+      <span><span class="dot" id="wdtDot"></span><span id="wdtState">旺店通检测中…</span></span>
+      <button class="btn primary" id="syncBtn" onclick="syncMonth()">⟳ 同步本月旺店通</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <h1 class="page">发货明细</h1>
+
+    <div class="filterbar">
+      <input type="month" id="fMonth" style="min-height:34px">
+      <select id="fShop"><option value="">全部店铺</option></select>
+      <select id="fPlatform"><option value="">全部平台</option></select>
+      <select id="fStatus"><option value="">全部状态</option></select>
+      <select id="fRefund"><option value="">退款:全部</option></select>
+      <select id="fAdj"><option value="all">调整:全部</option><option value="adjusted">已调整</option><option value="unadjusted">未调整</option><option value="excluded">已排除</option></select>
+      <input class="search" id="fSearch" placeholder="🔍 出库单号 / 订单号 / 店铺">
+      <button class="btn" onclick="load()">查询</button>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="card">
+      <div class="head"><h3>销售出库订单</h3><span style="font-size:12.5px;color:var(--muted)" id="totalInfo"></span></div>
+      <table>
+        <thead><tr><th>出库单号</th><th>店铺</th><th>平台</th><th>发货时间</th><th>状态</th><th>退款</th><th>销售金额</th><th>货品成本</th><th>邮资+包装</th><th>毛利</th><th>标记</th><th>操作</th></tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+      <div class="empty" id="empty" style="display:none"><div class="big">📦</div>本月暂无出库数据 —— 点右上角「同步本月旺店通」拉取</div>
+      <div class="pager">
+        <span id="pageInfo"></span>
+        <button class="btn" id="prevBtn" onclick="go(-1)">上一页</button>
+        <button class="btn" id="nextBtn" onclick="go(1)">下一页</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="detailMask" onclick="if(event.target===this)this.classList.remove('show')">
+  <div id="detailBox"><button class="close" onclick="document.getElementById('detailMask').classList.remove('show')">✕</button><div id="detailBody">加载中…</div></div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=n=>'¥'+Number(n||0).toLocaleString('zh-CN',{maximumFractionDigits:0});
+const fmt2=n=>'¥'+Number(n||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+let page=1, pages=1;
+const PLATFORM_NAMES={ '39':'拼多多','75':'快手','69':'抖音','101':'得物' };
+const pname=id=>PLATFORM_NAMES[String(id)]||String(id??'-');
+
+function defMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
+
+async function jfetch(url){let r=await fetch(url);let d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||'请求失败');return d}
+function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+
+function qs(){
+  const p=new URLSearchParams({month:$('fMonth').value||defMonth(),page,page_size:50});
+  if($('fShop').value)p.set('shop',$('fShop').value);
+  if($('fPlatform').value)p.set('platform',$('fPlatform').value);
+  if($('fStatus').value)p.set('status',$('fStatus').value);
+  if($('fRefund').value)p.set('refund_status',$('fRefund').value);
+  if($('fAdj').value&&$('fAdj').value!=='all')p.set('adjustment',$('fAdj').value);
+  if($('fSearch').value.trim())p.set('keyword',$('fSearch').value.trim());
+  return p;
+}
+
+async function loadOverview(){
+  try{
+    const o=await jfetch(`/api/data/sales-outbound/overview?month=${$('fMonth').value}`);
+    const t=o.effective_totals||{};
+    const cards=[
+      {k:'发货订单数',v:String(o.orders??0),sub:`已调整 ${o.adjusted_orders||0} · 已排除 ${o.excluded_orders||0}`,ico:'📦',cls:'blue'},
+      {k:'销售金额',v:fmt(t.goods_total_amount),sub:'RAW '+fmt((o.raw_totals||{}).goods_total_amount),ico:'💰',cls:'green'},
+      {k:'货品成本',v:fmt(t.goods_total_cost),sub:'物流 '+fmt(t.post_cost)+' · 包装 '+fmt(t.package_cost),ico:'🏷️',cls:'amber'},
+      {k:'毛利',v:fmt(o.effective_gross_profit),sub:'RAW '+fmt(o.raw_gross_profit),ico:'📈',cls:'teal'},
+      {k:'毛利率',v:(o.effective_gross_margin_pct??0)+'%',sub:'RAW '+(o.raw_gross_margin_pct??0)+'%',ico:'🎯',cls:'red'},
+    ];
+    $('stats').innerHTML=cards.map(c=>`<div class="stat"><div class="ico ${c.cls}">${c.ico}</div><div><div class="k">${c.k}</div><div class="v">${c.v}</div><div class="s">${c.sub}</div></div></div>`).join('');
+  }catch(e){$('stats').innerHTML=''}
+}
+
+async function loadFacets(){
+  try{
+    const f=await jfetch(`/api/data/sales-outbound/filters?month=${$('fMonth').value}`);
+    const fill=(id,list,allLabel)=>{const cur=$(id).value;$(id).innerHTML=`<option value="">${allLabel}</option>`+(list||[]).map(x=>`<option value="${esc(x)}" ${x===cur?'selected':''}>${esc(x)}</option>`).join('')};
+    fill('fShop',f.shops,'全部店铺');
+    const prevPlat=$('fPlatform').value;
+    $('fPlatform').innerHTML=`<option value="">全部平台</option>`+(f.platforms||[]).map(x=>`<option value="${esc(x)}" ${x===prevPlat?'selected':''}>${esc(pname(x))}</option>`).join('');
+    fill('fStatus',f.statuses,'全部状态');fill('fRefund',f.refund_statuses,'退款:全部');
+  }catch(e){}
+}
+
+async function load(){
+  page=Math.max(1,page);
+  try{
+    const d=await jfetch('/api/data/sales-outbound/orders?'+qs());
+    pages=d.pages;page=d.page;
+    $('totalInfo').textContent=`共 ${Number(d.total).toLocaleString()} 单`;
+    $('empty').style.display=d.rows.length?'none':'block';
+    $('rows').innerHTML=d.rows.map(r=>{
+      const e=r.effective||{},rw=r.raw||{};
+      const post=(Number(e.post_cost||0)+Number(e.package_cost||0));
+      return `<tr>
+      <td style="font-family:ui-monospace,monospace;font-size:12px">${esc(r.stockout_no)}</td>
+      <td>${esc(r.shop_name)}</td><td>${esc(pname(r.platform_id))}</td>
+      <td style="color:var(--muted)">${esc((r.consign_time||'').replace('T',' ').slice(0,16))}</td>
+      <td><span class="tag ${r.status==='已发货'||r.status==='已完成'?'ok':'mut'}">${esc(r.status||'-')}</span></td>
+      <td>${r.refund_status&&r.refund_status!=='无退款'?`<span class="tag wait">${esc(r.refund_status)}</span>`:'<span class="tag mut">-</span>'}</td>
+      <td class="num">${fmt2(e.goods_total_amount)}</td>
+      <td class="num">${fmt2(e.goods_total_cost)}</td>
+      <td class="num">${fmt2(post)}</td>
+      <td class="num" style="color:${Number(r.effective_gross_profit)>=0?'var(--green)':'var(--red)'};font-weight:600">${fmt2(r.effective_gross_profit)}</td>
+      <td>${r.excluded?'<span class="tag off">已排除</span>':r.adjusted?'<span class="tag adj">已调整</span>':''}</td>
+      <td><span class="link" style="color:var(--blue);cursor:pointer;font-size:12.5px" onclick="detail('${esc(r.stockout_no)}')">详情</span></td>
+      </tr>`;}).join('');
+    $('pageInfo').textContent=`第 ${d.page} / ${d.pages} 页`;
+    $('prevBtn').disabled=page<=1;$('nextBtn').disabled=page>=pages;
+  }catch(e){$('rows').innerHTML=`<tr><td colspan="12" class="empty">加载失败：${esc(e.message)}</td></tr>`}
+}
+
+function go(d){page+=d;load()}
+
+async function detail(no){
+  $('detailMask').classList.add('show');$('detailBody').textContent='加载中…';
+  try{
+    const d=await jfetch('/api/data/sales-outbound/orders/'+encodeURIComponent(no));
+    const o=d.order||d,e=d.effective||{},rw=d.raw||{};
+    const row=(k,a,b)=>`<tr><td>${k}</td><td class="num">${a}</td><td class="num">${b}</td></tr>`;
+    $('detailBody').innerHTML=`<h3>出库单 ${esc(no)}</h3>
+    <div style="font-size:13px;color:var(--muted);margin-bottom:10px">店铺 ${esc(o.shop_name||'-')} · 平台 ${esc(pname(o.platform_id)||'-')} · 发货 ${esc((o.consign_time||'').replace('T',' ').slice(0,16))} · 状态 ${esc(o.status||'-')}</div>
+    <table><thead><tr><th>项目</th><th>旺店通原始</th><th>核销生效值</th></tr></thead><tbody>
+    ${row('销售金额',fmt2(rw.goods_total_amount),fmt2(e.goods_total_amount))}
+    ${row('货品成本',fmt2(rw.goods_total_cost),fmt2(e.goods_total_cost))}
+    ${row('物流成本',fmt2(rw.post_cost),fmt2(e.post_cost))}
+    ${row('包装成本',fmt2(rw.package_cost),fmt2(e.package_cost))}
+    ${row('应收金额',fmt2(rw.receivable),fmt2(e.receivable))}
+    ${row('已付金额',fmt2(rw.paid),fmt2(e.paid))}
+    </tbody></table>
+    ${d.adjustments&&d.adjustments.length?`<h3 style="margin-top:14px">调整记录</h3><table><tbody>${d.adjustments.map(a=>`<tr><td>${esc(a.reason||a.field_name||'')}</td></tr>`).join('')}</tbody></table>`:''}`;
+  }catch(e){$('detailBody').textContent='加载失败：'+e.message}
+}
+
+async function syncMonth(){
+  const m=$('fMonth').value||defMonth();
+  if(!confirm(`同步 ${m} 整月的旺店通销售出库？已有数据不会重复写入。`))return;
+  const b=$('syncBtn');b.disabled=true;b.textContent='同步中…';
+  try{
+    const start=`${m}-01T00:00`,end=new Date(new Date(m+'-01').getFullYear(),new Date(m+'-01').getMonth()+1,0,23,59);
+    const endStr=`${m}-${String(end.getDate()).padStart(2,'0')}T23:59`;
+    const r=await fetch(`/api/data/sales-outbound/sync?start=${encodeURIComponent(start)}&end=${encodeURIComponent(endStr)}`,{method:'POST'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'同步失败');
+    alert(`同步完成：订单 ${d.orders}，明细 ${d.items??'-'}`);
+    await Promise.all([loadOverview(),loadFacets(),load()]);
+  }catch(e){alert('同步失败：'+e.message)}
+  finally{b.disabled=false;b.textContent='⟳ 同步本月旺店通'}
+}
+
+async function checkWdt(){
+  try{const r=await fetch('/api/wdt/test');if(r.ok){$('wdtState').textContent='旺店通已连接';return}}catch(e){}
+  $('wdtDot').style.background='#f59e0b';$('wdtState').textContent='旺店通未连接';
+}
+
+$('fMonth').value=defMonth();
+$('fMonth').addEventListener('change',()=>{page=1;loadFacets();loadOverview();load()});
+['fShop','fPlatform','fStatus','fRefund','fAdj'].forEach(id=>$(id).addEventListener('change',()=>{page=1;load()}));
+$('fSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){page=1;load()}});
+loadOverview();loadFacets();load();checkWdt();
+</script>
+</body>
+</html>

@@ -1,0 +1,631 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>报表中心 · 电商核销中心</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar:#1b2735; --sidebar-hover:#24334a; --active:#2463eb;
+  --bg:#f4f6fa; --card:#fff; --line:#e8ecf3; --muted:#7b8798;
+  --text:#1c2740; --blue:#2463eb; --green:#18a05e; --orange:#f59e0b; --red:#e5484d; --teal:#0e9f9a;
+}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.sidebar{width:216px;background:var(--sidebar);color:#c6d0de;display:flex;flex-direction:column;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;font-size:16px;font-weight:700;color:#fff}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav{flex:1;padding:6px 10px}
+.nav a{display:flex;align-items:center;gap:10px;padding:11px 12px;margin:2px 0;border-radius:9px;color:#aab6c8;text-decoration:none;font-size:14px;position:relative}
+.nav a .ic{width:18px;text-align:center;font-size:15px}
+.nav a:hover{background:var(--sidebar-hover);color:#fff}
+.nav a.active{background:var(--active);color:#fff;font-weight:600}
+.nav a.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:2px;background:#5b8bef}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;flex-shrink:0}
+.crumbs{font-size:13px;color:var(--muted)}
+.crumbs b{color:var(--text);font-weight:600}
+.topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:5px}
+.btn{border:1px solid #d6dce6;background:#fff;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500}
+.btn:hover{border-color:#b9c4d4}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{background:#1d54cf}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.content{padding:20px 24px 40px;overflow:auto}
+h1.page{font-size:22px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card h3{font-size:14.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--blue)}
+.card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card .head h3{margin:0}
+.card .head .sub{font-size:12px;color:var(--muted)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{background:#f7f9fc;text-align:left;padding:9px 10px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;color:#5b6778}
+td{padding:9px 10px;border-bottom:1px solid #f0f3f8;white-space:nowrap}
+tr:hover td{background:#fafbfe}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+td.neg{color:var(--red)}
+.empty{padding:36px 0;text-align:center;color:var(--muted);font-size:13px}
+/* ---------- 仓库月度销售主报表 ---------- */
+.rpBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.rpLbl{font-size:12.5px;color:var(--muted)}
+.rpInput{min-height:32px;border:1px solid #d8dee9;border-radius:8px;padding:4px 8px;font-size:13px;background:#fff}
+.rpSpacer{flex:1}
+.rpStats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin:14px 0}
+.rpStat{border:1px solid var(--line);border-radius:10px;padding:12px 14px;background:#fafbfe}
+.rpStat .k{font-size:12px;color:var(--muted);margin-bottom:5px}
+.rpStat .v{font-size:18px;font-weight:750;letter-spacing:-.2px;font-variant-numeric:tabular-nums}
+.rpStat .v.neg{color:var(--red)}
+.rpTableWrap{max-height:62vh;overflow:auto;border:1px solid var(--line);border-radius:10px}
+.rpTableWrap table{margin:0}
+.rpTableWrap thead th{position:sticky;top:0;z-index:1}
+.rpTableWrap tfoot td{background:#f7f9fc;font-weight:700;border-top:2px solid var(--line);position:sticky;bottom:0}
+.rpFoot{display:flex;gap:10px;align-items:center;margin-top:12px;font-size:12.5px;color:var(--muted);flex-wrap:wrap}
+.rpFoot .btn{padding:4px 10px;font-size:12.5px}
+/* ---------- DIY 折叠面板 ---------- */
+details.diyDetails{padding:0}
+details.diyDetails summary{list-style:none;cursor:pointer;padding:14px 16px;font-size:14px;font-weight:600;display:flex;align-items:center;gap:8px;user-select:none}
+details.diyDetails summary::-webkit-details-marker{display:none}
+details.diyDetails summary::before{content:"";width:4px;height:14px;border-radius:2px;background:#9aa5b5}
+details.diyDetails summary::after{content:"展开 ▾";margin-left:auto;font-size:12px;color:var(--muted);font-weight:400}
+details.diyDetails[open] summary::after{content:"收起 ▴"}
+details.diyDetails[open] summary::before{background:var(--blue)}
+details.diyDetails .diyBody{padding:0 16px 16px;border-top:1px solid var(--line)}
+.diyRow{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:14px;padding-top:14px}
+.diySpacer{flex:1}
+.diyLbl{font-size:12.5px;color:var(--muted)}
+.diyInput{min-height:32px;border:1px solid #d8dee9;border-radius:8px;padding:4px 8px;font-size:13px;background:#fff}
+.diySeg{display:inline-flex;background:#eef1f6;border-radius:10px;padding:3px;gap:2px}
+.diySeg button{border:0;background:transparent;border-radius:8px;padding:5px 16px;font-size:13px;cursor:pointer;color:#5b6778;display:flex;flex-direction:column;align-items:center;gap:1px;line-height:1.25}
+.diySeg button span{font-size:10.5px;color:#9aa5b5;font-weight:400}
+.diySeg button.on{background:#fff;color:var(--text);font-weight:600;box-shadow:0 1px 3px rgba(28,39,64,.14)}
+.diySeg button.on span{color:var(--blue)}
+.diyStepLbl{font-size:12.5px;font-weight:600;color:#5b6778;margin:2px 0 8px}
+.diyGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(215px,1fr));gap:10px}
+.diyGroup{border:1px solid var(--line);border-radius:10px;padding:10px 12px;background:#fafbfe}
+.diyGroupHead{display:flex;align-items:center;gap:8px;font-size:12.5px;font-weight:600;color:#5b6778;margin-bottom:6px}
+.diyGroupHead a{font-weight:400;font-size:11.5px;cursor:pointer;text-decoration:none}
+.diyGroupHead a.all{color:var(--blue)} .diyGroupHead a.none{color:var(--muted)}
+.diyGroup label{display:flex;align-items:center;gap:6px;font-size:12.5px;padding:2.5px 0;white-space:nowrap;cursor:pointer}
+.diyGroup label:hover{color:var(--blue)}
+.diyDimFilters{display:flex;gap:8px;flex-wrap:wrap;margin:8px 0 0}
+.dfSlot{display:inline-flex;align-items:center;gap:6px;background:#f4f7fc;border:1px solid #dde3ee;border-radius:8px;padding:4px 8px 4px 10px;font-size:12.5px}
+.dfSlot .dfLabel{color:#5b6778;font-weight:600}
+.dfSlot select{min-height:28px;border:1px solid #d8dee9;border-radius:6px;padding:2px 6px;font-size:12.5px;background:#fff;max-width:280px}
+.dfSlot .dfHint{color:#9aa5b5;font-size:11px}
+.dfSlot .dfDel{cursor:pointer;color:#9aa5b5;margin-left:2px;font-size:14px;line-height:1}
+.dfSlot .dfDel:hover{color:var(--red)}
+.diyTplBar{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:10px}
+.diyTplBar .lb{font-size:12.5px;color:#5b6778;font-weight:600;margin-right:2px}
+.tpl{border:1px solid #d8dee9;background:#fff;border-radius:999px;padding:5px 13px;font-size:12.5px;cursor:pointer;color:#3d4a5c;transition:.15s}
+.tpl:hover{border-color:var(--blue);color:var(--blue);background:#f2f7ff}
+.tpl.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.diySortBar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;padding:9px 12px;border:1px dashed #d8dee9;border-radius:10px;background:#fcfdff;font-size:12.5px;color:#5b6778}
+.diySortBar select,.diySortBar input{min-height:30px;border:1px solid #d8dee9;border-radius:8px;padding:3px 8px;font-size:12.5px;background:#fff}
+.diySortBar input{width:76px}
+.diyFoot{display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:14px;padding-top:12px;font-size:12.5px}
+.diyFoot b{color:var(--blue)}
+</style>
+<script src="/static/embed.js"></script>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><span class="logo">🛒</span>电商核销中心</div>
+  <nav class="nav">
+    <a href="/workbench"><span class="ic">🏠</span>工作台</a>
+    <a href="#" data-soon><span class="ic">💰</span>平台收入</a>
+    <a href="/shipments"><span class="ic">🚚</span>发货明细</a>
+    <a href="#" data-soon><span class="ic">📦</span>采购与库存</a>
+    <a href="#" data-soon><span class="ic">🧾</span>费用管理</a>
+    <a class="active" href="/reports"><span class="ic">📊</span>报表中心</a>
+  </nav>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="crumbs">核销管理&nbsp;/&nbsp;<b>报表中心</b></div>
+    <div class="topright">
+      <span><span class="dot" id="wdtDot"></span><span id="wdtState">旺店通检测中…</span></span>
+      <input type="month" id="fMonth" class="rpInput" title="同步的目标月份">
+      <button class="btn primary" id="syncBtn" onclick="syncMonth()">⟳ 同步本月旺店通</button>
+    </div>
+  </div>
+
+  <div class="content">
+    <h1 class="page">报表中心</h1>
+
+    <div class="card">
+      <div class="head">
+        <h3>仓库月度销售</h3>
+        <span class="sub">每个月 × 每个仓库的销售数量、售价、成本、毛利 · 数据量大时建议先选仓库或缩小日期范围</span>
+      </div>
+
+      <div class="rpBar">
+        <label class="rpLbl">日期</label>
+        <input type="date" id="rpStart" class="rpInput">
+        <label class="rpLbl">至</label>
+        <input type="date" id="rpEnd" class="rpInput">
+        <label class="rpLbl">仓库</label>
+        <select id="rpWarehouse" class="rpInput" style="max-width:220px"><option value="">全部仓库</option></select>
+        <label class="rpLbl">按</label>
+        <select id="rpDim" class="rpInput">
+          <option value="goods_name">商品</option>
+          <option value="class_name">品类</option>
+          <option value="brand_name">品牌</option>
+          <option value="spec_no">规格编号</option>
+        </select>
+        <label class="rpLbl">排序</label>
+        <select id="rpSort" class="rpInput">
+          <option value="sales">销售金额</option>
+          <option value="qty">销售数量</option>
+          <option value="avg_price">销售均价</option>
+          <option value="gross">毛利</option>
+          <option value="margin">毛利率</option>
+        </select>
+        <select id="rpSortDir" class="rpInput">
+          <option value="desc">从高到低</option>
+          <option value="asc">从低到高</option>
+        </select>
+        <span class="rpSpacer"></span>
+        <button class="btn primary" id="rpRunBtn" onclick="runRp()">🔍 查询</button>
+        <button class="btn" id="rpCsvBtn" onclick="exportRp()" title="导出全部行（CSV，Excel 直开不乱码）">⬇ 导出 CSV</button>
+      </div>
+
+      <div class="rpStats" id="rpStats"></div>
+
+      <div class="rpTableWrap">
+        <table>
+          <thead id="rpHead"></thead>
+          <tbody id="rpBody"></tbody>
+          <tfoot id="rpFoot"></tfoot>
+        </table>
+        <div class="empty" id="rpLoading" style="display:none">查询中，数据量较大时约需 10~40 秒…</div>
+        <div class="empty" id="rpEmpty" style="display:none">当前范围暂无出库数据（可先用右上角「同步本月旺店通」补数据）</div>
+      </div>
+
+      <div class="rpFoot">
+        <span id="rpInfo"></span>
+        <span class="rpSpacer"></span>
+        <button class="btn" id="rpPrev" onclick="rpPage(-1)">‹ 上一页</button>
+        <span id="rpPageNo"></span>
+        <button class="btn" id="rpNext" onclick="rpPage(1)">下一页 ›</button>
+      </div>
+    </div>
+
+    <details class="card diyDetails" id="diyDetails">
+      <summary>高级自定义导出（明细 / 订单 / 汇总 · 全字段自选）</summary>
+      <div class="diyBody">
+        <div class="diyRow">
+          <div class="diySeg" id="diySeg">
+            <button type="button" data-mode="detail" class="on" onclick="diySetMode('detail')">明细<span>一行一个商品</span></button>
+            <button type="button" data-mode="order" onclick="diySetMode('order')">订单<span>一行一单</span></button>
+            <button type="button" data-mode="summary" onclick="diySetMode('summary')">汇总<span>维度 × 指标</span></button>
+          </div>
+          <span class="diySpacer"></span>
+          <label class="diyLbl">日期</label>
+          <input type="date" id="diyStart" class="diyInput">
+          <label class="diyLbl">至</label>
+          <input type="date" id="diyEnd" class="diyInput">
+          <input type="text" id="diyKeyword" class="diyInput" style="width:170px" placeholder="单号 / 店铺关键字（可空）">
+          <label class="diyLbl">仓库</label>
+          <select id="diyWarehouse" class="diyInput" style="max-width:210px"><option value="">全部仓库</option></select>
+          <label class="diyLbl">店铺</label>
+          <select id="diyShop" class="diyInput" style="max-width:230px"><option value="">全部店铺</option></select>
+          <input type="radio" name="diyMode" value="detail" checked style="display:none">
+          <input type="radio" name="diyMode" value="order" style="display:none">
+          <input type="radio" name="diyMode" value="summary" style="display:none">
+        </div>
+
+        <div class="diyStepLbl" id="diyPickTitle">② 选择导出字段</div>
+        <div id="diyFieldPanel">
+          <div id="diyFieldGroups" class="diyGrid"></div>
+        </div>
+
+        <div id="diySummaryPanel" style="display:none">
+          <div class="diyTplBar">
+            <span class="lb">常用组合</span>
+            <button class="tpl" data-tpl="wh_goods" onclick="diyApplyTpl('wh_goods')">仓库 × 商品</button>
+            <button class="tpl" data-tpl="wh_class" onclick="diyApplyTpl('wh_class')">仓库 × 品类</button>
+            <button class="tpl" data-tpl="wh_brand_goods" onclick="diyApplyTpl('wh_brand_goods')">仓库 × 品牌 × 商品</button>
+            <button class="tpl" data-tpl="shop_goods" onclick="diyApplyTpl('shop_goods')">店铺 × 商品</button>
+            <button class="tpl" data-tpl="month_class" onclick="diyApplyTpl('month_class')">月份 × 品类</button>
+            <button class="tpl" data-tpl="plat_goods" onclick="diyApplyTpl('plat_goods')">平台 × 商品</button>
+          </div>
+          <div class="diyGrid" style="grid-template-columns:1fr 1fr">
+            <div class="diyGroup">
+              <div class="diyGroupHead">汇总维度 <span style="font-weight:400;color:var(--muted);font-size:11px">（带 * 按商品行聚合，不含包装成本）</span><span class="diySpacer"></span><a class="all" onclick="diyToggleAll('.diyDim',true)">全选</a><a class="none" onclick="diyToggleAll('.diyDim',false)">清空</a></div>
+              <div id="diyDims"></div>
+            </div>
+            <div class="diyGroup">
+              <div class="diyGroupHead">指标<span class="diySpacer"></span><a class="all" onclick="diyToggleAll('.diyMeasure',true)">全选</a><a class="none" onclick="diyToggleAll('.diyMeasure',false)">清空</a></div>
+              <div id="diyMeasures"></div>
+            </div>
+          </div>
+          <div class="diyDimFilters" id="diyDimFilters"><span class="dfHint" id="diyDimFiltersHint">勾选上方维度后会出现值筛选下拉（如勾「仓库」→ 选某个仓）</span></div>
+          <div class="diySortBar">
+            <span>排序</span>
+            <select id="diySortBy"><option value="">自动（按销售金额）</option></select>
+            <select id="diySortDir"><option value="desc">从高到低</option><option value="asc">从低到高</option></select>
+            <span style="margin-left:6px">仅取前</span>
+            <input type="number" id="diyTop" min="0" placeholder="全部">
+            <span>行（如 Top 50 商品）</span>
+            <span style="color:var(--muted)">提示：先在上方「仓库」下拉选定某个仓，再点「仓库 × 商品」，即导出该仓的产品明细汇总</span>
+          </div>
+        </div>
+
+        <div class="diyFoot">
+          <span>已选 <b id="diyCount">0</b></span>
+          <span style="color:var(--muted)" id="diyNote"></span>
+          <span class="diySpacer"></span>
+          <button class="btn" onclick="syncGoodsClass()" id="diySyncBtn" title="从旺店通拉取商品品类(零食/巧克力等)，明细与汇总的「品类」字段依赖此缓存">⟳ 同步品类缓存</button>
+          <button class="btn primary" onclick="doDiyExport()">⬇ 导出 CSV</button>
+        </div>
+      </div>
+    </details>
+  </div>
+</div>
+
+<script>
+const $=id=>document.getElementById(id);
+const fmt=n=>'¥'+Number(n||0).toLocaleString('zh-CN',{maximumFractionDigits:0});
+const fmt2=n=>'¥'+Number(n||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
+const PLATFORM_NAMES={ '39':'拼多多','75':'快手','69':'抖音','101':'得物' };
+const pname=id=>PLATFORM_NAMES[String(id)]||String(id??'-');
+
+function defMonth(){const d=new Date();return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`}
+function prevMonths(n){const out=[];const now=new Date();for(let i=0;i<n;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);out.push(`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}`)}return out}
+
+async function jfetch(url){let r=await fetch(url);let d=await r.json().catch(()=>({}));if(!r.ok)throw new Error(d.detail||'请求失败');return d}
+function esc(v){return String(v??'').replace(/[&<>"']/g,s=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[s]))}
+
+async function syncMonth(){
+  const m=$('fMonth').value||defMonth();
+  if(!confirm(`同步 ${m} 整月的旺店通销售出库？已有数据不会重复写入。`))return;
+  const b=$('syncBtn');b.disabled=true;b.textContent='同步中…';
+  try{
+    const start=`${m}-01T00:00`,end=new Date(new Date(m+'-01').getFullYear(),new Date(m+'-01').getMonth()+1,0,23,59);
+    const endStr=`${m}-${String(end.getDate()).padStart(2,'0')}T23:59`;
+    const r=await fetch(`/api/data/sales-outbound/sync?start=${encodeURIComponent(start)}&end=${encodeURIComponent(endStr)}`,{method:'POST'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'同步失败');
+    alert(`同步完成：订单 ${d.orders}，明细 ${d.items??'-'}`);
+  }catch(e){alert('同步失败：'+e.message)}
+  finally{b.disabled=false;b.textContent='⟳ 同步本月旺店通'}
+}
+
+async function checkWdt(){
+  try{const r=await fetch('/api/wdt/test');if(r.ok){$('wdtState').textContent='旺店通已连接';return}}catch(e){}
+  $('wdtDot').style.background='#f59e0b';$('wdtState').textContent='旺店通未连接';
+}
+
+/* ---------- 仓库月度销售（主报表） ---------- */
+const RP_PAGE_SIZE=100;
+const RP_MEASURES=['orders','qty','sales','avg_price','cost','avg_cost','gross','margin'];
+const RP_MEASURE_LABELS={orders:'订单数',qty:'件数',sales:'销售金额',avg_price:'销售均价',cost:'成本金额',avg_cost:'单件成本',gross:'毛利',margin:'毛利率%'};
+const RP_MONEY=['销售金额','销售均价','成本金额','单件成本','毛利'];
+let RP_DATA=null,RP_PAGE=1;
+
+function rpNfmt(n,dec){return Number(n||0).toLocaleString('zh-CN',{minimumFractionDigits:dec,maximumFractionDigits:dec})}
+
+async function loadRpOptions(){
+  const start=$('rpStart').value,end=$('rpEnd').value;
+  if(!start||!end)return;
+  const keep=$('rpWarehouse').value;
+  $('rpWarehouse').innerHTML='<option value="" disabled selected>加载中…</option>';
+  try{
+    const o=await jfetch(`/api/data/sales-outbound/export/filter-options?start=${start}&end=${end}`);
+    const list=o.warehouses||[];
+    $('rpWarehouse').innerHTML='<option value="">全部仓库</option>'+list.map(v=>`<option ${v===keep?'selected':''}>${esc(v)}</option>`).join('');
+    if(!list.includes(keep))$('rpWarehouse').value='';
+  }catch(e){
+    $('rpWarehouse').innerHTML='<option value="">全部仓库</option>';
+  }
+}
+function rpParams(){
+  const p=new URLSearchParams({
+    mode:'summary',
+    start:$('rpStart').value,end:$('rpEnd').value,
+    group_by:['month','warehouse_name',$('rpDim').value].join(','),
+    measures:RP_MEASURES.join(','),
+    sort_by:$('rpSort').value,sort_dir:$('rpSortDir').value,
+    warehouse:(()=>{const el=$('rpWarehouse');return (el.selectedIndex>=0&&el.options[el.selectedIndex].disabled)?'':el.value})(),
+    shop:''
+  });
+  return p;
+}
+async function runRp(){
+  const start=$('rpStart').value,end=$('rpEnd').value;
+  if(!start||!end||start>end){alert('请选择有效的日期范围');return}
+  const b=$('rpRunBtn');b.disabled=true;b.textContent='查询中…';
+  $('rpLoading').style.display='block';$('rpEmpty').style.display='none';
+  $('rpHead').innerHTML='';$('rpBody').innerHTML='';$('rpFoot').innerHTML='';
+  $('rpStats').innerHTML='';$('rpInfo').textContent='';$('rpPageNo').textContent='';
+  try{
+    const p=rpParams();p.set('format','json');
+    RP_DATA=await jfetch('/api/data/sales-outbound/export?'+p.toString());
+    RP_PAGE=1;renderRp();
+  }catch(e){alert('查询失败：'+e.message)}
+  finally{b.disabled=false;b.textContent='🔍 查询';$('rpLoading').style.display='none'}
+}
+function renderRp(){
+  const d=RP_DATA;
+  if(!d)return;
+  const headers=d.headers||[],rows=d.rows||[];
+  if(!rows.length){
+    $('rpEmpty').style.display='block';
+    $('rpInfo').textContent='共 0 组';
+    return;
+  }
+  $('rpEmpty').style.display='none';
+  $('rpInfo').textContent=`共 ${d.total_groups} 组数据`;
+  // 列头
+  $('rpHead').innerHTML='<tr>'+headers.map(h=>{
+    const num=Object.values(RP_MEASURE_LABELS).includes(h);
+    return `<th class="${num?'num':''}">${esc(h)}</th>`;
+  }).join('')+'</tr>';
+  // 全量合计（分页只影响显示，不影响合计）
+  const idx=k=>headers.indexOf(RP_MEASURE_LABELS[k]);
+  let tq=0,ts=0,tc=0,tg=0;
+  const iQty=idx('qty'),iSales=idx('sales'),iCost=idx('cost'),iGross=idx('gross');
+  rows.forEach(r=>{tq+=r[iQty]||0;ts+=r[iSales]||0;tc+=r[iCost]||0;tg+=r[iGross]||0});
+  const tMargin=ts?tg/ts*100:0;
+  $('rpStats').innerHTML=[
+    ['销售数量',rpNfmt(tq,0),false],
+    ['销售金额','¥'+rpNfmt(ts,2),false],
+    ['成本金额','¥'+rpNfmt(tc,2),false],
+    ['毛利（毛利率）',`¥${rpNfmt(tg,2)}（${rpNfmt(tMargin,2)}%）`,tg<0]
+  ].map(([k,v,neg])=>`<div class="rpStat"><div class="k">${k}</div><div class="v${neg?' neg':''}">${v}</div></div>`).join('');
+  // 分页
+  const pages=Math.max(1,Math.ceil(rows.length/RP_PAGE_SIZE));
+  if(RP_PAGE>pages)RP_PAGE=pages;
+  const slice=rows.slice((RP_PAGE-1)*RP_PAGE_SIZE,RP_PAGE*RP_PAGE_SIZE);
+  const numIdx=new Set(headers.map((h,i)=>Object.values(RP_MEASURE_LABELS).includes(h)?i:-1).filter(i=>i>=0));
+  $('rpBody').innerHTML=slice.map(r=>'<tr>'+r.map((v,ci)=>{
+    if(numIdx.has(ci)){
+      const dec=RP_MONEY.includes(headers[ci])||headers[ci]==='毛利率%'?2:0;
+      const neg=(headers[ci]==='毛利'||headers[ci]==='毛利率%')&&Number(v)<0;
+      return `<td class="num${neg?' neg':''}">${rpNfmt(v,dec)}</td>`;
+    }
+    return `<td>${esc(v)}</td>`;
+  }).join('')+'</tr>').join('');
+  // 合计行（订单数跨组会重复计数，不合计）
+  let foot=`<td style="font-weight:700">合计（${d.total_groups} 组）</td>`;
+  headers.slice(1).forEach(h=>{
+    if(h==='订单数'){foot+='<td class="num">-</td>';return}
+    if(h==='件数'){foot+=`<td class="num">${rpNfmt(tq,0)}</td>`;return}
+    if(h==='销售金额'){foot+=`<td class="num">${rpNfmt(ts,2)}</td>`;return}
+    if(h==='销售均价'){foot+=`<td class="num">${rpNfmt(tq?ts/tq:0,2)}</td>`;return}
+    if(h==='成本金额'){foot+=`<td class="num">${rpNfmt(tc,2)}</td>`;return}
+    if(h==='单件成本'){foot+=`<td class="num">${rpNfmt(tq?tc/tq:0,2)}</td>`;return}
+    if(h==='毛利'){foot+=`<td class="num${tg<0?' neg':''}">${rpNfmt(tg,2)}</td>`;return}
+    if(h==='毛利率%'){foot+=`<td class="num${tMargin<0?' neg':''}">${rpNfmt(tMargin,2)}</td>`;return}
+    foot+='<td class="num">-</td>';
+  });
+  $('rpFoot').innerHTML='<tr>'+foot+'</tr>';
+  $('rpPageNo').textContent=`第 ${RP_PAGE} / ${pages} 页`;
+  $('rpPrev').disabled=RP_PAGE<=1;
+  $('rpNext').disabled=RP_PAGE>=pages;
+}
+function rpPage(delta){
+  if(!RP_DATA)return;
+  const pages=Math.max(1,Math.ceil((RP_DATA.rows||[]).length/RP_PAGE_SIZE));
+  RP_PAGE=Math.min(pages,Math.max(1,RP_PAGE+delta));
+  renderRp();
+}
+function exportRp(){
+  const start=$('rpStart').value,end=$('rpEnd').value;
+  if(!start||!end||start>end){alert('请选择有效的日期范围');return}
+  window.open('/api/data/sales-outbound/export?'+rpParams().toString());
+}
+
+/* ---------- DIY 导出（高级） ---------- */
+const DIY_DEFAULT_FIELDS=['consign_time','stockout_no','shop_name','platform_name','warehouse_name','logistics_name','logistics_no','goods_name','spec_no','class_name','brand_name','item_count','share_amount','cost_price','item_profit'];
+const DIY_DEFAULT_DIMS=['month','warehouse_name','class_name'];
+const DIY_DEFAULT_MEASURES=['orders','qty','sales','cost','gross','margin'];
+let DIY_CATALOG=null;
+
+function diyMode(){return document.querySelector('input[name=diyMode]:checked').value}
+function diySetMode(m){
+  document.querySelectorAll('input[name=diyMode]').forEach(r=>r.checked=(r.value===m));
+  document.querySelectorAll('#diySeg button').forEach(b=>b.classList.toggle('on',b.dataset.mode===m));
+  $('diyFieldPanel').style.display=(m==='summary')?'none':'block';
+  $('diySummaryPanel').style.display=(m==='summary')?'block':'none';
+  $('diyPickTitle').textContent=(m==='summary')?'② 选择维度与指标':'② 选择导出字段';
+  updateDiyCount();
+}
+function initDiyDimFilterBinding(){
+  const root=$('diyDims');
+  if(!root||root._dfBound)return;
+  root.addEventListener('change',e=>{
+    const cb=e.target.closest&&e.target.closest('.diyDim');
+    if(!cb)return;
+    if(cb.checked) renderDimFilter(cb.value);
+    else removeDimFilter(cb.value,false);
+  });
+  root._dfBound=true;
+}
+function diyModeChange(){diySetMode(document.querySelector('input[name=diyMode]:checked').value)}
+function chip(label,input){return `<label>${input}${esc(label)}</label>`}
+
+function updateDiyCount(){
+  const m=diyMode();
+  const n=(m==='summary')
+    ?document.querySelectorAll('.diyDim:checked').length+document.querySelectorAll('.diyMeasure:checked').length
+    :document.querySelectorAll('.diyField:checked').length;
+  const unit=(m==='summary')?'项（维度+指标）':'个字段';
+  $('diyCount').textContent=`${n} ${unit}`;
+}
+
+async function loadDiyCatalog(){
+  if(DIY_CATALOG)return;
+  try{
+    DIY_CATALOG=await jfetch('/api/data/sales-outbound/export/fields');
+    $('diyFieldGroups').innerHTML=DIY_CATALOG.groups.map(gr=>`
+      <div class="diyGroup">
+        <div class="diyGroupHead">${esc(gr.name)}<span class="diySpacer"></span>
+          <a class="all" onclick="diyToggleGroup('${esc(gr.name)}',true)">全选</a>
+          <a class="none" onclick="diyToggleGroup('${esc(gr.name)}',false)">清空</a></div>
+        ${gr.fields.map(f=>chip(f.label,`<input type="checkbox" class="diyField" data-group="${esc(gr.name)}" value="${esc(f.key)}" ${DIY_DEFAULT_FIELDS.includes(f.key)?'checked':''}>`)).join('')}
+      </div>`).join('');
+    $('diyDims').innerHTML=DIY_CATALOG.summary_dimensions.map(d=>chip(d.label+(d.item_level?' *':''),`<input type="checkbox" class="diyDim" value="${esc(d.key)}" ${DIY_DEFAULT_DIMS.includes(d.key)?'checked':''}>`)).join('');
+    $('diyMeasures').innerHTML=DIY_CATALOG.summary_measures.map(m=>chip(m.label,`<input type="checkbox" class="diyMeasure" value="${esc(m.key)}" ${DIY_DEFAULT_MEASURES.includes(m.key)?'checked':''}>`)).join('');
+    $('diyNote').textContent=DIY_CATALOG.note;
+    diyFillSort();
+    initDiyDimFilterBinding();
+    updateDiyCount();
+  }catch(e){$('diyNote').textContent='字段目录加载失败：'+e.message}
+}
+function diyToggleGroup(name,checked){
+  document.querySelectorAll(`.diyField[data-group="${name}"]`).forEach(cb=>cb.checked=checked);
+  updateDiyCount();
+}
+function diyToggleAll(sel,checked){
+  document.querySelectorAll(sel).forEach(cb=>cb.checked=checked);
+  updateDiyCount();
+}
+function diyFillSort(){
+  const sel=$('diySortBy');
+  if(!sel||!DIY_CATALOG)return;
+  sel.innerHTML='<option value="">自动（按销售金额）</option>'+
+    DIY_CATALOG.summary_measures.map(m=>`<option value="${esc(m.key)}">${esc(m.label)}</option>`).join('');
+}
+const DIY_TPLS={
+  wh_goods:{dims:['warehouse_name','goods_name']},
+  wh_class:{dims:['warehouse_name','class_name']},
+  wh_brand_goods:{dims:['warehouse_name','brand_name','goods_name']},
+  shop_goods:{dims:['shop_name','goods_name']},
+  month_class:{dims:['month','class_name']},
+  plat_goods:{dims:['platform_name','goods_name']},
+};
+const DIY_TPL_MEASURES=['orders','qty','sales','cost','post','gross','margin'];
+function diyApplyTpl(name){
+  const t=DIY_TPLS[name];
+  if(!t)return;
+  diySetMode('summary');
+  document.querySelectorAll('.diyDim').forEach(cb=>cb.checked=t.dims.indexOf(cb.value)>=0);
+  document.querySelectorAll('.diyMeasure').forEach(cb=>cb.checked=DIY_TPL_MEASURES.indexOf(cb.value)>=0);
+  document.querySelectorAll('.tpl').forEach(b=>b.classList.toggle('on',b.dataset.tpl===name));
+  // 触发维度值筛选联动
+  document.querySelectorAll('.diyDim').forEach(cb=>{
+    if(cb.checked) renderDimFilter(cb.value);
+    else removeDimFilter(cb.value);
+  });
+  updateDiyCount();
+}
+async function renderDimFilter(dim){
+  const wrap=$('diyDimFilters');
+  if(!wrap)return;
+  const hint=$('diyDimFiltersHint');
+  if(hint)hint.remove();
+  let slot=document.getElementById('df_'+dim);
+  if(slot){slot.style.display='inline-flex';return}
+  slot=document.createElement('span');
+  slot.className='dfSlot';
+  slot.id='df_'+dim;
+  slot.innerHTML=`<span class="dfLabel">${esc(dim)}</span><select id="dfsel_${dim}" disabled><option value="">加载中…</option></select><span class="dfDel" title="清除该维度" onclick="removeDimFilter('${esc(dim)}',true)">×</span>`;
+  wrap.appendChild(slot);
+  try{
+    const start=$('diyStart').value,end=$('diyEnd').value;
+    const o=await jfetch(`/api/data/sales-outbound/export/distinct-values?dim=${encodeURIComponent(dim)}&start=${start}&end=${end}`);
+    const sel=slot.querySelector('select');
+    if(o.unsupported||(o.values||[]).length===0&&o.unsupported){
+      sel.innerHTML='<option value="" disabled selected>此维度暂不支持值筛选</option>';
+    } else {
+      sel.innerHTML='<option value="">全部 '+esc(dim)+'</option>'+o.values.map(v=>`<option value="${esc(v)}">${esc(v)}</option>`).join('');
+      sel.disabled=false;
+    }
+  }catch(err){
+    const sel=slot.querySelector('select');
+    sel.innerHTML='<option value="" disabled selected>加载失败</option>';
+  }
+}
+function removeDimFilter(dim,uncheck){
+  const s=document.getElementById('df_'+dim);
+  if(s)s.remove();
+  if(uncheck){
+    const cb=document.querySelector(`.diyDim[value="${CSS.escape(dim)}"]`);
+    if(cb&&cb.checked){cb.checked=false;updateDiyCount();}
+  }
+}
+
+async function loadDiyFilterOptions(){
+  const start=$('diyStart').value,end=$('diyEnd').value;
+  if(!start||!end)return;
+  const keepW=$('diyWarehouse').value,keepS=$('diyShop').value;
+  $('diyWarehouse').innerHTML='<option value="" disabled selected>加载中…</option>';
+  $('diyShop').innerHTML='<option value="" disabled selected>加载中…</option>';
+  try{
+    const o=await jfetch(`/api/data/sales-outbound/export/filter-options?start=${start}&end=${end}`);
+    const fill=(el,list,kept)=>{
+      const cur=kept||'';
+      el.innerHTML='<option value="">全部</option>'+list.map(v=>`<option ${v===cur?'selected':''}>${esc(v)}</option>`).join('');
+      if(!list.includes(cur))el.value='';
+    };
+    fill($('diyWarehouse'),o.warehouses||[],keepW);
+    fill($('diyShop'),o.shops||[],keepS);
+  }catch(e){
+    $('diyWarehouse').innerHTML='<option value="">全部</option>';
+    $('diyShop').innerHTML='<option value="">全部</option>';
+  }
+}
+function picked(cls){return Array.from(document.querySelectorAll('.'+cls+':checked')).map(cb=>cb.value)}
+function doDiyExport(){
+  const m=diyMode();
+  const start=$('diyStart').value,end=$('diyEnd').value;
+  if(!start||!end||start>end){alert('请选择有效的导出时间范围');return}
+  // 选项可能仍在异步加载（占位项 value 为空），避免把占位文字当筛选值
+  const pick=id=>{const el=$(id);return (el.selectedIndex>=0&&el.options[el.selectedIndex]&&el.options[el.selectedIndex].disabled)?'':el.value};
+  const p=new URLSearchParams({mode:m,start,end,keyword:$('diyKeyword').value.trim(),warehouse:pick('diyWarehouse'),shop:pick('diyShop')});
+  if(m==='summary'){
+    const dims=picked('diyDim'),ms=picked('diyMeasure');
+    if(!dims.length){alert('请至少勾选一个汇总维度');return}
+    if(!ms.length){alert('请至少勾选一个指标');return}
+    p.set('group_by',dims.join(','));p.set('measures',ms.join(','));
+    // 维度值过滤
+    const df=[...document.querySelectorAll('#diyDimFilters select')].map(s=>{
+      const m=(s.id||'').match(/^dfsel_(.+)$/);return m?{dim:m[1],val:s.value}:null;
+    }).filter(x=>x&&x.val);
+    if(df.length)p.set('dim_filters',df.map(x=>`${x.dim}:${x.val}`).join('|'));
+    const sb=$('diySortBy').value,sd=$('diySortDir').value,tp=parseInt($('diyTop').value||'0',10);
+    if(sb)p.set('sort_by',sb);
+    p.set('sort_dir',sd||'desc');
+    if(tp>0)p.set('top',String(tp));
+  }else{
+    const fs=picked('diyField');
+    if(!fs.length){alert('请至少勾选一个导出字段');return}
+    p.set('fields',fs.join(','));
+  }
+  window.open('/api/data/sales-outbound/export?'+p.toString());
+}
+async function syncGoodsClass(){
+  const b=$('diySyncBtn');b.disabled=true;const old=b.textContent;b.textContent='同步中…(约1-2分钟)';
+  try{
+    const r=await fetch('/api/wdt/sync-goods-class',{method:'POST'});
+    const d=await r.json();
+    if(!r.ok)throw new Error(d.detail||'同步失败');
+    alert(`品类缓存已更新：规格 ${d.spec_count} 条`);
+  }catch(e){alert('品类同步失败：'+e.message)}
+  finally{b.disabled=false;b.textContent=old}
+}
+
+/* ---------- 初始化 ---------- */
+document.querySelectorAll('[data-soon]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();alert('该模块开发中')}));
+// 主报表：默认最近 3 个月（当月往前推 2 个月的 1 号 ~ 今天）
+(function(){const n=new Date();const d=new Date(n.getFullYear(),n.getMonth()-2,1);const s=`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-01`;$('rpStart').value=s;})();
+$('rpEnd').value=new Date().toISOString().slice(0,10);
+$('rpStart').addEventListener('change',loadRpOptions);
+$('rpEnd').addEventListener('change',loadRpOptions);
+// DIY 折叠面板：默认今年 1/1 ~ 今天
+$('fMonth').value=defMonth();
+$('diyStart').value=`${new Date().getFullYear()}-01-01`;
+$('diyEnd').value=new Date().toISOString().slice(0,10);
+document.addEventListener('change',e=>{if(e.target.closest&&(e.target.closest('.diyGroup')))updateDiyCount()});
+$('diyStart').addEventListener('change',loadDiyFilterOptions);
+$('diyEnd').addEventListener('change',loadDiyFilterOptions);
+checkWdt();
+loadRpOptions();loadDiyCatalog();loadDiyFilterOptions();
+runRp();
+</script>
+</body>
+</html>
