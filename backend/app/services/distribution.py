@@ -22,7 +22,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..models import FxDistributor, FxOrder, FxOrderLine, FxPrice, FxProduct
-from .product_maintenance import maintenance_of
+from .product_maintenance import log_price_change, maintenance_of
 from .wangdian import WangdianClient
 
 MONEY_Q = Decimal("0.01")
@@ -373,7 +373,10 @@ def update_product(db: Session, product_id: int, data: dict) -> dict:
             raise ValueError("基础价格不能为负数")
         row.base_price = base_price
     if data.get("tier1_price") is not None:
-        row.tier1_price = _parse_money(data["tier1_price"], "一级分销价")
+        new_val = _parse_money(data["tier1_price"], "一级分销价")
+        old_val = row.tier1_price
+        row.tier1_price = new_val
+        log_price_change(db, row, old_val, new_val, source="manual", note="编辑商品弹窗")
     for field in ("name", "spec", "unit", "note", "brand", "category"):
         if field in data and data[field] is not None:
             setattr(row, field, str(data[field]).strip())
@@ -411,10 +414,13 @@ def set_tier1_prices(db: Session, items: list[dict]) -> dict:
             errors.append({"row": index, "message": f"商品不存在: {product_id}"})
             continue
         try:
-            row.tier1_price = _parse_money(item.get("tier1_price"), "一级分销价")
+            new_val = _parse_money(item.get("tier1_price"), "一级分销价")
         except ValueError as exc:
             errors.append({"row": index, "message": str(exc)})
             continue
+        old_val = row.tier1_price
+        row.tier1_price = new_val
+        log_price_change(db, row, old_val, new_val, source="manual")
         updated += 1
     db.commit()
     return {"updated": updated, "errors": errors}

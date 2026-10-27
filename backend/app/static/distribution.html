@@ -85,6 +85,8 @@ td.tier-cell{display:flex;align-items:center;gap:7px;padding-top:6px;padding-bot
 .tier-margin.pos{color:var(--green)}
 .tier-margin.neg{color:var(--red);font-weight:600}
 .tier-margin.na{color:#b6bfcc}
+/* 折扣率小标签：一级价 ÷ 品牌标价，如 8.5折 */
+.tier-rate{font-size:11px;color:#0f9d6e;background:#e8f8f1;border-radius:10px;padding:1px 8px;white-space:nowrap;font-variant-numeric:tabular-nums}
 .prod-ck{width:15px;height:15px;cursor:pointer;accent-color:#2463eb}
 /* 采购价列：来自旺店通采购单的真实付款价（含税/基本单位） */
 td.cost{font-variant-numeric:tabular-nums;position:relative}
@@ -238,8 +240,6 @@ toast{display:none}
     <h1 class="page">分销管理</h1>
     <div class="subtitle">红盒子供销平台 · 分销商 — 商品 — 订单审核，后续继续在此扩建</div>
 
-    <div class="stats" id="stats"></div>
-
     <div class="tabs">
       <button class="tab active" data-tab="distributors" onclick="switchTab('distributors')">分销商</button>
       <button class="tab" id="tabProducts" data-tab="products" onclick="switchTab('products')">商品</button>
@@ -293,10 +293,10 @@ toast{display:none}
       <div class="needbar" id="prodNeed" style="display:none"></div>
       <div class="tbl">
         <table class="cols" data-ckey="prod">
-          <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:104px"><col style="width:120px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:70px"><col style="width:60px"><col style="width:130px"></colgroup>
+          <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:120px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:60px"><col style="width:130px"></colgroup>
           <thead><tr>
           <th title="勾选后用上方「按标价×折扣设一级价」批量定价"><input type="checkbox" id="prodSelAll" onchange="toggleAllProd(this)"></th>
-          <th>SKU</th><th>名称</th><th class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">品牌标价(含税)</th><th class="num">采购价(含税)</th><th>一级分销价(含税)</th><th class="num" title="一级分销箱价 = 一级分销价 × 箱规；未定价或没箱规显示 —">一级箱价(含税)</th><th>规格</th><th>品牌</th><th>分类</th><th>条码</th><th>单位</th><th>箱规</th><th>来源</th><th>状态</th><th>操作</th>
+          <th>SKU</th><th>名称</th><th class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">品牌标价(含税)</th><th class="num">采购价(含税)</th><th>一级分销价(含税)</th><th class="num" title="一级分销箱价 = 一级分销价 × 箱规；未定价或没箱规显示 —">一级箱价(含税)</th><th>品牌</th><th>分类</th><th>条码</th><th>单位</th><th>箱规</th><th>状态</th><th>操作</th>
         </tr></thead><tbody id="prodBody"></tbody></table>
         <div class="empty" id="prodEmpty" style="display:none">还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。</div>
       </div>
@@ -528,26 +528,11 @@ async function loadAll(){
     state.overview = ov; state.distributors = dist.distributors; state.products = prod.products;
     state.maintenance = prod.maintenance || null;
     await loadOrders();
-    renderStats(); renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
+    renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
     fillEntrySelects(); loadStockOverview(); loadWdtShops();
     loadInventoryBadge();
     $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
   } catch (e) { toast("加载失败: " + e.message); }
-}
-
-function renderStats(){
-  const s = $("stats");
-  if (!state.overview) { s.innerHTML = ""; return; }
-  const labels = { "draft": "草稿", "submitted": "已提交待审核", "approved": "已审核", "cancelled": "已取消" };
-  const icons = { "draft": "blue", "submitted": "amber", "approved": "green", "cancelled": "red" };
-  const items = state.overview.statuses.map(x =>
-    `<div class="stat"><div class="ico ${icons[x.key]}">🧾</div><div><div class="k">${labels[x.key]}</div>
-     <div class="v num">${x.count}</div><div class="s">${money(x.amount)}</div></div></div>`);
-  items.push(`<div class="stat"><div class="ico teal">🤝</div><div><div class="k">启用分销商</div>
-    <div class="v">${state.overview.active_distributors}</div><div class="s">档案</div></div></div>`);
-  items.push(`<div class="stat"><div class="ico purple">📦</div><div><div class="k">在售商品</div>
-    <div class="v">${state.overview.active_products}</div><div class="s">SKU</div></div></div>`);
-  s.innerHTML = items.join("");
 }
 
 function switchTab(name){
@@ -854,6 +839,11 @@ function renderProducts(){
     const packQty = p.pack_qty || 0;
     const t1 = parseFloat(p.tier1_price) || 0;
     const packUnit = esc(p.pack_unit || "箱");
+    // 折扣率 = 一级价 ÷ 品牌标价（服务端 tier1_discount 同口径），如 8.5折
+    const rateVal = (lp > 0 && t1 > 0) ? t1 / lp * 10 : 0;
+    const rateCell = rateVal > 0
+      ? `<span class="tier-rate" title="一级分销折扣率 = 一级价 ${t1.toFixed(2)} ÷ 品牌标价 ${lp.toFixed(2)}">${rateVal.toFixed(1).replace(/\\.0$/, "")}折</span>`
+      : "";
     // 一级箱价 = 一级价(按盒) × 箱规，独立列；没定价或没箱规显示 —
     const boxCell = (packQty > 0 && t1 > 0)
       ? `<span title="一级分销箱价 = 一级价 ${t1.toFixed(2)} × 箱规 ${packQty}${packUnit}">¥${(t1 * packQty).toFixed(2)}</span>`
@@ -868,14 +858,12 @@ function renderProducts(){
              value="${p.tier1_price > 0 ? p.tier1_price : ""}" data-orig="${p.tier1_price > 0 ? p.tier1_price : ""}"
              data-id="${p.id}" data-cost="${costOf(p)}" data-cost-label="${costLabelOf(p)}" data-list="${lp}" data-cost-status="${p.cost_status || ""}" data-pack="${packQty}" data-pack-unit="${packUnit}" placeholder="${p.need_tier1_price ? "未设" : "待定"}" title="${p.need_tier1_price ? "还没设一级分销价 —— 直接在这里填，填完点右上「保存改价」" : "一级分销价（含税），按箱/件设定，改完点右上「保存改价」"}"
              oninput="onTierInput(this)">
-      <span class="tier-margin ${m.cls}" title="${m.tip}">${m.text}</span>
+      <span class="tier-margin ${m.cls}" title="${m.tip}">${m.text}</span>${rateCell}
     </td>
     <td class="num tier-box-cell">${boxCell}</td>
-    <td title="${esc(p.spec)}">${esc(p.spec) || "-"}</td>
     <td>${esc(p.brand) || "-"}</td>
     <td>${esc(p.category) || "-"}</td><td>${esc(p.barcode) || "-"}</td><td>${esc(p.unit)}</td>
     <td>${esc(p.pack_spec) || "—"}</td>
-    <td>${p.source === "wdt" ? '<span class="tag on">旺店通</span>' : '<span class="tag">手工</span>'}</td>
     <td>${p.cost_status === "pending"
       ? `<span class="tag warn" title="${esc(p.cost_note || "采购价存疑，待核对")}">待核对</span>`
       : `<span class="tag ${p.active ? "on" : "off"}">${p.active ? "在售" : "停用"}</span>`}</td>
@@ -1018,6 +1006,18 @@ function onTierInput(input){
     boxCell.innerHTML = (pq > 0 && v > 0)
       ? `<span title="一级分销箱价 = 一级价 ${v.toFixed(2)} × 箱规 ${pq}${input.dataset.packUnit || "箱"}">¥${(v * pq).toFixed(2)}</span>`
       : '<span style="color:#b6bfcc">—</span>';
+  }
+  // 折扣率实时跟着变：一级价 ÷ 品牌标价
+  const rateTag = row.querySelector(".tier-rate");
+  if (rateTag) {
+    const list = parseFloat(input.dataset.list) || 0;
+    const v = parseFloat(input.value) || 0;
+    const r = (list > 0 && v > 0) ? v / list * 10 : 0;
+    if (r > 0) {
+      rateTag.style.display = "";
+      rateTag.textContent = r.toFixed(1).replace(/\.0$/, "") + "折";
+      rateTag.title = `一级分销折扣率 = 一级价 ${v.toFixed(2)} ÷ 品牌标价 ${list.toFixed(2)}`;
+    } else { rateTag.style.display = "none"; }
   }
   refreshTierDirty();
 }

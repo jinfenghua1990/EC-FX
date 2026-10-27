@@ -19,7 +19,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from ..models import FxProduct
+from ..models import FxPriceHistory, FxProduct
 
 # 价格统一保留两位小数（牌价/一级价都是元，Excel 里也只给两位）
 _CENT = Decimal("0.01")
@@ -267,6 +267,36 @@ def backfill_list_prices(
     }
 
 
+# ---------------------------------------------------------------- 改价流水（底层账本）
+def log_price_change(
+    db: Session, product: FxProduct, old_value, new_value,
+    rate="", source: str = "manual", note: str = "",
+) -> None:
+    """一级分销价变更留底：只在值真变化时写一行 fx_price_history。
+
+    - old/new 传原始值即可；0 或空统一存空串（页面上就是「待定」），口径一致；
+    - rate = 本次用的折扣率（归一化小数，如 0.85 = 8.5 折）；手工改价留空；
+    - list_price 存改价那一刻的标价快照——事后标价再变也解释得清当时为什么是这个价；
+    - 只增不改不删：对账追溯的底线，任何人都别去动这张表的历史行。
+    """
+    old_s = "" if not old_value or Decimal(str(old_value)) == 0 else str(old_value)
+    new_s = "" if not new_value or Decimal(str(new_value)) == 0 else str(new_value)
+    if old_s == new_s:
+        return
+    db.add(
+        FxPriceHistory(
+            product_id=product.id,
+            sku=product.sku or "",
+            old_value=old_s,
+            new_value=new_s,
+            rate=str(rate or ""),
+            list_price=Decimal(str(product.list_price or 0)),
+            source=source,
+            note=(note or "").strip(),
+        )
+    )
+
+
 # ---------------------------------------------------------------- 批量折扣率设一级分销价
 def _norm_zhe(value) -> Decimal:
     """折扣率归一化：8.5（几折）或 0.85（小数）都认，统一换算成 0.85。"""
@@ -330,7 +360,9 @@ def tier1_by_discount(db: Session, product_ids: list[int], zhe, dry_run: bool = 
             p = db.get(FxProduct, r["id"])
             if p is None:
                 continue
+            old_val = p.tier1_price
             p.tier1_price = Decimal(r["tier1_price"])
+            log_price_change(db, p, old_val, p.tier1_price, rate=rate, source="batch")
             updated += 1
         db.commit()
 

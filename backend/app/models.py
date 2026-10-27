@@ -154,6 +154,30 @@ class FxProduct(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
 
+class FxPriceHistory(Base):
+    """改价流水（只增不改）：一级分销价的每次变更都留底，方便对账追溯。
+
+    底层账本口径：
+    - 一行 = 一次「商品的一级分销价发生变化」；
+    - old_value/new_value 存字符串（空 = 待定/清空），金额含税按盒；
+    - rate = 当时使用的折扣率（批量折扣时记 归一化小数如 0.85；手工改价记空）；
+    - list_price 存改价那一刻的标价快照（折扣率的分母，防止事后标价变动说不清）；
+    - source：manual=表格手改/编辑弹窗，batch=批量折扣率，import=导入。
+    """
+
+    __tablename__ = "fx_price_history"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    product_id: Mapped[int] = mapped_column(Integer, index=True)
+    sku: Mapped[str] = mapped_column(String(60), default="", index=True)
+    old_value: Mapped[str] = mapped_column(String(40), default="")
+    new_value: Mapped[str] = mapped_column(String(40), default="")
+    rate: Mapped[str] = mapped_column(String(20), default="")
+    list_price: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
+    source: Mapped[str] = mapped_column(String(20), default="manual")
+    note: Mapped[str] = mapped_column(String(300), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
+
+
 class FxPurchaseOrder(Base):
     """采购单（旺店通 purchase_order_query.php 原单）。
 
