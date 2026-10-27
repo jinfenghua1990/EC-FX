@@ -54,6 +54,40 @@ def _pick(row: dict[str, Any], keys: Iterable[str]) -> str:
     return ""
 
 
+def _parse_pack(goods: dict[str, Any]) -> tuple[int, str]:
+    """从旺店通货品解析箱规，返回 (每箱数量, 箱规单位)。
+
+    实测字段（goods_query.php）：
+    - unit_name   = "件"      基本单位
+    - aux_unit    = "36"      辅助单位换算数量
+    - aux_unit_name = "36/箱" 辅助单位名称（数量/单位）
+
+    数量 <= 1 视为未维护箱规（旺店通对大部分商品填的是 1/箱，没有信息量）。
+    """
+    name = _s(goods.get("aux_unit_name"))
+    qty_text = _s(goods.get("aux_unit"))
+    unit = "箱"
+    if name:
+        # 优先信「36/箱」里的两段；取不到就整串当单位名
+        if "/" in name:
+            left, _, right = name.partition("/")
+            if not qty_text:
+                qty_text = left.strip()
+            unit = right.strip() or unit
+        elif name.strip().isdigit():
+            if not qty_text:
+                qty_text = name.strip()
+        else:
+            unit = name.strip()
+    try:
+        qty = int(Decimal(qty_text)) if qty_text else 0
+    except (InvalidOperation, ValueError):
+        qty = 0
+    if qty <= 1:
+        return 0, "箱"
+    return qty, unit or "箱"
+
+
 def _money_or_none(text: str) -> Decimal | None:
     """0 或负数一律视为「没有价格」。
 
@@ -178,6 +212,7 @@ def normalize_products(goods_rows: list[dict]) -> list[dict]:
         class_name = _s(goods.get("class_name"))
         brand_name = _s(goods.get("brand_name"))
         unit_name = _s(goods.get("unit_name") or goods.get("unit") or goods.get("base_unit"))
+        pack_qty, pack_unit = _parse_pack(goods)
         specs = goods.get("spec_list") or []
         for spec in specs:
             # sku 取规格编码 spec_no：旺店通出库/下单都以规格为最小单位，这是最可靠的唯一键
@@ -197,6 +232,8 @@ def normalize_products(goods_rows: list[dict]) -> list[dict]:
                     "category": class_name,
                     "brand": brand_name,
                     "unit": unit_name or "箱",
+                    "pack_qty": pack_qty,
+                    "pack_unit": pack_unit,
                     "base_price": unit_price,
                     "price_source": price_key,
                 }
@@ -241,6 +278,8 @@ def upsert_products(
                     name=item["name"],
                     spec=item["spec"],
                     unit=item["unit"],
+                    pack_qty=int(item.get("pack_qty") or 0),
+                    pack_unit=item.get("pack_unit") or "箱",
                     base_price=incoming_price if incoming_price is not None else Decimal("0"),
                     spec_no=item["spec_no"],
                     goods_no=item["goods_no"],
@@ -261,6 +300,10 @@ def upsert_products(
                 row.name = item["name"] or row.name
                 row.spec = item["spec"] or row.spec
                 row.unit = item["unit"] or row.unit
+                # 箱规以旺店通为准，但只在旺店通确实有值时覆盖，避免把手工维护的清掉
+                if int(item.get("pack_qty") or 0) > 0:
+                    row.pack_qty = int(item["pack_qty"])
+                    row.pack_unit = item.get("pack_unit") or row.pack_unit or "箱"
                 row.spec_no = item["spec_no"]
                 row.goods_no = item["goods_no"]
                 row.barcode = item["barcode"] or row.barcode

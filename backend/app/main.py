@@ -32,11 +32,26 @@ from .services.distribution import (
     delete_price, fx_overview, import_distributors, import_products,
     list_distributors, list_orders, list_prices, list_products, list_statements,
     list_brands,
-    order_detail, push_order_to_wangdian, set_price, statement_excel_bytes,
+    order_detail, push_order_to_wangdian, set_price, set_tier1_prices, statement_excel_bytes,
     transition_order, toggle_distributor, toggle_product, update_distributor,
     update_order, update_product,
 )
 from .services.wdt_products import sync_products_from_wdt
+from .services.product_cost import import_list_prices, set_cost_status
+from .services.product_maintenance import backfill_list_prices, summary_from_db, tier1_by_discount
+from .services.wdt_purchase import (
+    list_purchase_orders,
+    list_purchase_prices,
+    purchase_order_summary,
+    refresh_product_purchase_prices,
+    set_cost_warehouse,
+    sync_purchase_orders,
+)
+from .services.inventory import (
+    fulfillment_for_order,
+    inventory_summary,
+    sync_stock_snapshot,
+)
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -69,10 +84,32 @@ class FxProductPayload(BaseModel):
     name: str
     spec: str = ""
     unit: str = "箱"
+    # 箱规：1 箱 = pack_qty 个 unit；0 = 未维护
+    pack_qty: int = 0
+    pack_unit: str = "箱"
     base_price: Decimal = Decimal("0")
+    # 一级分销价（含税）：我们卖给一级分销商的价，人工设定；不传 = 本次不动这个字段
+    tier1_price: Decimal | None = None
     note: str = ""
     brand: str = ""
     category: str = ""
+
+
+class FxTier1PriceItem(BaseModel):
+    product_id: int
+    # 空值 = 清空（回到「待定」）
+    tier1_price: Decimal | None = None
+
+
+class FxTier1PricesPayload(BaseModel):
+    items: list[FxTier1PriceItem] = []
+
+
+class FxBatchDiscountPayload(BaseModel):
+    """勾选商品批量按折扣率设一级分销价：zhe 传「几折」(8.5) 或小数 (0.85) 都认。"""
+    product_ids: list[int] = []
+    zhe: str = ""
+    dry_run: int = 0
 
 
 class FxOrderLinePayload(BaseModel):
@@ -635,7 +672,15 @@ def fx_distributor_toggle(distributor_id: int, db: Session = Depends(get_db)):
 
 @app.get("/api/fx/products")
 def fx_products(include_inactive: int = 1, brand: str = "", db: Session = Depends(get_db)):
-    return {"products": list_products(db, include_inactive=bool(include_inactive), brand=brand)}
+    """商品列表 + 待维护汇总。
+
+    maintenance 是给页面顶部「强制提醒横幅」用的：缺牌价 / 缺一级分销价 /
+    成本待核对各多少个，点击横幅上的数字直接筛出对应商品。
+    """
+    return {
+        "products": list_products(db, include_inactive=bool(include_inactive), brand=brand),
+        "maintenance": summary_from_db(db, brand=brand, include_inactive=bool(include_inactive)),
+    }
 
 
 @app.get("/api/fx/brands")
@@ -648,6 +693,110 @@ def fx_brands(db: Session = Depends(get_db)):
 def fx_product_create(payload: FxProductPayload, db: Session = Depends(get_db)):
     try:
         return {"ok": True, "product": create_product(db, payload.model_dump())}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.put("/api/fx/products/tier1-prices")
+def fx_product_tier1_prices(payload: FxTier1PricesPayload, db: Session = Depends(get_db)):
+    """批量保存「一级分销价」：商品表里直接改价，一次提交多行。
+
+    注意本路由必须声明在 /api/fx/products/{product_id} 之前，
+    否则 "tier1-prices" 会被当成路径参数按 int 解析，直接 422。
+    """
+    if not payload.items:
+        raise HTTPException(400, "没有需要保存的改价行")
+    rows = [
+        {"product_id": item.product_id, "tier1_price": "" if item.tier1_price is None else str(item.tier1_price)}
+        for item in payload.items
+    ]
+    return {"ok": True, **set_tier1_prices(db, rows)}
+
+
+@app.post("/api/fx/products/backfill-list-price")
+def fx_product_backfill_list_price(
+    brand: str = "", discount: str = "", dry_run: int = 1, db: Session = Depends(get_db)
+):
+    """回填牌价，折扣按品牌自动取：格力高 牌价=采购价÷0.8（8 折拿货）；
+    瑞士莲/桂格等其他品牌 **采购价就是品牌标价**，牌价=采购价。
+
+    只补空值、不覆盖已维护的牌价，排除耗材/赠品等非售卖品。
+    dry_run=1 只预览不写库，前端确认后再 dry_run=0 写入。
+    discount 传非空值可强制覆盖所有品牌（0~1 小数），留空=按品牌自动。
+    """
+    try:
+        return {
+            "ok": True,
+            **backfill_list_prices(db, brand=brand, discount=discount, dry_run=bool(dry_run)),
+        }
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/products/tier1-batch-discount")
+def fx_product_tier1_batch_discount(payload: FxBatchDiscountPayload, db: Session = Depends(get_db)):
+    """勾选商品批量按折扣率设一级分销价：一级价 = 牌价 × 折扣（8.5 折 = 0.85）。
+
+    没牌价的商品跳过并在 skipped 里给原因（牌价是折扣的基准，没有就算不了）；
+    返回里带箱价 = 一级价 × 箱规，预览和写完都对得上。
+    """
+    try:
+        return {
+            "ok": True,
+            **tier1_by_discount(db, payload.product_ids, payload.zhe, dry_run=bool(payload.dry_run)),
+        }
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/products/import-list-price")
+def fx_product_import_list_price(
+    path: str, dry_run: int = 0, overwrite: int = 1, db: Session = Depends(get_db)
+):
+    """从品牌订货单 Excel 导入牌价（只用于算分销折扣率，不参与利润）。
+
+    path 是本机文件路径（本地单机部署，直接读盘，不做上传）。
+    Excel 列：条码 / 规格 / 盒（未税）/ 单价(含税)；
+    每盒含税牌价 = 单价(含税) ÷ 规格（缺失时退回 盒(未税) × 1.13）。
+    2026-10-27 用户明确：牌价只有格力高需要维护，其他品牌不维护。
+    """
+    try:
+        return {"ok": True, **import_list_prices(db, path, dry_run=bool(dry_run), overwrite=bool(overwrite))}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/products/cost-status")
+def fx_product_cost_status(
+    status: str = "pending",
+    sku: str = "",
+    brand: str = "",
+    note: str = "",
+    db: Session = Depends(get_db),
+):
+    """标记成本待核对：pending 时不参与利润计算。
+
+    用于源单录错的情况（如 CG202512090001/2 把两个 SKU 单价录反）。
+    status 传空字符串 = 恢复正常。
+    """
+    skus = [s.strip() for s in sku.split(",") if s.strip()]
+    try:
+        return {"ok": True, **set_cost_status(db, skus=skus, brand=brand, status=status, note=note)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/products/cost-warehouse")
+def fx_product_cost_warehouse(
+    sku: str = "", brand: str = "", warehouse: str = "", db: Session = Depends(get_db)
+):
+    """指定成本仓：按 SKU 或按品牌整批下发（各品牌取价逻辑不同）。
+
+    warehouse 传空 = 恢复自动选仓。改完需再跑一次 refresh-prices 才生效。
+    注意本路由同样必须声明在 /api/fx/products/{product_id} 之前。
+    """
+    try:
+        return {"ok": True, **set_cost_warehouse(db, sku=sku, brand=brand, warehouse=warehouse)}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -721,6 +870,143 @@ def fx_products_sync_wdt(
         raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
         raise HTTPException(502, f"旺店通商品同步失败：{exc}") from exc
+
+
+@app.get("/api/fx/purchase-prices")
+def fx_purchase_prices(sku: str = "", limit: int = 2000, db: Session = Depends(get_db)):
+    """按仓分组的采购价明细。
+
+    同一个 SKU 在不同仓的价可以差很多（瑞士莲 600g 在京东专供仓 103、
+    在自家调拨仓 88），页面上要看得到「这个价是哪个仓给的」，
+    所以明细单独出接口，不塞进商品列表里。
+    """
+    rows = list_purchase_prices(db, sku=sku, limit=limit)
+    return {"sku": sku, "count": len(rows), "prices": rows}
+
+
+@app.get("/api/fx/purchase-orders")
+def fx_purchase_orders(
+    month: str = "",
+    keyword: str = "",
+    abnormal: int = -1,
+    limit: int = 200,
+    db: Session = Depends(get_db),
+):
+    """采购单列表。采购单是成本的唯一来源，后续与商品/分销订单的关联也从这里接。"""
+    if month and not (len(month) == 7 and month[:4].isdigit() and month[5:7].isdigit() and month[4] == "-"):
+        raise HTTPException(400, "month 格式应为 YYYY-MM")
+    return {
+        "summary": purchase_order_summary(db),
+        "orders": list_purchase_orders(db, month=month, keyword=keyword, abnormal=abnormal, limit=limit),
+    }
+
+
+@app.post("/api/fx/purchase-orders/sync")
+def fx_purchase_orders_sync(
+    months: int = 12,
+    dry_run: int = 0,
+    refresh_prices: int = 1,
+    apply_to_base_price: str = "none",
+    start: str = "",
+    end: str = "",
+    page_size: int = 100,
+    db: Session = Depends(get_db),
+):
+    """从旺店通拉采购单入库，并刷新商品采购价。
+
+    - months：回扫月数（默认 12），接口单次窗口上限 30 天，内部自动切窗
+    - dry_run=1：只统计不落库
+    - refresh_prices=1：入库后立刻刷新 fx_products.purchase_price
+    - apply_to_base_price：none 不动品牌原价 / empty 只补零价 / overwrite 强制覆盖
+    """
+    try:
+        return {
+            "ok": True,
+            **sync_purchase_orders(
+                db,
+                months=months,
+                dry_run=bool(dry_run),
+                refresh_prices=bool(refresh_prices),
+                apply_to_base_price=apply_to_base_price,
+                start=start,
+                end=end,
+                page_size=page_size,
+            ),
+        }
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"旺店通采购单同步失败：{exc}") from exc
+
+
+# ---------------------------------------------------------------- 库存 / 满足率
+@app.get("/api/fx/inventory/summary")
+def fx_inventory_summary(db: Session = Depends(get_db)):
+    """库存快照概况：最新快照日期、是否已有「昨日基线」。"""
+    return inventory_summary(db)
+
+
+@app.post("/api/fx/inventory/sync")
+def fx_inventory_sync(
+    snap_date: str = "",
+    lookback_days: int = 120,
+    dry_run: int = 0,
+    db: Session = Depends(get_db),
+):
+    """从旺店通拉当前库存，存为当天快照（解决「昨天库存」基线）。
+
+    单仓模式：不区分仓库。首次同步后，次日再同步即产生「昨日基线」，
+    「昨天库存 + 今天入库 = 实际可用」的满足率提示才能完整运转。
+    """
+    try:
+        return {
+            "ok": True,
+            **sync_stock_snapshot(
+                db, snap_date=snap_date, lookback_days=lookback_days, dry_run=bool(dry_run)
+            ),
+        }
+    except RuntimeError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"旺店通库存同步失败：{exc}") from exc
+
+
+@app.get("/api/fx/inventory/fulfillment")
+def fx_inventory_fulfillment(order_id: int, as_of: str = "", db: Session = Depends(get_db)):
+    """一张出库单的满足率三态：满足库存 / 到仓待入库 / 库存不足。
+
+    实际可用 = 昨天库存 + 今日已入库；与每行需求量比，给出逐行状态与整单总状态。
+    """
+    try:
+        return fulfillment_for_order(db, order_id, as_of=as_of)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(500, f"满足率计算失败：{exc}") from exc
+
+
+
+def fx_purchase_orders_refresh_prices(
+    months: int = 12,
+    dry_run: int = 0,
+    apply_to_base_price: str = "none",
+    db: Session = Depends(get_db),
+):
+    """不重新拉单，直接用库里已有的采购单刷新商品采购价（秒回）。
+
+    补零价走 apply_to_base_price=empty；强制对齐走 overwrite。
+    """
+    try:
+        return {
+            "ok": True,
+            **refresh_product_purchase_prices(
+                db, months=months, dry_run=bool(dry_run), apply_to_base_price=apply_to_base_price
+            ),
+        }
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
 
 
 @app.get("/api/fx/orders")

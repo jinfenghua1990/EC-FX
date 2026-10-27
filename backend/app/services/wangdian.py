@@ -126,6 +126,95 @@ class WangdianClient:
             },
         )
 
+    def purchases(
+        self,
+        start: datetime,
+        end: datetime,
+        page_size: int = 100,
+    ) -> list[dict[str, Any]]:
+        """拉取采购单（purchase_order_query.php），含明细价格。
+
+        三条硬约束（实测，别再改成一次性全量）
+        -------------------------------------
+        1. start_time / end_time **必填且跨度不得超过 30 天**，超了报 2180
+           （与 goods_query.php 同一套限制）。
+        2. end_time **不能晚于当前时间**，否则报 2150。调用方需自带安全余量
+           （本项目统一用 now - 10min）。
+        3. total_count 不可信 —— 与出库单一致，只用「本页条数 < page_size」判停。
+
+        明细里的价格字段（实测口径）
+        ---------------------------
+        - price / tax_price：含税单价，按基本单位（盒/袋），**已是折后实付价**。
+          例：格力高百奇蜜桃 55g 牌价含税 5.83/盒，8 折拿货 → 采购单 price=4.6641。
+          与本地 FxProduct.base_price 同口径，40 个有价 SKU 中 35 个精确命中。
+        - purchase_price：历史不含税价，口径不稳定（瑞士莲 600g：price=103、
+          purchase_price=92.42，比值 1.1145 非 13%），**不要当成本用**。
+        - last_price：上一次采购价；lowest_price：历史最低价（仅供比价参考）。
+        """
+        if end <= start:
+            raise ValueError("end 必须晚于 start")
+        if end - start > timedelta(days=30):
+            raise ValueError("旺店通单次时间跨度不能超过30天")
+        rows: list[dict[str, Any]] = []
+        page_no = 0
+        while True:
+            payload = self._request(
+                "purchase_order_query.php",
+                {
+                    "start_time": start.strftime("%Y-%m-%d %H:%M:%S"),
+                    "end_time": end.strftime("%Y-%m-%d %H:%M:%S"),
+                    "page_no": page_no,
+                    "page_size": page_size,
+                },
+            )
+            page_rows = payload.get("purchase_list") or []
+            rows.extend(page_rows)
+            if not page_rows or len(page_rows) < page_size:
+                break
+            page_no += 1
+            if page_no > 500:  # 兜底，防止接口异常时无限翻页
+                break
+        return rows
+
+    def stock_query(
+        self,
+        start: datetime,
+        end: datetime,
+        page_size: int = 100,
+    ) -> list[dict[str, Any]]:
+        """库存查询（stock_query.php）：返回各 SKU 的当前实际/可用库存。
+
+        ⚠️ 返回的是「当前」库存，不是历史。要算「昨天库存 + 今天入库 = 实际可用」，
+        必须由调用方按日期自己拍快照（见 services/inventory.py 的 sync_stock_snapshot）。
+
+        单次时间跨度限制同其他接口（≤30 天），用 modified 时间窗切页。
+        防御式解析：不同账号字段名可能略有差异，优先取 stock_num（实际库存），
+        否则 available_num（可用），再否则 num。
+        """
+        if end <= start:
+            raise ValueError("end 必须晚于 start")
+        if end - start > timedelta(days=30):
+            raise ValueError("旺店通单次时间跨度不能超过30天")
+        rows: list[dict[str, Any]] = []
+        page_no = 0
+        while True:
+            payload = self._request(
+                "stock_query.php",
+                {
+                    "start_time": start.strftime("%Y-%m-%d %H:%M:%S"),
+                    "end_time": end.strftime("%Y-%m-%d %H:%M:%S"),
+                    "page_no": page_no,
+                    "page_size": page_size,
+                },
+            )
+            page_rows = payload.get("stock_list") or []
+            rows.extend(page_rows)
+            if not page_rows or len(page_rows) < page_size:
+                break
+            page_no += 1
+            if page_no > 500:
+                break
+        return rows
 
 def upsert_stockouts(db: Session, rows: list[dict[str, Any]], source: str = "wdt_api") -> tuple[int, int]:
     order_count = item_count = 0

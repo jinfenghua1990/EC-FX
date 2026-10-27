@@ -22,6 +22,7 @@ from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
 from ..models import FxDistributor, FxOrder, FxOrderLine, FxPrice, FxProduct
+from .product_maintenance import maintenance_of
 from .wangdian import WangdianClient
 
 MONEY_Q = Decimal("0.01")
@@ -51,6 +52,104 @@ def _money(value: Decimal) -> Decimal:
 def _plain(value: Decimal) -> str:
     """Decimal 转普通文本：避免 normalize() 把 100 变成 1E+2。"""
     return format((value or Decimal("0")).normalize(), "f")
+
+
+def _price_gap(base_price: Decimal, purchase_price: Decimal) -> str:
+    """品牌原价 − 采购价（同为含税、同基本单位），任一侧为 0 时留空。
+
+    正值说明牌价比实付高（牌价口径，折扣未反映）；接近 0 说明 base_price
+    本身就是实付价；负值说明采购价已涨过牌价，需要复核。
+    """
+    base = _money(base_price)
+    cost = _money(purchase_price)
+    if base <= 0 or cost <= 0:
+        return ""
+    return str(_money(base - cost))
+
+
+def _tier1_margin(
+    cost_price: Decimal,
+    tier1_price: Decimal,
+    cost_source: str = "purchase",
+    cost_status: str = "",
+) -> dict:
+    """一级分销价相对**采购入库价**（含税）的毛利。
+
+    成本口径（2026-10-27 用户明确）：
+    「一切都是以采购入库价格为主算利润」—— 成本必须是真实拿货价，
+    不是品牌牌价。牌价只用于算分销折扣率，不参与利润计算。
+
+    所以成本取值优先级：采购入库价 > 牌价（采购单没覆盖到时退回）。
+    cost_source 回传是哪个价算的（"purchase" / "base"），页面据此提示
+    「这个毛利是按采购价算的」还是「按牌价估的」，避免口径含糊。
+
+    cost_status="pending"（成本待核对）时不出毛利 —— 拿错价算利润比不算更糟。
+    典型场景：旺店通源单把两个 SKU 单价录反了，那批商品的成本根本不能用。
+
+    两个价都是含税口径，直接相减，不做 ÷1.06 之类的税率换算
+    （税率是报价时的约定，系统不存，避免历史数据被后来的税率改动带偏）。
+    任一侧为 0 —— 成本没拿到、或一级分销价还没定 —— 就不给毛利，
+    免得把「0 元」误读成「零毛利」。
+    """
+    cost = _money(cost_price)
+    tier1 = _money(tier1_price)
+    base_out = {
+        "tier1_margin": "",
+        "tier1_rate": "",
+        "tier1_below_cost": False,
+        "tier1_cost_source": "",
+        "tier1_cost_pending": False,
+    }
+    if cost_status == "pending":
+        return {**base_out, "tier1_cost_source": cost_source, "tier1_cost_pending": True}
+    if cost <= 0 or tier1 <= 0:
+        return base_out
+    margin = _money(tier1 - cost)
+    rate = (margin / tier1 * Decimal("100")).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+    return {
+        "tier1_margin": str(margin),
+        "tier1_rate": str(rate),
+        "tier1_below_cost": margin < 0,
+        "tier1_cost_source": cost_source,
+        "tier1_cost_pending": False,
+    }
+
+
+def _tier1_discount(tier1_price: Decimal, list_price: Decimal) -> str:
+    """分销折扣率 = 一级分销价 ÷ 牌价，按「几折」表达（0.852 → "8.52"）。
+
+    牌价只有格力高维护（用户明确：「其他品牌不维护，不需要啊，就是格力高想要」），
+    没维护就留空。这个数只做报价参考，不参与利润计算 —— 利润按采购入库价算。
+    """
+    lp = _money(list_price)
+    t1 = _money(tier1_price)
+    if lp <= 0 or t1 <= 0:
+        return ""
+    return str((t1 / lp * Decimal("10")).quantize(Decimal("0.01"), rounding=ROUND_HALF_UP))
+
+
+def _parse_money(value, label: str) -> Decimal:
+    """金额入参解析：空值当 0，非法/负数报错（label 用于提示哪个字段）。"""
+    if value is None or value == "":
+        return Decimal("0")
+    try:
+        amount = _money(Decimal(str(value)))
+    except Exception as exc:
+        raise ValueError(f"{label}格式不正确") from exc
+    if amount < 0:
+        raise ValueError(f"{label}不能为负数")
+    return amount
+
+
+def _pack_qty(value) -> int:
+    """箱规数量归一：空/非法/负数一律当 0 = 未维护。"""
+    if value is None or value == "":
+        return 0
+    try:
+        qty = int(Decimal(str(value).strip()))
+    except Exception:
+        return 0
+    return qty if qty > 0 else 0
 
 
 # ---------------------------------------------------------------- 分销商
@@ -157,13 +256,55 @@ def list_brands(db: Session) -> list[dict]:
 
 
 def _product_view(row: FxProduct) -> dict:
+    pack_qty = int(row.pack_qty or 0)
+    pack_unit = (row.pack_unit or "箱").strip() or "箱"
+    tier1 = _money(row.tier1_price)
+    # 箱价 = 一级分销价(按盒/袋) × 箱规。一级价没设或没箱规时留空，页面不显示
+    tier1_box = tier1 * pack_qty if pack_qty > 0 and tier1 > 0 else None
     return {
         "id": row.id,
         "sku": row.sku,
         "name": row.name,
         "spec": row.spec,
         "unit": row.unit,
+        # 箱规：pack_spec 是给页面直接显示的整串（36/箱），qty 为 0 时留空
+        "pack_qty": pack_qty,
+        "pack_unit": pack_unit,
+        "pack_spec": f"{pack_qty}/{pack_unit}" if pack_qty > 0 else "",
         "base_price": str(_money(row.base_price)),
+        # 一级分销价（含税）：0 = 还没定价
+        "tier1_price": str(tier1),
+        # 一级分销箱价 = 一级价 × 箱规（按箱/件拿货时的整箱单价）；没箱规或没定价时为空
+        "tier1_box_price": str(tier1_box) if tier1_box is not None else "",
+        # 采购价（含税/基本单位）：来自旺店通采购单，真实拿货成本；0 = 从未采购
+        # 按「仓库」分组取价：这里存的是主成本仓的价，其余仓的价在 /api/fx/purchase-prices
+        "purchase_price": str(_money(row.purchase_price)),
+        "purchase_date": row.purchase_date.strftime("%Y-%m-%d") if row.purchase_date else "",
+        "purchase_no": row.purchase_no or "",
+        "purchase_warehouse": row.purchase_warehouse or "",
+        "purchase_provider": row.purchase_provider or "",
+        "cost_warehouse": row.cost_warehouse or "",
+        # 采购价与品牌原价的差额（>0 表示牌价比实付高，说明 base_price 是牌价口径）
+        "price_gap": str(_price_gap(row.base_price, row.purchase_price)),
+        # 成本口径：采购入库价优先（用户明确「一切都是以采购入库价格为主算利润」），
+        # 采购单没覆盖到才退回牌价，并回传用了哪个（页面要标出来）
+        **_tier1_margin(
+            row.purchase_price if _money(row.purchase_price) > 0 else row.base_price,
+            row.tier1_price,
+            "purchase" if _money(row.purchase_price) > 0 else "base",
+            row.cost_status or "",
+        ),
+        # 牌价（含税/基本单位）：只用于算分销折扣率，不参与利润。0 = 没维护（非格力高品牌不维护）
+        "list_price": str(_money(row.list_price)),
+        # 分销折扣率 = 一级分销价 ÷ 牌价（如 0.85 = 8.5 折）；牌价没维护或未定价时留空
+        "tier1_discount": _tier1_discount(row.tier1_price, row.list_price),
+        # 成本核对状态：pending = 采购价存疑，页面标「待核对」且不出毛利
+        "cost_status": row.cost_status or "",
+        "cost_note": row.cost_note or "",
+        # 待维护标记：缺什么、缺几项，页面据此标红并支持筛选
+        # 规则在 services/product_maintenance.py —— 牌价只对格力高要求、
+        # 耗材/帆布袋/好评卡不算缺项、分销价只对在售商品要求。
+        **maintenance_of(row),
         "note": row.note,
         "active": bool(row.active),
         # 旺店通商品档案字段
@@ -196,7 +337,10 @@ def create_product(db: Session, data: dict) -> dict:
         name=name,
         spec=(data.get("spec") or "").strip(),
         unit=(data.get("unit") or "箱").strip() or "箱",
+        pack_qty=_pack_qty(data.get("pack_qty")),
+        pack_unit=(str(data.get("pack_unit") or "").strip() or "箱"),
         base_price=base_price,
+        tier1_price=_parse_money(data.get("tier1_price"), "一级分销价"),
         note=(data.get("note") or "").strip(),
         # 手工建品也能指定品牌/分类：否则手工商品品牌为空，永远进不了顶部品牌维度
         brand=(data.get("brand") or "").strip(),
@@ -228,9 +372,15 @@ def update_product(db: Session, product_id: int, data: dict) -> dict:
         if base_price < 0:
             raise ValueError("基础价格不能为负数")
         row.base_price = base_price
+    if data.get("tier1_price") is not None:
+        row.tier1_price = _parse_money(data["tier1_price"], "一级分销价")
     for field in ("name", "spec", "unit", "note", "brand", "category"):
         if field in data and data[field] is not None:
             setattr(row, field, str(data[field]).strip())
+    if "pack_qty" in data and data["pack_qty"] is not None:
+        row.pack_qty = _pack_qty(data["pack_qty"])
+    if "pack_unit" in data and data["pack_unit"] is not None:
+        row.pack_unit = str(data["pack_unit"]).strip() or row.pack_unit or "箱"
     row.unit = row.unit or "箱"
     db.commit()
     return _product_view(row)
@@ -243,6 +393,31 @@ def toggle_product(db: Session, product_id: int) -> dict:
     row.active = 0 if row.active else 1
     db.commit()
     return _product_view(row)
+
+
+def set_tier1_prices(db: Session, items: list[dict]) -> dict:
+    """批量设「一级分销价」（商品表里直接改价，一次提交）。
+
+    - 传数字 = 设价；传空字符串 = 清空回「待定」；负数等非法值只报这一行，不影响其余行。
+    - 不校验「必须高于品牌原价」：现实中会有清仓、临期折价，
+      但前端会把低于成本的标红并提示，避免默默亏卖。
+    """
+    updated = 0
+    errors: list[dict] = []
+    for index, item in enumerate(items, start=1):
+        product_id = item.get("product_id")
+        row = db.get(FxProduct, int(product_id or 0)) if str(product_id or "").isdigit() else None
+        if not row:
+            errors.append({"row": index, "message": f"商品不存在: {product_id}"})
+            continue
+        try:
+            row.tier1_price = _parse_money(item.get("tier1_price"), "一级分销价")
+        except ValueError as exc:
+            errors.append({"row": index, "message": str(exc)})
+            continue
+        updated += 1
+    db.commit()
+    return {"updated": updated, "errors": errors}
 
 
 # ---------------------------------------------------------------- 分销订单

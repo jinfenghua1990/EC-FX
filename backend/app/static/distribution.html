@@ -10,7 +10,10 @@
   --bg:#f4f6fa; --card:#fff; --line:#e8ecf3; --muted:#7b8798;
   --text:#1c2740; --blue:#2463eb; --green:#18a05e; --orange:#f59e0b; --red:#e5484d;
 }
-body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+html,body{height:100%}
+/* 固定式布局：页面整体不滚动，顶栏 / 左菜单 / 标题 / 统计 / 工具条 / 表头都钉住，
+   只有下方表格的数据行在自己的框里上下滚动 */
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:flex;height:100%;overflow:hidden}
 .sidebar{width:216px;background:var(--sidebar);color:#c6d0de;display:flex;flex-direction:column;flex-shrink:0}
 .brand{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;font-size:16px;font-weight:700;color:#fff}
 .brand .logo{width:30px;height:30px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px}
@@ -19,7 +22,7 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var
 .nav a .ic{width:18px;text-align:center;font-size:15px}
 .nav a:hover{background:var(--sidebar-hover);color:#fff}
 .nav a.active{background:var(--active);color:#fff;font-weight:600}
-.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:0;height:100%}
 .topbar{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;flex-shrink:0}
 .crumbs{font-size:13px;color:var(--muted)}
 .crumbs b{color:var(--text);font-weight:600}
@@ -31,7 +34,8 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var
 .btn.mini{padding:3px 9px;font-size:12px;border-radius:7px}
 .btn.danger{color:var(--red);border-color:#f2c6c8}
 .btn.danger:hover{border-color:var(--red)}
-.content{padding:20px 24px 40px;overflow:auto}
+.content{flex:1;min-height:0;padding:20px 24px 24px;overflow:hidden;display:flex;flex-direction:column}
+.content > h1.page,.content > .subtitle,.content > .stats,.content > .tabs{flex-shrink:0}
 h1.page{font-size:22px;margin-bottom:4px}
 .subtitle{font-size:13px;color:var(--muted);margin-bottom:16px}
 /* 统计卡片 */
@@ -52,18 +56,57 @@ h1.page{font-size:22px;margin-bottom:4px}
 .tab{border:1px solid #d6dce6;background:#fff;border-radius:9px;padding:9px 18px;font-size:13.5px;cursor:pointer;font-weight:500;color:var(--muted)}
 .tab.active{background:var(--blue);border-color:var(--blue);color:#fff;font-weight:600}
 /* 卡片与表格 */
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
-.card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;min-height:0;flex:1}
+.card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;flex-shrink:0}
 .card h3{font-size:14.5px;display:flex;align-items:center;gap:8px}
 .card h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--blue)}
 .card input,.card select{min-height:32px;border:1px solid #d8dee9;border-radius:8px;background:#fff;padding:5px 10px;font-size:13px}
-table{width:100%;border-collapse:collapse;font-size:13px}
-th{background:#f7f9fc;text-align:left;padding:9px 10px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;color:#5b6778}
-td{padding:9px 10px;border-bottom:1px solid #f0f3f8;white-space:nowrap}
+/* 表格滚动框：只有这里滚，表头钉在框顶 */
+.tbl{flex:1;min-height:0;overflow:auto;overscroll-behavior:contain;scrollbar-width:thin;scrollbar-color:#c3ccdb #f7f9fc}
+.tbl::-webkit-scrollbar{width:12px;height:12px}
+.tbl::-webkit-scrollbar-track{background:#f7f9fc}
+.tbl::-webkit-scrollbar-thumb{background:#c3ccdb;border-radius:8px;border:3px solid #f7f9fc}
+.tbl::-webkit-scrollbar-thumb:hover{background:#98a3b6}
+.tbl::-webkit-scrollbar-corner{background:#f7f9fc}
+table{width:100%;border-collapse:separate;border-spacing:0;font-size:13px}
+th{background:#f7f9fc;text-align:left;padding:9px 10px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;color:#5b6778;position:sticky;top:0;z-index:3;box-shadow:inset 0 -1px 0 var(--line);overflow:hidden;text-overflow:ellipsis}
+td{padding:9px 10px;border-bottom:1px solid #f0f3f8;white-space:nowrap;background:#fff;overflow:hidden;text-overflow:ellipsis}
 tr:hover td{background:#fafbfe}
 tr.dirty td{background:#fff8e7}
 td.num{font-variant-numeric:tabular-nums}
 .ops{display:flex;gap:6px}
+/* 一级分销价：单元格里直接改价，右侧实时显示毛利（含税价相减，不做税率换算） */
+td.tier-cell{display:flex;align-items:center;gap:7px;padding-top:6px;padding-bottom:6px}
+.tier-in{width:96px;min-height:28px;border:1px solid #d8dee9;border-radius:7px;padding:2px 8px;font-size:12.5px;font-family:inherit;font-variant-numeric:tabular-nums;background:#fff;color:var(--text)}
+.tier-in::placeholder{color:#b6bfcc}
+.tier-in:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(36,99,235,.14)}
+.tier-in.low{border-color:var(--red);background:#fff6f6;color:var(--red)}
+.tier-margin{font-size:11.5px;color:var(--muted);font-variant-numeric:tabular-nums;white-space:nowrap}
+.tier-margin.pos{color:var(--green)}
+.tier-margin.neg{color:var(--red);font-weight:600}
+.tier-margin.na{color:#b6bfcc}
+.prod-ck{width:15px;height:15px;cursor:pointer;accent-color:#2463eb}
+/* 采购价列：来自旺店通采购单的真实付款价（含税/基本单位） */
+td.cost{font-variant-numeric:tabular-nums;position:relative}
+td.cost .cost-date{display:block;font-size:10.5px;color:#9aa6b8;line-height:1.25}
+td.cost.diff{background:#fffaf0;box-shadow:inset 3px 0 0 #f0a020}
+td.cost.diff .cost-gap{color:#c47f00;font-weight:600}
+td.cost.na{color:#b6bfcc}
+tr:hover td.cost.diff{background:#fff5e0}
+/* 有 colgroup 的表：列宽可调，右侧「操作」列固定不动，中间列宽度不够就横向滚 */
+table.cols{table-layout:fixed;width:100%}
+table.cols th{box-shadow:inset -1px 0 0 #e8edf6,inset 0 -1px 0 var(--line)}
+table.cols th,table.cols td{overflow:hidden;text-overflow:ellipsis}
+table.cols th:last-child,table.cols td:last-child{position:sticky;right:0;z-index:4}
+table.cols td:last-child{background:#fff;box-shadow:inset 1px 0 0 var(--line)}
+table.cols th:last-child{background:#f7f9fc;box-shadow:inset 1px 0 0 var(--line),inset 0 -1px 0 var(--line)}
+table.cols tbody tr:hover td:last-child{background:#fafbfe}
+table.cols tbody tr.dirty td:last-child{background:#fff8e7}
+/* 列宽拖拽手柄 */
+.colgrip{position:absolute;top:0;right:0;width:7px;height:100%;cursor:col-resize;z-index:6}
+.colgrip::after{content:"";position:absolute;top:0;right:0;width:2px;height:100%;background:transparent}
+.colgrip:hover::after,.colgrip.on::after{background:#3b6ef6}
+body.col-resizing{cursor:col-resize;user-select:none}
 .tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
 .tag.draft{background:#eef1f6;color:#5b6778}
 .tag.submitted{background:#fdf1dc;color:#b45309}
@@ -71,13 +114,74 @@ td.num{font-variant-numeric:tabular-nums}
 .tag.cancelled{background:#fdeaea;color:var(--red)}
 .tag.on{background:#e5f6ee;color:var(--green)}
 .tag.off{background:#eef1f6;color:#5b6778}
+/* 成本待核对：采购价存疑（源单录错），该行不算毛利，必须一眼看得出 */
+.tag.warn{background:#fdeaea;color:var(--red)}
+/* 待核对行：整行标红（浅红底 + 左侧红条），毛利不出数（拿错价算利润更糟） */
+tr.row-pending{background:#fff0f0}
+tr.row-pending td{background:#fff0f0;border-top-color:#f0b4b6;box-shadow:inset 3px 0 0 rgba(229,72,77,.55)}
+tr.row-pending:hover td{background:#ffe6e6}
+/* 标价角标：区分「Excel 导入的真标价」与「wholesale_price 参考值」 */
+.lp-tag{display:inline-block;margin-left:4px;padding:0 4px;border-radius:3px;font-size:9.5px;line-height:14px;background:#eef4ff;color:#3b6fd4;vertical-align:middle}
+/* 库存快照徽标 + 满足率三态提示 */
+.inv-badge{display:inline-block;padding:5px 10px;border-radius:8px;font-size:12.5px;background:#eef2f8;color:#5b6678;border:1px solid #e0e6ef;white-space:nowrap}
+.inv-badge.ok{background:#e9f8f0;color:#18a05e;border-color:#bfe9d3}
+.inv-badge.warn{background:#fff4e5;color:#c77700;border-color:#f3d9a8}
+.ff-banner{margin:14px 0 8px;padding:12px 14px;border-radius:12px;font-size:14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.ff-banner.ok{background:#e9f8f0;border:1px solid #bfe9d3;color:#147a49}
+.ff-banner.arriving{background:#fff4e5;border:1px solid #f3d9a8;color:#9a5b00}
+.ff-banner.short{background:#fdecec;border:1px solid #f3b9b9;color:#b3261e}
+.ff-banner .big{font-size:17px;font-weight:750}
+.ff-tag{display:inline-block;padding:2px 9px;border-radius:20px;font-size:12px;font-weight:600}
+.ff-tag.ok{background:#18a05e;color:#fff}
+.ff-tag.arriving{background:#f59e0b;color:#fff}
+.ff-tag.short{background:#e5484d;color:#fff}
+.ff-line{display:flex;align-items:center;gap:10px;padding:7px 0;border-top:1px dashed #eef1f6;font-size:13px}
+.ff-line .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.ff-line .qt{color:#7b8798;font-variant-numeric:tabular-nums}
+.ff-line .rt{font-weight:700;font-variant-numeric:tabular-nums}
+.lp-ref{color:#a8b2c2;border-bottom:1px dashed #cfd6e0;cursor:help}
 .empty{padding:40px 0;text-align:center;color:var(--muted);font-size:13px}
-.hint{padding:9px 12px;margin:0 0 10px;border-radius:8px;background:#f7f9fc;border:1px solid var(--line);color:#5b6778;font-size:12.5px;line-height:1.5;word-break:break-all}
+.hint{padding:9px 12px;margin:0 0 10px;border-radius:8px;background:#f7f9fc;border:1px solid var(--line);color:#5b6778;font-size:12.5px;line-height:1.5;word-break:break-all;flex-shrink:0}
+
+/* 待维护强制提醒条：有缺项就常驻在商品页顶部，不提供关闭按钮 ——
+   用户原话「不然我都不知道怎么维护」，所以要同时给出「缺多少」和「怎么补」。 */
+.needbar{display:flex;flex-direction:column;gap:9px;padding:12px 14px;margin-bottom:12px;
+  border-radius:10px;flex-shrink:0;background:#fffaf0;border:1px solid #f2d199;border-left:4px solid #e8901a}
+.needbar.done{background:#f3fbf7;border-color:#bfe6d2;border-left-color:var(--green)}
+.needbar .r1{display:flex;align-items:center;gap:9px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#8a5300}
+.needbar.done .r1{color:#12784a}
+.needbar .nchip{display:inline-flex;align-items:center;gap:7px;padding:5px 12px;border-radius:999px;
+  background:#fff;border:1px solid #efc780;color:#8a5300;font-size:12.5px;font-weight:600;cursor:pointer;font-family:inherit}
+.needbar .nchip b{font-size:14px;font-variant-numeric:tabular-nums}
+.needbar .nchip:hover{border-color:#d9a441;box-shadow:0 0 0 3px rgba(232,144,26,.12)}
+.needbar .nchip.on{background:#8a5300;border-color:#8a5300;color:#fff}
+.needbar .nchip.ghost{background:transparent;color:#a07840;border-style:dashed;cursor:default}
+.needbar .nchip.ghost.on{background:#8a5300;color:#fff}
+.needbar .how{font-size:12px;color:#8a6a33;line-height:1.75;font-weight:400}
+.needbar .how b{color:#6d4400}
+.needbar .how .k{display:inline-block;padding:0 5px;border-radius:4px;background:#fff;border:1px solid #eed7ad;font-size:11.5px;color:#7a4f00;font-weight:600}
+/* 标价缺失：只在「要求维护标价的品牌 + 正常商品」上出现，红字提醒但不涂满整格 */
+.need-pill{display:inline-block;padding:1px 7px;border-radius:999px;background:#fdeaea;color:var(--red);
+  font-size:11px;font-weight:700;white-space:nowrap;cursor:help}
+.need-sug{display:block;margin-top:2px;font-size:10.5px;color:#c07a2a;font-variant-numeric:tabular-nums}
+/* 缺分销价：输入框标红边框（不填不结算），比浅黄更醒目，一眼能扫出哪些还没设价 */
+.tier-in.need{background:#fff7f7;border-color:var(--red);box-shadow:0 0 0 2px rgba(229,72,77,.12)}
+.tier-in.need::placeholder{color:#d98a8c}
+.tab-badge{display:inline-block;min-width:17px;padding:0 5px;margin-left:5px;border-radius:999px;
+  background:var(--red);color:#fff;font-size:10.5px;line-height:17px;text-align:center;font-weight:700;vertical-align:1px}
 /* 弹窗 */
 .backdrop{position:fixed;inset:0;background:rgba(16,24,40,.45);display:none;align-items:center;justify-content:center;z-index:99;padding:20px}
 .backdrop.show{display:flex}
 .modal{background:#fff;border-radius:14px;width:min(720px,96vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(16,24,40,.25)}
 .modal.sm{width:min(460px,96vw)}
+/* 商品编辑：字段多，给一版更宽的弹窗，两列不再挤成一坨 */
+.modal.md{width:min(840px,94vw)}
+.modal.md .mb{padding:18px 24px}
+.modal.md label{font-size:13px;margin:12px 0 6px}
+.modal.md input,.modal.md select,.modal.md textarea{min-height:40px;font-size:14px}
+.modal.md .form-grid{gap:0 22px}
+.modal.md .form-grid > div > .pair{display:flex;gap:8px}
+.modal.md .form-grid > div > .pair input:first-child{flex:0 0 110px}
 .modal .mh{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px 10px;border-bottom:1px solid var(--line)}
 .modal .mh h2{font-size:16px}
 .modal .mb{padding:14px 20px}
@@ -96,7 +200,7 @@ td.num{font-variant-numeric:tabular-nums}
 .line-row select,.line-row input{min-height:30px;border:1px solid #d8dee9;border-radius:7px;padding:4px 8px;font-size:12.5px;width:100%}
 .line-row .sub{text-align:right;font-variant-numeric:tabular-nums;font-weight:600}
 .line-row .del{border:0;background:transparent;color:var(--red);font-size:15px;cursor:pointer}
-.line-total{display:flex;justify-content:flex-end;gap:16px;padding:10px;font-size:13px}
+.line-total{display:flex;justify-content:flex-end;gap:16px;padding:10px;font-size:13px;flex-shrink:0}
 .line-total b{font-size:15px;font-variant-numeric:tabular-nums}
 .err{background:#fdeaea;color:var(--red);font-size:12.5px;border-radius:8px;padding:8px 12px;margin-top:10px;display:none}
 .err.show{display:block}
@@ -137,7 +241,7 @@ toast{display:none}
 
     <div class="tabs">
       <button class="tab active" data-tab="distributors" onclick="switchTab('distributors')">分销商</button>
-      <button class="tab" data-tab="products" onclick="switchTab('products')">商品</button>
+      <button class="tab" id="tabProducts" data-tab="products" onclick="switchTab('products')">商品</button>
       <button class="tab" data-tab="orders" onclick="switchTab('orders')">分销订单</button>
       <button class="tab" data-tab="prices" onclick="switchTab('prices')">价格</button>
       <button class="tab" data-tab="statements" onclick="switchTab('statements')">对账单</button>
@@ -151,26 +255,48 @@ toast{display:none}
         <button class="btn" onclick="openImportModal('dist')">⇪ 批量导入</button>
         <button class="btn primary" onclick="openDistModal()">＋ 新建分销商</button>
       </div>
-      <table><thead><tr>
-        <th>编码</th><th>名称</th><th>联系人</th><th>电话</th><th>区域</th><th>状态</th><th style="width:130px">操作</th>
-      </tr></thead><tbody id="distBody"></tbody></table>
-      <div class="empty" id="distEmpty" style="display:none">还没有分销商，点右上角「新建分销商」开始</div>
+      <div class="tbl">
+        <table class="cols" data-ckey="dist">
+          <colgroup><col style="width:110px"><col style="width:240px"><col style="width:90px"><col style="width:135px"><col style="width:120px"><col style="width:80px"><col style="width:140px"></colgroup>
+          <thead><tr>
+          <th>编码</th><th>名称</th><th>联系人</th><th>电话</th><th>区域</th><th>状态</th><th>操作</th>
+        </tr></thead><tbody id="distBody"></tbody></table>
+        <div class="empty" id="distEmpty" style="display:none">还没有分销商，点右上角「新建分销商」开始</div>
+      </div>
     </div>
 
     <!-- 商品 -->
     <div class="card" id="panel-products" style="display:none">
       <div class="head">
-        <h3>商品目录（基础价）<span id="prodBrandTag" class="tag" style="display:none;margin-left:8px"></span></h3>
+        <h3>商品目录（含税价）<span id="prodBrandTag" class="tag" style="display:none;margin-left:8px"></span></h3>
         <input id="prodSearch" placeholder="搜索 SKU / 名称 / 条码 / 品牌" oninput="renderProducts()" style="width:220px">
         <button class="btn" id="btnWdtSync" onclick="syncWdtProducts()" title="从旺店通商品档案拉取货品与规格">⟳ 从旺店通同步</button>
+        <button class="btn" id="btnPurchaseSync" onclick="syncPurchaseOrders()" title="从旺店通采购单拉取真实采购价（含税、已折后）">⇣ 同步采购单</button>
+        <button class="btn" id="btnFillBase" onclick="fillBaseFromPurchase()" title="把采购价填进「标价」为空的商品（不影响已有价格的商品）">⇡ 用采购价补零价</button>
+        <button class="btn" onclick="importListPrice()" title="从品牌订货单 Excel 导入标价（只用于算分销折扣率，不参与利润）">⇡ 导入标价</button>
+        <button class="btn" onclick="backfillListPrice()" title="标价为空但有采购价的商品：按品牌规律反推（格力高 标价=采购价÷0.8；瑞士莲/桂格等 采购价即标价）。先预览确认，只补空值不覆盖">⇡ 回填标价</button>
+        <span id="prodSelBar" style="display:none;align-items:center;gap:6px;border-left:1px solid #d8dee9;padding-left:10px">
+          <b id="prodSelCount" style="color:#2463eb">0</b><span style="color:#8a94a6">已选</span>
+          <input id="tierZhe" type="number" step="0.1" min="0.1" max="9.9" placeholder="8.5" style="width:66px" title="折扣：填 8.5 表示 8.5 折（填 0.85 也可以）">
+          <span style="color:#8a94a6">折</span>
+          <button class="btn primary" onclick="applyTierDiscount()" title="一级价 = 标价 × 折扣，批量写入勾选的商品；箱价自动按 一级价×箱规 算">按标价×折扣设一级价</button>
+        </span>
         <button class="btn" onclick="openImportModal('prod')">⇪ 批量导入</button>
         <button class="btn primary" onclick="openProdModal()">＋ 新建商品</button>
+        <button class="btn" id="btnSaveTier" onclick="saveTier1Prices()" style="display:none;border-color:#2463eb;color:#2463eb">保存改价 <b id="tierDirtyCount">0</b></button>
       </div>
       <div class="hint" id="wdtSyncHint" style="display:none"></div>
-      <table><thead><tr>
-        <th>SKU</th><th>名称</th><th>规格</th><th>品牌</th><th>分类</th><th>条码</th><th>单位</th><th>基础价</th><th>来源</th><th>状态</th><th style="width:130px">操作</th>
-      </tr></thead><tbody id="prodBody"></tbody></table>
-      <div class="empty" id="prodEmpty" style="display:none">还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。</div>
+      <!-- 待维护提醒条：由 renderNeedBar() 根据 /api/fx/products 的 maintenance 汇总渲染 -->
+      <div class="needbar" id="prodNeed" style="display:none"></div>
+      <div class="tbl">
+        <table class="cols" data-ckey="prod">
+          <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:104px"><col style="width:120px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:70px"><col style="width:60px"><col style="width:130px"></colgroup>
+          <thead><tr>
+          <th title="勾选后用上方「按标价×折扣设一级价」批量定价"><input type="checkbox" id="prodSelAll" onchange="toggleAllProd(this)"></th>
+          <th>SKU</th><th>名称</th><th class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">品牌标价(含税)</th><th class="num">采购价(含税)</th><th>一级分销价(含税)</th><th class="num" title="一级分销箱价 = 一级分销价 × 箱规；未定价或没箱规显示 —">一级箱价(含税)</th><th>规格</th><th>品牌</th><th>分类</th><th>条码</th><th>单位</th><th>箱规</th><th>来源</th><th>状态</th><th>操作</th>
+        </tr></thead><tbody id="prodBody"></tbody></table>
+        <div class="empty" id="prodEmpty" style="display:none">还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。</div>
+      </div>
     </div>
 
     <!-- 订单 -->
@@ -185,12 +311,18 @@ toast{display:none}
           <option value="cancelled">已取消</option>
         </select>
         <select id="orderDist" style="width:180px" onchange="renderOrders()"></select>
+        <span id="invBadge" class="inv-badge" title="库存快照：满足率提示的「昨天库存」基线">库存快照：未同步</span>
+        <button class="btn" onclick="syncInventory()">⟳ 同步库存</button>
         <button class="btn primary" onclick="openOrderModal()">＋ 新建订单</button>
       </div>
-      <table><thead><tr>
-        <th>订单号</th><th>分销商</th><th>状态</th><th class="num">金额</th><th class="num">明细</th><th>下单时间</th><th style="width:200px">操作</th>
-      </tr></thead><tbody id="orderBody"></tbody></table>
-      <div class="empty" id="orderEmpty" style="display:none">还没有订单</div>
+      <div class="tbl">
+        <table class="cols" data-ckey="order">
+          <colgroup><col style="width:170px"><col style="width:240px"><col style="width:90px"><col style="width:110px"><col style="width:70px"><col style="width:150px"><col style="width:190px"></colgroup>
+          <thead><tr>
+          <th>订单号</th><th>分销商</th><th>状态</th><th class="num">金额</th><th class="num">明细</th><th>下单时间</th><th>操作</th>
+        </tr></thead><tbody id="orderBody"></tbody></table>
+        <div class="empty" id="orderEmpty" style="display:none">还没有订单</div>
+      </div>
     </div>
 
     <!-- 价格 -->
@@ -201,10 +333,14 @@ toast{display:none}
         <button class="btn primary" onclick="saveDirtyPrices()">保存修改</button>
       </div>
       <div class="hint">专属价只对选定的分销商生效：<b>留空 = 使用商品基础价</b>；填了数字 = 该经销商的协议价。下单时不手填价格，会自动套用这里的专属价。</div>
-      <table><thead><tr>
-        <th>SKU</th><th>名称</th><th>规格</th><th>单位</th><th class="num">基础价</th><th>经销商专属价</th><th style="width:120px"></th>
-      </tr></thead><tbody id="priceBody"></tbody></table>
-      <div class="empty" id="priceEmpty" style="display:none">请先在上方选择分销商（分销商或商品为空时，先到对应标签页创建）</div>
+      <div class="tbl">
+        <table class="cols" data-ckey="price">
+          <colgroup><col style="width:130px"><col style="width:220px"><col style="width:100px"><col style="width:58px"><col style="width:120px"><col style="width:112px"><col style="width:120px"><col style="width:150px"><col style="width:90px"></colgroup>
+          <thead><tr>
+          <th>SKU</th><th>名称</th><th>规格</th><th>单位</th><th class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">标价(含税)</th><th class="num">采购价(含税)</th><th class="num">一级分销价(含税)</th><th>经销商专属价</th><th></th>
+        </tr></thead><tbody id="priceBody"></tbody></table>
+        <div class="empty" id="priceEmpty" style="display:none">请先在上方选择分销商（分销商或商品为空时，先到对应标签页创建）</div>
+      </div>
     </div>
 
     <!-- 对账单 -->
@@ -217,8 +353,10 @@ toast{display:none}
       </div>
       <div class="hint">不选月份 = 看各月汇总（点月份可下钻）；选定月份 = 显示该月已审核订单明细。「导出 Excel」需同时选好分销商与月份，导出为逐商品明细对账单。</div>
       <div class="line-total" style="justify-content:flex-start" id="stmtSummary"></div>
-      <table><thead id="stmtHead"></thead><tbody id="stmtBody"></tbody></table>
-      <div class="empty" id="stmtEmpty" style="display:none">当前筛选下没有已审核订单</div>
+      <div class="tbl">
+        <table><thead id="stmtHead"></thead><tbody id="stmtBody"></tbody></table>
+        <div class="empty" id="stmtEmpty" style="display:none">当前筛选下没有已审核订单</div>
+      </div>
     </div>
   </div>
 </div>
@@ -245,7 +383,7 @@ toast{display:none}
 </div></div>
 
 <!-- 商品弹窗 -->
-<div class="backdrop" id="prodModal"><div class="modal sm">
+<div class="backdrop" id="prodModal"><div class="modal md">
   <div class="mh"><h2 id="prodModalTitle">新建商品</h2><button class="btn" onclick="closeModal('prodModal')">✕</button></div>
   <div class="mb">
     <div class="form-grid">
@@ -253,10 +391,20 @@ toast{display:none}
       <div><label>名称 *</label><input id="pName"></div>
       <div><label>规格</label><input id="pSpec" placeholder="如 24×100g"></div>
       <div><label>单位</label><input id="pUnit" value="箱"></div>
-      <div><label>基础价（元/单位）</label><input id="pPrice" type="number" step="0.01" min="0" value="0"></div>
+      <div><label>箱规（1 箱 = 多少单位）</label>
+        <div class="pair"><input id="pPackQty" type="number" min="0" step="1" placeholder="36"><input id="pPackUnit" value="箱" placeholder="箱"></div>
+      </div>
+      <div><label>标价（含税，元/单位）</label><input id="pPrice" type="number" step="0.01" min="0" value="0" placeholder="品牌标价，含税；只用于算折扣率" oninput="updateTier1Hint()"></div>
+      <div><label>一级分销价（含税，元/单位）</label>
+        <div class="pair">
+          <input id="pTier1" type="number" step="0.01" min="0" placeholder="待定" oninput="updateTier1Hint()">
+          <span class="tier-margin na" id="pTier1Hint" style="align-self:center"></span>
+        </div>
+      </div>
       <div><label>品牌</label><input id="pBrand" list="brandOptions" placeholder="如 格力高/Glico"><datalist id="brandOptions"></datalist></div>
       <div><label>分类</label><input id="pCat" placeholder="如 零食"></div>
     </div>
+    <div class="hint" id="pPurchaseHint" style="display:none"></div>
     <label>备注</label><textarea id="pNote"></textarea>
     <div class="err" id="prodErr"></div>
   </div>
@@ -317,6 +465,9 @@ toast{display:none}
 const state = { distributors: [], products: [], orders: [], overview: null, tab: "distributors",
   distEditId: null, prodEditId: null, orderEditId: null,
   prices: [], statement: null, priceCache: {},
+  // maintenance = 后端算好的待维护汇总（缺标价/缺分销价/成本待核对）
+  // need = 当前筛选中的缺项代码，空串表示不筛选
+  maintenance: null, need: "",
   // 品牌维度：由外壳顶栏的品牌切换器通过 iframe 地址传入，空值表示「全部品牌」
   brand: new URLSearchParams(location.search).get("brand") || "" };
 
@@ -340,8 +491,10 @@ async function loadAll(){
     const [ov, dist, prod] = await Promise.all([
       api("/api/fx/overview"), api("/api/fx/distributors"), api("/api/fx/products")]);
     state.overview = ov; state.distributors = dist.distributors; state.products = prod.products;
+    state.maintenance = prod.maintenance || null;
     await loadOrders();
     renderStats(); renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
+    loadInventoryBadge();
     $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
   } catch (e) { toast("加载失败: " + e.message); }
 }
@@ -418,6 +571,75 @@ async function toggleDist(id){
 }
 
 /* ---------- 商品 ---------- */
+/* 待维护提醒条：缺多少 + 怎么补。
+   用户明确要求「页面强制提醒，不然我都不知道怎么维护」，所以这里同时回答两个问题：
+   缺什么（可点的数字，点了就筛出来），以及每一项该走哪条路径补。 */
+function renderNeedBar(){
+  const bar = $("prodNeed"), m = state.maintenance;
+  if (!bar) return;
+  if (!m) { bar.style.display = "none"; return; }
+  bar.style.display = "";
+  bar.classList.toggle("done", !!m.clean);
+
+  // 角标：不管在哪个标签页，商品页还有多少没维护都能看到
+  const tab = $("tabProducts");
+  if (tab) tab.innerHTML = m.blocking > 0 ? `商品<span class="tab-badge">${m.blocking}</span>` : "商品";
+
+  if (m.clean) {
+    bar.innerHTML = `<div class="r1">✅ 价格已全部维护完（${m.total_products} 个商品）</div>`;
+    return;
+  }
+
+  const chip = (code, n, label, extra) => n > 0
+    ? `<button class="nchip${state.need === code ? " on" : ""}" onclick="filterNeed('${code}')"
+         title="点一下只看这 ${n} 个，再点一下取消筛选">${label} <b>${n}</b>${extra || ""}</button>`
+    : `<span class="nchip ghost">${label} <b>0</b></span>`;
+
+  const scope = m.brand ? `「${esc(m.brand)}」` : "全部";
+  // 选了某个品牌时额外报全局，否则切品牌后会以为其他品牌都维护好了
+  const globalHint = m.brand && m.all_blocking !== m.blocking
+    ? `　·　全部品牌共 <b>${m.all_blocking}</b> 项待处理` : "";
+
+  bar.innerHTML = `
+    <div class="r1">⚠ 商品价格待维护（${scope}）${globalHint}</div>
+    <div class="r1" style="font-weight:500">
+      ${chip("list_price", m.no_list_price, "缺标价")}
+      ${chip("tier1_price", m.no_tier1_price, "缺一级分销价")}
+      ${chip("cost_check", m.cost_pending, "采购价待核对")}
+      ${state.need ? `<button class="nchip ghost" onclick="filterNeed('')" style="cursor:pointer;border-style:solid">✕ 取消筛选</button>` : ""}
+    </div>
+    <div class="how">
+      <b>缺标价 ${m.no_list_price} 个</b>（只对格力高要求，纸箱耗材/帆布袋/好评卡这类不算）：
+      点右上 <span class="k">⇡ 导入标价</span> 选格力高订货单 Excel 自动匹配条码；
+      零星的直接点该行 <span class="k">编辑</span> 手填。<br>
+      ${m.no_list_price_with_cost > 0
+        ? `　其中 <b>${m.no_list_price_with_cost} 个已有采购价</b>，可按「采购价 ÷ 0.8」反推标价，表里已用橙色标了建议值。<br>`
+        : ""}
+      <b>缺一级分销价 ${m.no_tier1_price} 个</b>：
+      不用开弹窗，直接在下表「一级分销价」列的输入框里填，填完点右上 <span class="k">保存改价</span> 一次性提交。<br>
+      ${m.cost_pending > 0
+        ? `<b>采购价待核对 ${m.cost_pending} 个</b>：旺店通源单录错，核对清楚前不算毛利（不会算错利润），这类可以最后处理。`
+        : ""}
+    </div>`;
+}
+
+/* 点提醒条上的数字 → 只看这一类。再点一次取消，避免用户被卡在筛选状态里出不来。 */
+function filterNeed(code){
+  state.need = (state.need === code) ? "" : code;
+  renderNeedBar();
+  renderProducts();
+  const body = $("prodBody");
+  if (body && body.firstElementChild) body.parentElement.parentElement.scrollTop = 0;
+}
+
+function productMatchesNeed(p){
+  if (!state.need) return true;
+  if (state.need === "list_price") return !!p.need_list_price;
+  if (state.need === "tier1_price") return !!p.need_tier1_price;
+  if (state.need === "cost_check") return !!p.need_cost_check;
+  return true;
+}
+
 function renderProducts(){
   const kw = ($("prodSearch").value || "").toLowerCase();
   const body = $("prodBody"), empty = $("prodEmpty"), tag = $("prodBrandTag");
@@ -428,24 +650,292 @@ function renderProducts(){
   }
   const rows = state.products.filter(p => {
     if (state.brand && (p.brand || "") !== state.brand) return false;
+    if (!productMatchesNeed(p)) return false;
     if (!kw) return true;
     return ((p.sku||"") + (p.name||"") + (p.spec||"") + (p.barcode||"") + (p.category||"") + (p.brand||"")).toLowerCase().includes(kw);
   });
   empty.style.display = rows.length ? "none" : "";
-  empty.textContent = state.brand
-    ? `「${state.brand}」下没有符合条件的商品。点顶栏品牌切换器选「全部品牌」可看全部 ${state.products.length} 个商品。`
-    : "还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。";
-  body.innerHTML = rows.map(p => `<tr>
-    <td><b>${esc(p.sku)}</b></td><td>${esc(p.name)}</td><td>${esc(p.spec) || "-"}</td>
+  empty.textContent = state.need
+    ? "当前筛选下没有待维护商品 —— 这一类已经全部维护好了。点提醒条上的「取消筛选」看全部商品。"
+    : (state.brand
+      ? `「${state.brand}」下没有符合条件的商品。点顶栏品牌切换器选「全部品牌」可看全部 ${state.products.length} 个商品。`
+      : "还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。");
+  renderNeedBar();
+  body.innerHTML = rows.map(p => {
+    // 折扣率只认真标价（list_price）。base_price 语义混乱（可能是采购价/标价/旧价），
+    // 拿它当标价算折扣率会算出错的折数，不如不显示。
+    const lp = parseFloat(p.list_price) || 0;
+    const m = tierMargin(costOf(p), p.tier1_price, costLabelOf(p), lp, p.cost_status);
+    const tierNeed = p.need_tier1_price ? " need" : "";
+    const packQty = p.pack_qty || 0;
+    const t1 = parseFloat(p.tier1_price) || 0;
+    const packUnit = esc(p.pack_unit || "箱");
+    // 一级箱价 = 一级价(按盒) × 箱规，独立列；没定价或没箱规显示 —
+    const boxCell = (packQty > 0 && t1 > 0)
+      ? `<span title="一级分销箱价 = 一级价 ${t1.toFixed(2)} × 箱规 ${packQty}${packUnit}">¥${(t1 * packQty).toFixed(2)}</span>`
+      : '<span style="color:#b6bfcc" title="一级价定了之后这里自动算出整箱价">—</span>';
+    return `<tr class="${p.cost_status === "pending" ? "row-pending" : ""}">
+    <td><input type="checkbox" class="prod-ck" data-id="${p.id}" onchange="onProdCheck()"></td>
+    <td><b>${esc(p.sku)}</b></td><td title="${esc(p.name)}">${esc(p.name)}</td>
+    <td class="num">${listPriceCell(p)}</td>
+    ${purchaseCell(p)}
+    <td class="tier-cell">
+      <input class="tier-in${m.low ? " low" : ""}${tierNeed}" type="number" min="0" step="0.01"
+             value="${p.tier1_price > 0 ? p.tier1_price : ""}" data-orig="${p.tier1_price > 0 ? p.tier1_price : ""}"
+             data-id="${p.id}" data-cost="${costOf(p)}" data-cost-label="${costLabelOf(p)}" data-list="${lp}" data-cost-status="${p.cost_status || ""}" data-pack="${packQty}" data-pack-unit="${packUnit}" placeholder="${p.need_tier1_price ? "未设" : "待定"}" title="${p.need_tier1_price ? "还没设一级分销价 —— 直接在这里填，填完点右上「保存改价」" : "一级分销价（含税），按箱/件设定，改完点右上「保存改价」"}"
+             oninput="onTierInput(this)">
+      <span class="tier-margin ${m.cls}" title="${m.tip}">${m.text}</span>
+    </td>
+    <td class="num tier-box-cell">${boxCell}</td>
+    <td title="${esc(p.spec)}">${esc(p.spec) || "-"}</td>
     <td>${esc(p.brand) || "-"}</td>
     <td>${esc(p.category) || "-"}</td><td>${esc(p.barcode) || "-"}</td><td>${esc(p.unit)}</td>
-    <td class="num">${money(p.base_price)}</td>
+    <td>${esc(p.pack_spec) || "—"}</td>
     <td>${p.source === "wdt" ? '<span class="tag on">旺店通</span>' : '<span class="tag">手工</span>'}</td>
-    <td><span class="tag ${p.active ? "on" : "off"}">${p.active ? "在售" : "停用"}</span></td>
+    <td>${p.cost_status === "pending"
+      ? `<span class="tag warn" title="${esc(p.cost_note || "采购价存疑，待核对")}">待核对</span>`
+      : `<span class="tag ${p.active ? "on" : "off"}">${p.active ? "在售" : "停用"}</span>`}</td>
     <td class="ops">
       <button class="btn mini" onclick='openProdModal(${p.id})'>编辑</button>
       <button class="btn mini ${p.active ? "danger" : ""}" onclick="toggleProd(${p.id})">${p.active ? "停用" : "启用"}</button>
-    </td></tr>`).join("");
+    </td></tr>`;
+  }).join("");
+  refreshTierDirty();
+  // 重新渲染后勾选已清空，把「已选 N」工具条同步回隐藏，避免挂着旧数字
+  onProdCheck();
+}
+
+/* 采购价单元格：真实付款价（含税/基本单位），来自旺店通采购单。
+   用户口径：采购单价格 = 开盘价，上下 1 元属于正常浮动，超过 1 元才算真差异。
+   悬浮里带来源仓 —— 同一 SKU 在不同仓价格不同，不标清楚就说不清这价哪来的。 */
+/* 采购价单元格：真实付款价（含税/基本单位），来自旺店通采购单，是**唯一成本来源**。
+   口径来自用户 2026-10-27 的明确说明：
+   - 采购单价格 = 开盘价，上下 1 元浮动属正常（这个判断在算价时做，页面不再重复报差异）；
+   - 成本以采购入库价为准，所以这里只如实显示值、日期、来源仓；
+   - 有标价时顺手标出「是标价的 X 折」，用来交叉验证标价准不准（实测格力高恒为 8 折）。
+   不再拿 base_price 做比较 —— 那个字段语义混乱（可能是采购价、标价或旧价），
+   拿它比会把正常商品报成「标价过期」，用户反而不知道该信哪个数。 */
+function purchaseCell(p){
+  const cost = parseFloat(p.purchase_price) || 0;
+  const list = parseFloat(p.list_price) || 0;
+  if (cost <= 0) {
+    return `<td class="cost na" title="还没有采购记录。点上方「⇣ 同步采购单」从旺店通拉取">—</td>`;
+  }
+  const date = p.purchase_date || "";
+  const wh = p.purchase_warehouse || "";
+  const prov = p.purchase_provider || "";
+  const head = `<span>${cost.toFixed(2)}</span>`;
+  const sub = date ? `<span class="cost-date">${esc(date)}</span>` : "";
+  const src = [wh, prov].filter(Boolean).join(" / ");
+  const detail = `采购价 ${cost.toFixed(2)}（${esc(date)}，单号 ${esc(p.purchase_no || "")}${src ? "；来源 " + esc(src) : ""}）`;
+  if (list <= 0) {
+    return `<td class="cost" title="${detail}">${head}${sub}</td>`;
+  }
+  // 标价 ÷ 采购价 的应有倍数按品牌：格力高 1.25（8 折拿货），其他品牌 1.0（采购价即标价）
+  const disc = purchaseDiscountOf(p.brand);
+  const expect = 1 / disc;
+  const ratio = list / cost;
+  const ok = Math.abs(ratio - expect) <= 0.02;
+  const rule = disc === 1 ? "采购价即标价（该品牌不打折拿货）" : `约 ${disc} 折拿货`;
+  const ratioText = `；标价 ${list.toFixed(2)} ÷ 采购价 = ${ratio.toFixed(2)} 倍`;
+  const tip = ok
+    ? `${detail}${ratioText}（${rule}）`
+    : `${detail}${ratioText}，偏离应有倍数 ${expect.toFixed(2)}（${rule}），标价或采购价有一边可能不对，值得核对`;
+  return `<td class="cost${ok ? "" : " diff"}" title="${esc(tip)}">${head}${sub}</td>`;
+}
+
+/* 标价单元格。三种状态要分清，否则用户以为已经维护好了：
+   ① 有真标价（Excel 导入）→ 数字 + 「牌」角标
+   ② 该维护但没维护 → 红字「待补标价」；有采购价的附一个按折扣率反推的建议值（仅供参考，不写库）
+   ③ 不要求维护标价的品牌 → 灰色参考值，并写明「不要当标价用」
+   关键口径（用户 2026-10-27 明确）：按「采购价 ÷ 0.8」反推标价这个玩法，只有格力高有——
+   其他品牌没有这个反推概念，所以②里那个建议值必须限定格力高，绝不给别的品牌显示。 */
+function isGlico(p){
+  const b = (p.brand || "").toLowerCase();
+  return b.includes("格力高") || b.includes("glico");
+}
+/* 拿货折扣按品牌区分（2026-10-27 用户明确口径，与后端 purchase_discount_of 同源）：
+   格力高：采购价 = 标价 × 0.8（8 折拿货，实测 88/88 命中）；
+   瑞士莲/桂格等其他品牌：采购价本身就是品牌标价，即 × 1.0。 */
+function purchaseDiscountOf(brand){
+  const b = (brand || "").toLowerCase();
+  return (b.includes("格力高") || b.includes("glico")) ? 0.8 : 1.0;
+}
+function listPriceCell(p){
+  const lp = parseFloat(p.list_price) || 0;
+  const bp = parseFloat(p.base_price) || 0;
+  const tip = "标价（含税，按盒/袋）。只用于算分销折扣率，不参与利润计算";
+  if (lp > 0) {
+    return `<span title="${tip}">${lp.toFixed(2)}</span><span class="lp-tag" title="${tip}">标</span>`;
+  }
+  if (p.need_list_price) {
+    // 只有格力高才有「采购价 ÷ 0.8 反推标价」的概念；别的品牌哪怕缺标价也不给这个建议值。
+    const cost = parseFloat(p.purchase_price) || 0;
+    const d = state.maintenance ? parseFloat(state.maintenance.list_price_discount) || 0.8 : 0.8;
+    const sugHtml = (isGlico(p) && cost > 0)
+      ? `<span class="need-sug" title="建议标价 = 采购价 ${cost.toFixed(2)} ÷ ${d}（格力高拿货恒为 ${d} 折逆推）。仅供参考，不写库，你核对后再填">建议≈${(cost / d).toFixed(2)}</span>`
+      : "";
+    return `<span class="need-pill" title="这个商品（格力高）的标价还没维护。点右上「⇡ 导入标价」导入订货单 Excel，或点该行「编辑」手填；下方建议值仅供参考，确认后再填">待补标价</span>${sugHtml}`;
+  }
+  if (bp > 0) {
+    return `<span class="lp-ref" title="该品牌不要求维护标价。${bp.toFixed(2)} 是旺店通 wholesale_price 的参考值，可能是采购价、标价或旧价，不要当标价用">${bp.toFixed(2)}</span>`;
+  }
+  return '<span style="color:#b6bfcc">—</span>';
+}
+
+/* 成本取值：采购入库价优先，采购单没覆盖到才退回标价。
+   口径来源（2026-10-27 用户明确）：「一切都是以采购入库价格为主算利润」，
+   标价只用于算分销折扣率，不参与利润计算。 */
+function costOf(p){
+  const pur = parseFloat(p.purchase_price) || 0;
+  return pur > 0 ? pur : (parseFloat(p.base_price) || 0);
+}
+function costLabelOf(p){
+  return (parseFloat(p.purchase_price) || 0) > 0 ? "采购价" : "标价（估）";
+}
+
+/* 毛利：一级分销价（含税）− 成本（含税），直接相减，不做税率换算。
+   成本默认是采购入库价；没有采购记录时退回标价并在提示里标明「估」。
+   listPrice 是标价，用来算「分销价打了几折」——这是标价的唯一用途。
+   costStatus="pending" 时不算毛利：拿错价算利润比不算更糟。 */
+function tierMargin(costPrice, tier, costLabel, listPrice, costStatus){
+  if (costStatus === "pending") {
+    return {text: "待核对", cls: "neg", low: false, tip: "采购价存疑（源单价格录错），核对清楚前不算毛利"};
+  }
+  const c = parseFloat(costPrice) || 0, t = parseFloat(tier) || 0;
+  const lp = parseFloat(listPrice) || 0;
+  const label = costLabel || "成本";
+  if (c <= 0) return {text: "成本未定", cls: "na", low: false, tip: `${label}还没维护，先补上才能算毛利`};
+  if (t <= 0) return {text: "毛利 —", cls: "na", low: false, tip: "还没设一级分销价"};
+  const margin = t - c, rate = (margin / t) * 100;
+  const disc = lp > 0 ? `；是标价 ${lp.toFixed(2)} 的 ${(t / lp * 10).toFixed(2)} 折` : "";
+  return {
+    text: `${margin >= 0 ? "+" : ""}${margin.toFixed(2)} / ${rate.toFixed(1)}%`,
+    cls: margin < 0 ? "neg" : "pos",
+    low: margin < 0,
+    tip: margin < 0
+      ? `低于${label} ${Math.abs(margin).toFixed(2)} 元，卖一箱亏一箱${disc}`
+      : `每单位毛利 ${margin.toFixed(2)} 元（分销价 ${t.toFixed(2)} − ${label} ${c.toFixed(2)}）${disc}`,
+  };
+}
+
+function onTierInput(input){
+  const m = tierMargin(input.dataset.cost, input.value, input.dataset.costLabel, input.dataset.list, input.dataset.costStatus);
+  const row = input.closest("tr");
+  const span = row.querySelector(".tier-margin");
+  span.textContent = m.text; span.className = "tier-margin " + m.cls; span.title = m.tip;
+  input.classList.toggle("low", m.low);
+  row.classList.toggle("dirty", input.value !== (input.dataset.orig || ""));
+  // 一级箱价列实时跟着变：一级价 × 箱规
+  const boxCell = row.querySelector(".tier-box-cell");
+  if (boxCell) {
+    const pq = parseFloat(input.dataset.pack) || 0;
+    const v = parseFloat(input.value) || 0;
+    boxCell.innerHTML = (pq > 0 && v > 0)
+      ? `<span title="一级分销箱价 = 一级价 ${v.toFixed(2)} × 箱规 ${pq}${input.dataset.packUnit || "箱"}">¥${(v * pq).toFixed(2)}</span>`
+      : '<span style="color:#b6bfcc">—</span>';
+  }
+  refreshTierDirty();
+}
+
+function dirtyTierRows(){
+  return [...$("prodBody").querySelectorAll("tr")].filter(r => {
+    const i = r.querySelector(".tier-in");
+    return i && i.value !== (i.dataset.orig || "");
+  });
+}
+
+function refreshTierDirty(){
+  const n = dirtyTierRows().length, btn = $("btnSaveTier");
+  if (!btn) return;
+  btn.style.display = n ? "" : "none";
+  $("tierDirtyCount").textContent = n;
+}
+
+async function saveTier1Prices(){
+  const rows = dirtyTierRows();
+  if (!rows.length) { toast("没有改过的价格"); return; }
+  const items = rows.map(r => {
+    const i = r.querySelector(".tier-in");
+    return { product_id: Number(i.dataset.id), tier1_price: i.value === "" ? null : i.value };
+  });
+  const lowCount = rows.filter(r => r.querySelector(".tier-in").classList.contains("low")).length;
+  try {
+    const res = await api("/api/fx/products/tier1-prices", { method: "PUT", body: JSON.stringify({ items }) });
+    const extra = lowCount ? `，其中 ${lowCount} 个低于标价（已标红）` : "";
+    toast(`已保存 ${res.updated} 个商品的一级分销价${extra}`);
+    state.priceCache = {};
+    await loadAll();
+    switchTab("products");
+  } catch (e) { toast("保存失败: " + e.message); }
+}
+
+/* ---------- 批量折扣定价 + 标价回填 ---------- */
+function checkedProdIds(){
+  return [...$("prodBody").querySelectorAll(".prod-ck:checked")].map(c => Number(c.dataset.id));
+}
+function onProdCheck(){
+  const ids = checkedProdIds();
+  const bar = $("prodSelBar");
+  bar.style.display = ids.length ? "inline-flex" : "none";
+  $("prodSelCount").textContent = ids.length;
+  const all = $("prodSelAll");
+  const boxes = [...$("prodBody").querySelectorAll(".prod-ck")];
+  all.checked = boxes.length && ids.length === boxes.length;
+  all.indeterminate = ids.length > 0 && ids.length < boxes.length;
+}
+function toggleAllProd(ck){
+  [...$("prodBody").querySelectorAll(".prod-ck")].forEach(c => c.checked = ck.checked);
+  onProdCheck();
+}
+
+/* 勾选商品批量按折扣率设一级分销价：一级价 = 标价 × 折扣。
+   预览在本地算（state.products 里有标价和箱规），确认后服务端按同一公式重算写入，
+   服务端是唯一真相：没标价的行会被跳过并回传原因。 */
+async function applyTierDiscount(){
+  const ids = checkedProdIds();
+  if (!ids.length) { toast("先勾选要设置的商品"); return; }
+  const zhe = ($("tierZhe").value || "").trim();
+  if (!zhe || parseFloat(zhe) <= 0) { toast("先填折扣：填 8.5 表示 8.5 折（填 0.85 也可以）"); return; }
+  const rate = parseFloat(zhe) > 1 ? parseFloat(zhe) / 10 : parseFloat(zhe);
+  const map = Object.fromEntries(state.products.map(p => [p.id, p]));
+  const lines = []; let noLp = 0;
+  for (const id of ids) {
+    const p = map[id]; if (!p) continue;
+    const lp = parseFloat(p.list_price) || 0;
+    if (lp <= 0) { noLp++; continue; }
+    const t1 = Math.round(lp * rate * 100) / 100;
+    const pq = p.pack_qty || 0;
+    lines.push(`${p.sku} ${(p.name || "").slice(0, 14)}：标价 ${lp.toFixed(2)} × ${rate} = ¥${t1.toFixed(2)}${pq ? `（箱价 ¥${(t1 * pq).toFixed(2)}）` : ""}`);
+  }
+  if (!lines.length) { toast("勾选的商品都没有标价 —— 先点「⇡ 回填标价」"); return; }
+  const sample = lines.slice(0, 12).join("\n") + (lines.length > 12 ? `\n… 共 ${lines.length} 行` : "");
+  const warn = noLp ? `\n\n（另有 ${noLp} 个商品没标价，会被跳过）` : "";
+  if (!confirm(`将按「标价 × ${rate}」设置勾选商品的一级分销价：\n\n${sample}${warn}\n\n确认写入？`)) return;
+  try {
+    const r = await api("/api/fx/products/tier1-batch-discount", { method: "POST", body: JSON.stringify({ product_ids: ids, zhe, dry_run: 0 }) });
+    toast(`已设置 ${r.updated} 个商品的一级分销价${r.skipped.length ? `，跳过 ${r.skipped.length} 个（${r.skipped[0].reason}）` : ""}`);
+    state.priceCache = {};
+    await loadAll();
+    switchTab("products");
+  } catch (e) { toast("批量设置失败: " + e.message); }
+}
+
+/* 回填标价：标价 = 采购价 ÷ 0.8。规律实测（88 个已维护标价的商品采购价÷标价全部≈0.8，
+   即拿货恒为 8 折）。先 dry_run 预览，确认后写入；只补空值，绝不覆盖已有标价。 */
+async function backfillListPrice(){
+  const scope = state.brand ? `品牌「${state.brand}」` : "全部品牌";
+  try {
+    const pre = await api("/api/fx/products/backfill-list-price?dry_run=1" + (state.brand ? `&brand=${encodeURIComponent(state.brand)}` : ""));
+    if (!pre.eligible) { toast(`${scope}没有「标价为空但有采购价」的商品，不用回填`); return; }
+    const rows = pre.rows.map(r => `${r.sku} ${(r.name || "").slice(0, 14)}：${parseFloat(r.purchase_price).toFixed(2)} ÷ ${r.discount} = 标价 ${parseFloat(r.list_price).toFixed(2)}`);
+    const sample = rows.slice(0, 12).join("\n") + (rows.length > 12 ? `\n… 共 ${rows.length} 行` : "");
+    if (!confirm(`找到 ${pre.eligible} 个「标价为空但有采购价」的商品（${scope}）：\n\n${sample}\n\n反推规律按品牌：\n· 格力高：采购价 = 标价 × 0.8（8 折拿货，88 个商品实测全部吻合）\n· 瑞士莲/桂格等其他品牌：采购价本身就是标价（÷1.0，原样回填）\n只补空值，已有标价的商品不会被改。\n\n确认写入？`)) return;
+    const r = await api("/api/fx/products/backfill-list-price?dry_run=0" + (state.brand ? `&brand=${encodeURIComponent(state.brand)}` : ""));
+    toast(`已回填 ${r.updated} 个商品的标价`);
+    await loadAll();
+    switchTab("products");
+  } catch (e) { toast("回填失败: " + e.message); }
 }
 
 async function syncWdtProducts(){
@@ -484,26 +974,162 @@ async function syncWdtProducts(){
   }
 }
 
+/* 同步采购单：把旺店通采购单拉进系统，并用真实采购价刷新商品成本。
+   采购价 = 采购单里的含税实付单价（标价打折后的价），是唯一不需要人工维护的成本来源。 */
+async function syncPurchaseOrders(){
+  const btn = $("btnPurchaseSync"), hint = $("wdtSyncHint");
+  const show = (msg, ok) => { hint.style.display = ""; hint.textContent = msg; hint.style.color = ok === false ? "#c0392b" : ""; };
+  try {
+    btn.disabled = true; btn.textContent = "拉取中…";
+    const st = await api("/api/fx/products/wdt-status");
+    if (!st.configured) {
+      show(`旺店通凭证未配置，缺少：${(st.missing || []).join(" / ")}。请在 .env 填写后重启服务。`, false);
+      toast("旺店通未配置");
+      return;
+    }
+    // 先 dry-run 预览：确认能拉到多少单、能匹配多少商品，再决定是否落库
+    const preview = await api("/api/fx/purchase-orders/sync?dry_run=1&months=12", { method: "POST" });
+    if (!preview.fetched_orders) {
+      show(`近 12 个月没有拉到采购单（接口调用 ${preview.api_calls} 次）。`, false);
+      toast("未拉到采购单");
+      return;
+    }
+    const p = preview.prices || {};
+    const msg = [
+      `近 12 个月采购单 ${preview.fetched_orders} 张（异常单 ${preview.abnormal_orders} 张已排除）`,
+      `其中 ${p.specs_with_price || 0} 个 SKU 有有效采购价，可匹配商品 ${p.updated || 0} 个`,
+      "。确认写入？（只写采购价，不改标价）",
+    ].join("");
+    if (!confirm(msg)) { show("已取消，未写入任何数据。"); return; }
+    btn.textContent = "写入中…";
+    const res = await api("/api/fx/purchase-orders/sync?months=12&apply_to_base_price=none", { method: "POST" });
+    const pr = res.prices || {};
+    const parts = [
+      `采购单入库 ${res.total_orders} 张（新增 ${res.created} / 更新 ${res.updated}，明细 ${res.items} 条）`,
+      `采购价刷新 ${pr.updated} 个商品`,
+      pr.price_changed ? `；${pr.price_changed} 个商品采购价与上次不同` : "",
+      pr.base_filled ? "" : "",
+    ];
+    show(parts.join("") + "。");
+    toast("采购单同步完成");
+    await loadAll();
+  } catch (e) {
+    show("采购单同步失败：" + e.message, false);
+    toast("同步失败");
+  } finally {
+    btn.disabled = false; btn.textContent = "⇣ 同步采购单";
+  }
+}
+
+/* 用采购价补齐「标价为空」的商品：只补零价，不覆盖已维护的价。 */
+async function fillBaseFromPurchase(){
+  const zero = state.products.filter(p => (parseFloat(p.base_price) || 0) <= 0 && (parseFloat(p.purchase_price) || 0) > 0);
+  if (!zero.length) { toast("没有可补齐的商品（零价且已有采购价）"); return; }
+  if (!confirm(`有 ${zero.length} 个商品的「标价」为空，但采购单里已有实付价。\n用采购价填进去吗？（只补这些空值，已有价格的商品不会被改）`)) return;
+  const btn = $("btnFillBase");
+  try {
+    btn.disabled = true; btn.textContent = "补齐中…";
+    const res = await api("/api/fx/purchase-orders/refresh-prices?months=12&apply_to_base_price=empty", { method: "POST" });
+    const pr = res;
+    toast(`已补齐 ${pr.base_filled} 个商品`);
+    await loadAll();
+  } catch (e) {
+    toast("补齐失败：" + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = "⇡ 用采购价补零价";
+  }
+}
+
+/* 从品牌订货单 Excel 导入标价。
+   标价只有格力高维护（其他品牌不需要），用途只有一个：算分销折扣率。
+   表里每盒含税标价 = 单价(含税) ÷ 规格，来源是品牌给的订货单。 */
+async function importListPrice(){
+  const path = prompt(
+    "输入品牌订货单 Excel 的完整路径（.xls / .xlsx）：\n" +
+    "标价按条码匹配商品，每盒含税标价 = 单价(含税) ÷ 规格。\n" +
+    "注意：标价只用于算分销折扣率，不影响利润（利润按采购入库价算）。",
+    "D:\\\\个人文件\\\\桌面\\\\20261027抖音红盒子订单.xls"
+  );
+  if (!path || !path.trim()) return;
+  try {
+    const p = await api(`/api/fx/products/import-list-price?path=${encodeURIComponent(path.trim())}&dry_run=1`, { method: "POST" });
+    const msg = [
+      `表格 ${p.sheet}，共 ${p.rows_in_file} 行`,
+      `可匹配商品 ${p.updated} 个`,
+      p.unmatched_count ? `，系统里没有 ${p.unmatched_count} 个条码（可先建档再导）` : "",
+      "。确认写入标价？",
+    ].join("");
+    if (!confirm(msg)) { show("已取消，未写入。"); return; }
+    const r = await api(`/api/fx/products/import-list-price?path=${encodeURIComponent(path.trim())}&dry_run=0`, { method: "POST" });
+    show(`标价已导入 ${r.updated} 个商品${r.unmatched_count ? `，${r.unmatched_count} 个条码系统里没有` : ""}。`);
+    toast("标价导入完成");
+    await loadAll();
+  } catch (e) {
+    show("导入标价失败：" + e.message, false);
+    toast("导入失败");
+  }
+}
+
 function openProdModal(id){
   state.prodEditId = id || null;
   const p = id ? state.products.find(x => x.id === id) : null;
   $("prodModalTitle").textContent = p ? "编辑商品 · " + p.name : "新建商品";
-  ["pSku","pName","pSpec","pPrice","pNote","pBrand","pCat"].forEach(k => $(k).value = "");
+  ["pSku","pName","pSpec","pPrice","pNote","pBrand","pCat","pPackQty","pTier1"].forEach(k => $(k).value = "");
   $("pUnit").value = "箱";
+  $("pPackUnit").value = "箱";
   // 品牌候选：取自现有商品，新建时可直接挑已有品牌，也能手输新品牌
   const brands = [...new Set(state.products.map(x => x.brand).filter(Boolean))]
     .sort((a, b) => a.localeCompare(b, "zh"));
   $("brandOptions").innerHTML = brands.map(b => `<option value="${esc(b)}"></option>`).join("");
   if (p) { $("pSku").value = p.sku; $("pName").value = p.name; $("pSpec").value = p.spec;
     $("pUnit").value = p.unit || "箱"; $("pPrice").value = p.base_price; $("pNote").value = p.note;
+    $("pPackQty").value = p.pack_qty > 0 ? p.pack_qty : "";
+    $("pPackUnit").value = p.pack_unit || "箱";
+    $("pTier1").value = p.tier1_price > 0 ? p.tier1_price : "";
     $("pBrand").value = p.brand || ""; $("pCat").value = p.category || ""; }
+  // 采购价只读提示：编辑已有商品时把真实成本摊开给用户看，避免只凭记忆填「标价」
+  const ph = $("pPurchaseHint"), cost = p ? (parseFloat(p.purchase_price) || 0) : 0;
+  if (ph) {
+    if (cost > 0) {
+      const gap = (parseFloat(p.base_price) || 0) - cost;
+      // ±1 元是正常浮动（用户口径），超过才提示
+      const gapText = Math.abs(gap) <= 1 ? "在 ±1 元正常浮动内"
+        : (gap > 0 ? `比标价低 ${gap.toFixed(2)} 元` : `比标价高 ${Math.abs(gap).toFixed(2)} 元`);
+      const src = [p.purchase_warehouse, p.purchase_provider].filter(Boolean).join(" / ");
+      ph.style.display = "";
+      ph.innerHTML = `最近采购价 <b>${cost.toFixed(2)}</b> 元/单位（${esc(p.purchase_date || "")}，单号 ${esc(p.purchase_no || "")}），${gapText}。` +
+        (src ? `来源：${esc(src)}。` : "") +
+        `采购价来自旺店通采购单，是真实付款价，只读；毛利按它算。`;
+    } else {
+      ph.style.display = "none";
+    }
+  }
+  updateTier1Hint();
   showError("prodErr", ""); openModal("prodModal");
   setTimeout(() => $(p ? "pName" : "pSku").focus(), 50);
+}
+
+/* 弹窗里实时算毛利：成本（采购价优先）→ 一级分销价（含税） */
+function updateTier1Hint(){
+  const input = $("pTier1"), hint = $("pTier1Hint");
+  if (!input || !hint) return;
+  // 编辑已有商品时优先用采购入库价（真实成本），没有采购记录才用弹窗里填的标价
+  const editing = state.prodEditId ? state.products.find(x => x.id === state.prodEditId) : null;
+  const pur = editing ? (parseFloat(editing.purchase_price) || 0) : 0;
+  const lp = editing ? ((parseFloat(editing.list_price) || 0) > 0 ? editing.list_price : editing.base_price) : $("pPrice").value;
+  const status = editing ? (editing.cost_status || "") : "";
+  const m = pur > 0
+    ? tierMargin(pur, input.value, "采购价", lp, status)
+    : tierMargin($("pPrice").value, input.value, "标价（估）", lp, status);
+  hint.textContent = m.text; hint.className = "tier-margin " + m.cls; hint.title = m.tip;
+  input.classList.toggle("low", m.low);
 }
 
 async function saveProd(){
   const body = { sku: $("pSku").value.trim(), name: $("pName").value.trim(), spec: $("pSpec").value.trim(),
     unit: $("pUnit").value.trim() || "箱", base_price: $("pPrice").value || "0", note: $("pNote").value.trim(),
+    tier1_price: $("pTier1").value === "" ? null : $("pTier1").value,
+    pack_qty: parseInt($("pPackQty").value, 10) || 0, pack_unit: $("pPackUnit").value.trim() || "箱",
     brand: $("pBrand").value.trim(), category: $("pCat").value.trim() };
   try {
     if (state.prodEditId) await api("/api/fx/products/" + state.prodEditId, { method: "PUT", body: JSON.stringify(body) });
@@ -703,6 +1329,9 @@ async function pushOrder(id){
 async function viewOrder(id){
   try {
     const d = await api("/api/fx/orders/" + id);
+    // 满足率三态提示（库存不足/到仓待入库/满足库存）
+    let fulfill = null;
+    try { fulfill = await api("/api/fx/inventory/fulfillment?order_id=" + id); } catch (e) { fulfill = null; }
     $("detailTitle").textContent = "订单详情 · " + d.order_no;
     $("detailBody").innerHTML = `
       <table>
@@ -717,6 +1346,7 @@ async function viewOrder(id){
             ? `<span style="color:#e5484d">失败：${esc(d.push_message) || "（无报错详情）"}</span>`
             : "未推送"}</td></tr>
       </table>
+      ${renderFulfillment(fulfill)}
       <table style="margin-top:12px"><thead><tr><th>商品</th><th>编号</th><th class="num">数量</th>
         <th class="num">单价</th><th class="num">小计</th></tr></thead>
         <tbody>${d.lines.map(l => `<tr><td>${esc(l.goods_name)} ${l.spec_name ? "(" + esc(l.spec_name) + ")" : ""}</td>
@@ -726,6 +1356,49 @@ async function viewOrder(id){
       <div class="line-total">订单合计：<b style="font-size:17px">${money(d.total_amount)}</b></div>`;
     openModal("detailModal");
   } catch (e) { toast(e.message); }
+}
+
+/* 满足率三态提示：满足库存(绿) / 到仓待入库(橙) / 库存不足(红) */
+function renderFulfillment(f){
+  if (!f) return `<div class="ff-banner warn" style="background:#fff8e6;border:1px solid #f0dca8;color:#9a5b00">⚠️ 库存快照未同步，满足率暂不可用。请先点上方「同步库存」。</div>`;
+  const cls = f.overall_state === "满足库存" ? "ok" : f.overall_state === "到仓待入库" ? "arriving" : "short";
+  const icon = cls === "ok" ? "✅" : cls === "arriving" ? "🚚" : "⛔";
+  const rows = f.lines.map(l => {
+    const c = l.state === "满足库存" ? "ok" : l.state === "到仓待入库" ? "arriving" : "short";
+    return `<div class="ff-line">
+      <span class="ff-tag ${c}">${esc(l.state)}</span>
+      <span class="nm">${esc(l.goods_name)} ${l.spec_name ? "(" + esc(l.spec_name) + ")" : ""}</span>
+      <span class="qt">需求 ${l.demand} · 实际可用 ${l.actual}（昨${l.yesterday_stock}+今入${l.today_stockin}${l.today_pending > 0 ? "·待入" + l.today_pending : ""}）</span>
+      <span class="rt">满足率 ${l.fulfill_rate}%</span>
+    </div>`;
+  }).join("");
+  return `<div class="ff-banner ${cls}">
+      <span style="font-size:20px">${icon}</span>
+      <span class="big">整单：${esc(f.overall_state)}</span>
+      <span>实际可用 = 昨天库存 + 今日已入库（截至 ${esc(f.as_of)}）</span>
+    </div>${rows}`;
+}
+
+async function syncInventory(){
+  try {
+    const r = await api("/api/fx/inventory/sync", { method: "POST", body: JSON.stringify({}) });
+    toast(`库存已同步（${r.skus} 个 SKU，快照日 ${r.snap_date}）`);
+    loadInventoryBadge();
+  } catch (e) { toast("同步失败：" + e.message); }
+}
+
+async function loadInventoryBadge(){
+  try {
+    const s = await api("/api/fx/inventory/summary");
+    const badge = $("invBadge");
+    if (!s.latest_snap_date){
+      badge.textContent = "库存快照：未同步"; badge.className = "inv-badge";
+    } else if (s.has_yesterday_baseline){
+      badge.textContent = "库存快照：" + s.latest_snap_date + "（已建基线）"; badge.className = "inv-badge ok";
+    } else {
+      badge.textContent = "库存快照：" + s.latest_snap_date + "（待次日建基线）"; badge.className = "inv-badge warn";
+    }
+  } catch (e) { /* 忽略，徽标保持默认 */ }
 }
 
 /* ---------- 经销商价格体系 ---------- */
@@ -744,12 +1417,14 @@ async function loadPrices(){
     const ov = map[p.id];
     const orig = ov ? ov.price : "";
     return `<tr data-product="${p.id}">
-      <td><b>${esc(p.sku)}</b></td><td>${esc(p.name)}</td><td>${esc(p.spec) || "-"}</td><td>${esc(p.unit)}</td>
-      <td class="num">${money(p.base_price)}</td>
+      <td><b>${esc(p.sku)}</b></td><td title="${esc(p.name)}">${esc(p.name)}</td><td title="${esc(p.spec)}">${esc(p.spec) || "-"}</td><td>${esc(p.unit)}</td>
+      <td class="num">${listPriceCell(p)}</td>
+      <td class="num">${p.purchase_price > 0 ? money(p.purchase_price) : '<span style="color:#b6bfcc">—</span>'}</td>
+      <td class="num">${p.tier1_price > 0 ? money(p.tier1_price) : '<span style="color:#b6bfcc">待定</span>'}</td>
       <td><input class="price-in" type="number" min="0" step="0.01" style="width:110px"
             value="${orig}" data-orig="${orig}" placeholder="${p.base_price}" oninput="markDirtyRow(this)">
           ${orig ? '<span class="tag on">专属</span>' : ""}</td>
-      <td class="ops">${orig ? `<button class="btn mini" onclick="clearPrice(${p.id})">恢复基础价</button>` : ""}</td>
+      <td class="ops">${orig ? `<button class="btn mini" onclick="clearPrice(${p.id})">恢复品标价</button>` : ""}</td>
     </tr>`;
   }).join("");
 }
@@ -852,7 +1527,7 @@ function openImportModal(kind){
   $("importTitle").textContent = isDist ? "批量导入分销商" : "批量导入商品";
   $("importHint").innerHTML = isDist
     ? `每行一个分销商，逗号分隔：<b>编码, 名称, 联系人, 电话, 区域, 备注</b><br>例如：<code>FX001, 上海xx商贸, 王经理, 13800000000, 华东, 月结30天</code><br>已存在的编码自动跳过，不会重复。`
-    : `每行一个商品，逗号分隔：<b>SKU, 名称, 规格, 单位, 基础价, 备注</b><br>例如：<code>GL001, 巧克力礼盒, 24×100g, 箱, 168.00,</code><br>已存在的 SKU 自动跳过，不会重复。`;
+    : `每行一个商品，逗号分隔：<b>SKU, 名称, 规格, 单位, 标价, 备注, 箱规, 一级分销价</b><br>例如：<code>GL001, 巧克力礼盒, 24×100g, 件, 168.00, , 24/箱, 188.00</code><br>箱规写「24/箱」或直接写数字 24；一级分销价留空 = 待定。已存在的 SKU 自动跳过，不会重复。`;
   $("importText").value = "";
   showError("importErr", "");
   openModal("importModal");
@@ -869,7 +1544,17 @@ async function runImport(){
   if (!rows.length) { showError("importErr", "没有可导入的内容（每行一条，字段用逗号分隔）"); return; }
   const items = importKind === "dist"
     ? rows.map(f => ({ code: f[0] || "", name: f[1] || "", contact: f[2] || "", phone: f[3] || "", region: f[4] || "", note: f[5] || "" }))
-    : rows.map(f => ({ sku: f[0] || "", name: f[1] || "", spec: f[2] || "", unit: f[3] || "箱", base_price: f[4] || "0", note: f[5] || "" }));
+    : rows.map(f => {
+        // 箱规支持「24/箱」「24」两种写法：斜杠前是数量，斜杠后是单位
+        const pack = (f[6] || "").replace(/\s/g, "");
+        const m = pack.match(/^(\d+)\s*\/\s*(.+)$/);
+        const packQty = m ? parseInt(m[1], 10) : (parseInt(pack, 10) || 0);
+        const packUnit = m ? m[2] : (packQty ? "箱" : "箱");
+        return { sku: f[0] || "", name: f[1] || "", spec: f[2] || "", unit: f[3] || "箱",
+                 base_price: f[4] || "0", note: f[5] || "", pack_qty: packQty, pack_unit: packUnit,
+                 // 第 8 段：一级分销价（含税），留空 = 待定
+                 tier1_price: (f[7] || "").trim() || null };
+      });
   try {
     const res = importKind === "dist"
       ? await api("/api/fx/distributors/import", { method: "POST", body: JSON.stringify({ items }) })
@@ -882,6 +1567,72 @@ async function runImport(){
     loadAll();
   } catch (e) { showError("importErr", e.message); }
 }
+
+/* ---------- 列宽：拖表头分隔线调整 + 记住设置 ---------- */
+/* key 带版本号：列顺序调整过（价格列前移），旧的列宽记录不再对应，v2 重新记 */
+const COLW_KEY = "fx_colw_v2";
+let colwStore = {};
+try { colwStore = JSON.parse(localStorage.getItem(COLW_KEY) || "{}") || {}; } catch (e) { colwStore = {}; }
+const saveColw = () => { try { localStorage.setItem(COLW_KEY, JSON.stringify(colwStore)); } catch (e) {} };
+const colEls = table => [...table.querySelectorAll("colgroup > col")];
+
+function setColWidths(table, widths){
+  const cols = colEls(table), w = widths.map(v => Math.max(48, Math.round(v)));
+  cols.forEach((c, i) => { if (w[i]) c.style.width = w[i] + "px"; });
+  const total = w.reduce((a, b) => a + b, 0);
+  // 一旦手工调过，就按像素定宽：拖谁就是谁，不会再被容器按比例拉伸
+  table.style.width = total + "px";
+  table.style.minWidth = total + "px";
+}
+
+function applySavedWidths(table){
+  const saved = colwStore[table.dataset.ckey];
+  if (saved && saved.length === colEls(table).length) setColWidths(table, saved);
+}
+
+function resetColWidths(table){
+  delete colwStore[table.dataset.ckey];
+  saveColw();
+  table.style.width = ""; table.style.minWidth = "";
+  colEls(table).forEach(c => { if (c.dataset.w) c.style.width = c.dataset.w; });
+}
+
+function thWidths(table){
+  return [...table.querySelectorAll("thead th")].map(th => th.getBoundingClientRect().width);
+}
+
+function startColDrag(ev, table, idx, grip){
+  ev.preventDefault(); ev.stopPropagation();
+  const widths = thWidths(table), startX = ev.clientX, startW = widths[idx] || 100;
+  grip.classList.add("on"); document.body.classList.add("col-resizing");
+  const move = e => { widths[idx] = Math.max(48, startW + (e.clientX - startX)); setColWidths(table, widths); };
+  const up = () => {
+    grip.classList.remove("on"); document.body.classList.remove("col-resizing");
+    document.removeEventListener("mousemove", move);
+    document.removeEventListener("mouseup", up);
+    colwStore[table.dataset.ckey] = widths.map(v => Math.round(v));
+    saveColw();
+  };
+  document.addEventListener("mousemove", move);
+  document.addEventListener("mouseup", up);
+}
+
+function initColumnResize(){
+  document.querySelectorAll("table.cols").forEach(table => {
+    colEls(table).forEach(c => { c.dataset.w = c.style.width; });
+    applySavedWidths(table);
+    [...table.querySelectorAll("thead th")].forEach((th, idx) => {
+      const grip = document.createElement("div");
+      grip.className = "colgrip";
+      grip.title = "左右拖动调整列宽 · 双击恢复默认";
+      th.appendChild(grip);
+      grip.addEventListener("mousedown", e => startColDrag(e, table, idx, grip));
+      grip.addEventListener("dblclick", e => { e.preventDefault(); e.stopPropagation(); resetColWidths(table); });
+    });
+  });
+}
+
+initColumnResize();
 
 $("oDist").onchange = () => refillAutoPrices();
 
