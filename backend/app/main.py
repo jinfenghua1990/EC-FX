@@ -97,6 +97,8 @@ class FxProductPayload(BaseModel):
     unit: str = "箱"
     base_price: Decimal = Decimal("0")
     note: str = ""
+    brand: str = ""
+    category: str = ""
 
 
 class FxOrderLinePayload(BaseModel):

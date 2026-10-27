@@ -198,6 +198,9 @@ def create_product(db: Session, data: dict) -> dict:
         unit=(data.get("unit") or "箱").strip() or "箱",
         base_price=base_price,
         note=(data.get("note") or "").strip(),
+        # 手工建品也能指定品牌/分类：否则手工商品品牌为空，永远进不了顶部品牌维度
+        brand=(data.get("brand") or "").strip(),
+        category=(data.get("category") or "").strip(),
         active=1,
     )
     db.add(row)
@@ -225,7 +228,7 @@ def update_product(db: Session, product_id: int, data: dict) -> dict:
         if base_price < 0:
             raise ValueError("基础价格不能为负数")
         row.base_price = base_price
-    for field in ("name", "spec", "unit", "note"):
+    for field in ("name", "spec", "unit", "note", "brand", "category"):
         if field in data and data[field] is not None:
             setattr(row, field, str(data[field]).strip())
     row.unit = row.unit or "箱"

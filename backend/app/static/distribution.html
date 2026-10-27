@@ -254,6 +254,8 @@ toast{display:none}
       <div><label>规格</label><input id="pSpec" placeholder="如 24×100g"></div>
       <div><label>单位</label><input id="pUnit" value="箱"></div>
       <div><label>基础价（元/单位）</label><input id="pPrice" type="number" step="0.01" min="0" value="0"></div>
+      <div><label>品牌</label><input id="pBrand" list="brandOptions" placeholder="如 格力高/Glico"><datalist id="brandOptions"></datalist></div>
+      <div><label>分类</label><input id="pCat" placeholder="如 零食"></div>
     </div>
     <label>备注</label><textarea id="pNote"></textarea>
     <div class="err" id="prodErr"></div>
@@ -486,17 +488,23 @@ function openProdModal(id){
   state.prodEditId = id || null;
   const p = id ? state.products.find(x => x.id === id) : null;
   $("prodModalTitle").textContent = p ? "编辑商品 · " + p.name : "新建商品";
-  ["pSku","pName","pSpec","pPrice","pNote"].forEach(k => $(k).value = "");
+  ["pSku","pName","pSpec","pPrice","pNote","pBrand","pCat"].forEach(k => $(k).value = "");
   $("pUnit").value = "箱";
+  // 品牌候选：取自现有商品，新建时可直接挑已有品牌，也能手输新品牌
+  const brands = [...new Set(state.products.map(x => x.brand).filter(Boolean))]
+    .sort((a, b) => a.localeCompare(b, "zh"));
+  $("brandOptions").innerHTML = brands.map(b => `<option value="${esc(b)}"></option>`).join("");
   if (p) { $("pSku").value = p.sku; $("pName").value = p.name; $("pSpec").value = p.spec;
-    $("pUnit").value = p.unit || "箱"; $("pPrice").value = p.base_price; $("pNote").value = p.note; }
+    $("pUnit").value = p.unit || "箱"; $("pPrice").value = p.base_price; $("pNote").value = p.note;
+    $("pBrand").value = p.brand || ""; $("pCat").value = p.category || ""; }
   showError("prodErr", ""); openModal("prodModal");
   setTimeout(() => $(p ? "pName" : "pSku").focus(), 50);
 }
 
 async function saveProd(){
   const body = { sku: $("pSku").value.trim(), name: $("pName").value.trim(), spec: $("pSpec").value.trim(),
-    unit: $("pUnit").value.trim() || "箱", base_price: $("pPrice").value || "0", note: $("pNote").value.trim() };
+    unit: $("pUnit").value.trim() || "箱", base_price: $("pPrice").value || "0", note: $("pNote").value.trim(),
+    brand: $("pBrand").value.trim(), category: $("pCat").value.trim() };
   try {
     if (state.prodEditId) await api("/api/fx/products/" + state.prodEditId, { method: "PUT", body: JSON.stringify(body) });
     else await api("/api/fx/products", { method: "POST", body: JSON.stringify(body) });
