@@ -21,6 +21,9 @@ if str(BACKEND) not in sys.path:
 from app.config import settings  # noqa: E402
 
 BASELINE = "0001_baseline"
+# 用于识别「V0.4 及更早、还没有 alembic_version 的老库」的特征表。
+# 其中 import_batches / legacy_shipment_rows 已在 0009 删除，但老库里必然存在过它们，
+# 所以这里保留原名作为历史特征，不要跟着 models.py 一起改。
 CORE_TABLES = {"import_batches", "legacy_shipment_rows", "stockout_orders"}
 
 

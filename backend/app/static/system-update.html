@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>系统更新 · 红盒子供销平台</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar:#1b2735; --sidebar-hover:#24334a; --active:#2463eb;
+  --bg:#f4f6fa; --card:#fff; --line:#e8ecf3; --muted:#7b8798;
+  --text:#1c2740; --blue:#2463eb; --green:#18a05e; --orange:#f59e0b; --red:#e5484d;
+}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.sidebar{width:216px;background:var(--sidebar);color:#c6d0de;display:flex;flex-direction:column;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;font-size:16px;font-weight:700;color:#fff}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav{flex:1;padding:6px 10px}
+.nav a{display:flex;align-items:center;gap:10px;padding:11px 12px;margin:2px 0;border-radius:9px;color:#aab6c8;text-decoration:none;font-size:14px}
+.nav a .ic{width:18px;text-align:center;font-size:15px}
+.nav a:hover{background:var(--sidebar-hover);color:#fff}
+.nav a.active{background:var(--active);color:#fff;font-weight:600}
+.main{flex:1;min-width:0;display:flex;flex-direction:column}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;flex-shrink:0}
+.crumbs{font-size:13px;color:var(--muted)}
+.crumbs b{color:var(--text);font-weight:600}
+.topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted)}
+.content{padding:20px 24px 40px;overflow:auto;max-width:980px}
+h1.page{font-size:22px;margin-bottom:6px}
+.lead{font-size:13px;color:var(--muted);margin-bottom:18px;line-height:1.6}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px 20px;margin-bottom:16px}
+.card h3{font-size:14.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+.card h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--blue)}
+.line{display:flex;justify-content:space-between;gap:16px;padding:10px 0;font-size:13.5px;border-bottom:1px dashed #eef1f6}
+.line:last-child{border-bottom:0}
+.line>span:first-child{color:var(--muted);flex-shrink:0;min-width:96px}
+.line b{font-weight:600;text-align:right}
+.line b.good{color:var(--green)}
+.line b.bad{color:var(--red)}
+.line select{min-height:30px;border:1px solid #d8dee9;border-radius:8px;padding:3px 8px;font-size:13px;color:var(--text);background:#fff}
+.btn{border:1px solid #d6dce6;background:#fff;border-radius:8px;padding:8px 15px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500}
+.btn:hover{border-color:#b9c4d4}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{background:#1d54cf}
+.btn.danger{color:var(--red)}
+.btn:disabled{opacity:.55;cursor:not-allowed}
+.actions{display:flex;gap:9px;flex-wrap:wrap;margin-top:16px}
+.hint{font-size:12.5px;color:var(--muted);line-height:1.7;margin-top:14px;padding-top:12px;border-top:1px solid #f0f3f8}
+.log{margin-top:14px;background:#0f172a;color:#a8c0e0;border-radius:10px;padding:13px;font-size:11.5px;line-height:1.55;max-height:260px;overflow:auto;white-space:pre-wrap;word-break:break-all}
+.switch{display:inline-flex;align-items:center;gap:8px;cursor:pointer}
+</style>
+<script src="/static/embed.js"></script>
+</head>
+<body>
+
+<aside class="sidebar">
+  <div class="brand"><span class="logo">🛒</span>红盒子供销平台</div>
+  <nav class="nav">
+    <a href="/"><span class="ic">🏠</span>工作台</a>
+    <a href="/distribution"><span class="ic">🤝</span>分销管理</a>
+    <a href="/shipments"><span class="ic">🚚</span>发货明细</a>
+    <a href="/reports"><span class="ic">📊</span>报表中心</a>
+    <a class="active" href="/system-update"><span class="ic">🔄</span>系统更新</a>
+  </nav>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="crumbs">系统设置&nbsp;/&nbsp;<b>系统更新</b></div>
+    <div class="topright"><span>本地版本 <b id="verTop">--</b></span></div>
+  </div>
+
+  <div class="content">
+    <h1 class="page">系统更新</h1>
+    <div class="lead">对照 GitHub 版本检查更新。升级前会自动备份数据库，更新期间页面短暂断开，完成后自动恢复。</div>
+
+    <div class="card">
+      <h3>版本信息</h3>
+      <div class="line"><span>本地版本</span><b id="curVer">读取中…</b></div>
+      <div class="line"><span>GitHub 版本</span><b id="remoteVer">未检查</b></div>
+      <div class="line"><span>更新状态</span><b id="stateText">读取中</b></div>
+      <div class="line"><span>说明</span><span id="msgText" style="text-align:right;max-width:72%;color:var(--muted)">--</span></div>
+      <div class="actions">
+        <button class="btn" id="btnCheck" onclick="act('check')">检查更新</button>
+        <button class="btn primary" id="btnApply" onclick="act('apply')">立即升级</button>
+        <label><input id="zipFile" type="file" accept=".zip" style="display:none" onchange="uploadPkg()"><button class="btn" onclick="document.getElementById('zipFile').click()">上传更新包</button></label>
+        <button class="btn danger" onclick="rollback()">回滚上一版</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>自动升级</h3>
+      <div class="line"><span>自动升级</span><span><label class="switch"><input type="checkbox" id="autoOn" onchange="saveAuto()"><span id="autoState">读取中</span></label></span></div>
+      <div class="line"><span>检查间隔</span><span><select id="autoInterval" onchange="saveAuto()"><option value="5">5 分钟</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option><option value="180">3 小时</option><option value="720">12 小时</option></select></span></div>
+      <div class="line"><span>最近检查</span><b id="lastCheck" style="font-weight:500;font-size:12.5px;line-height:1.5">--</b></div>
+      <div class="hint">开启后，系统按设定的间隔自动向 GitHub 查询新版本；只有你点「立即升级」才会真正替换代码。</div>
+    </div>
+
+    <div class="card">
+      <h3>更新日志</h3>
+      <pre id="logBox" class="log">暂无更新日志</pre>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let timer = null;
+
+function stateLabel(s){
+  return ({idle:'空闲',queued:'等待执行',running:'正在更新',success:'完成',error:'失败'})[s] || s || '未知';
+}
+
+async function post(url, body){
+  const opts = {method:'POST'};
+  if (body !== undefined) { opts.headers = {'Content-Type':'application/json'}; opts.body = JSON.stringify(body); }
+  const r = await fetch(url, opts);
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.detail || '操作失败');
+  return d;
+}
+
+async function refresh(){
+  try{
+    const d = await (await fetch('/api/system-update/status', {cache:'no-store'})).json();
+    const cv = d.current_version || '--';
+    $('curVer').textContent = 'v' + cv;
+    $('verTop').textContent = 'v' + cv;
+    $('remoteVer').textContent = d.remote_version ? ('v' + d.remote_version + (d.has_update ? '（有新版）' : '（已最新）')) : '未检查';
+    $('remoteVer').className = d.remote_version ? (d.has_update ? 'bad' : 'good') : '';
+    $('stateText').textContent = stateLabel(d.state);
+    $('stateText').className = d.state === 'error' ? 'bad' : (d.state === 'success' ? 'good' : '');
+    $('msgText').textContent = d.message || '--';
+    $('logBox').textContent = d.log || '暂无更新日志';
+    const busy = d.state === 'queued' || d.state === 'running';
+    $('btnApply').disabled = busy;
+    $('btnCheck').disabled = busy;
+    if (busy) { timer = setTimeout(refresh, 2500); }
+  }catch(e){
+    $('stateText').textContent = '重新连接中…';
+    timer = setTimeout(refresh, 3000);
+  }
+}
+
+async function loadAuto(){
+  try{
+    const d = await (await fetch('/api/system-update/auto', {cache:'no-store'})).json();
+    $('autoOn').checked = !!d.enabled;
+    $('autoState').textContent = d.enabled ? '已开启' : '已关闭';
+    $('autoInterval').value = String(d.interval_minutes || 30);
+    const at = d.last_check_at ? d.last_check_at.replace('T',' ').slice(0,19) : '未检查';
+    $('lastCheck').textContent = d.last_result ? (at + ' · ' + d.last_result) : at;
+  }catch(e){}
+}
+
+async function saveAuto(){
+  try{
+    await post('/api/system-update/auto', {enabled: $('autoOn').checked, interval_minutes: Number($('autoInterval').value) || 30});
+  }catch(e){ alert(e.message); }
+  await loadAuto();
+}
+
+async function act(a){
+  if (a !== 'check' && !confirm('确定立即升级到 GitHub 最新版本？系统会先备份数据库，期间页面会短暂断开。')) return;
+  try{
+    await post('/api/system-update/' + a);
+    if (timer) { clearTimeout(timer); timer = null; }
+    refresh();
+  }catch(e){ alert(e.message); }
+}
+
+async function rollback(){
+  if (!confirm('确定回滚到上一版本？数据库也会恢复到上次升级前的备份。')) return;
+  try{
+    await post('/api/system-update/rollback');
+    if (timer) { clearTimeout(timer); timer = null; }
+    refresh();
+  }catch(e){ alert(e.message); }
+}
+
+async function uploadPkg(){
+  const f = $('zipFile').files[0];
+  if (!f) return;
+  if (!confirm('确定上传并安装 ' + f.name + '？')) { $('zipFile').value = ''; return; }
+  const fd = new FormData();
+  fd.append('file', f);
+  try{
+    const r = await fetch('/api/system-update/upload-package', {method:'POST', body:fd});
+    const d = await r.json();
+    if (!r.ok) throw new Error(d.detail || '上传失败');
+    refresh();
+  }catch(e){ alert(e.message); }finally{ $('zipFile').value = ''; }
+}
+
+async function autoCheckOnce(){
+  // 打开页面时静默查一次 GitHub 版本；未配置仓库或正在更新则跳过
+  try{
+    const s = await (await fetch('/api/system-update/status', {cache:'no-store'})).json();
+    if (s.github_configured === false) return;
+    if (s.state === 'queued' || s.state === 'running') return;
+    await post('/api/system-update/check');
+    refresh();
+  }catch(e){/* 未配置或网络异常时保持「未检查」，用户可手动点检查 */}
+}
+
+refresh();
+loadAuto();
+autoCheckOnce();
+</script>
+</body>
+</html>

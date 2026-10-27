@@ -8,7 +8,7 @@ from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from ..models import StockoutItem, StockoutOrder
-from .module_hub import effective_stockout_rows, month_start
+from .adjustments import effective_stockout_rows, month_start
 
 
 def _month_range(month: str) -> tuple[datetime, datetime]:

@@ -274,7 +274,7 @@ def stage_update_zip(content: bytes, filename: str, *, data_root: str | Path = "
 
         manifest_path = package_root / "update-manifest.json"
         if not manifest_path.exists():
-            raise ValueError("不是有效的核销系统更新包：缺少 update-manifest.json")
+            raise ValueError("不是有效的系统更新包：缺少 update-manifest.json")
         manifest = json.loads(manifest_path.read_text(encoding="utf-8"))
         if manifest.get("app") != "ecommerce-reconciliation":
             raise ValueError("更新包应用标识不正确")

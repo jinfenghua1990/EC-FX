@@ -2,7 +2,7 @@
 <html lang="zh-CN">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>核销工作台 · 红盒子供销平台</title>
+<title>经营总览 · 红盒子供销平台</title>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -20,7 +20,6 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var
 .nav a .ic{width:18px;text-align:center;font-size:15px}
 .nav a:hover{background:var(--sidebar-hover);color:#fff}
 .nav a.active{background:var(--active);color:#fff;font-weight:600}
-.nav a.active::before{content:"";position:absolute;left:-10px;top:8px;bottom:8px;width:3px;border-radius:2px;background:#5b8bef}
 /* ---------- 主区 ---------- */
 .main{flex:1;min-width:0;display:flex;flex-direction:column}
 .topbar{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;flex-shrink:0}
@@ -28,17 +27,10 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var
 .crumbs b{color:var(--text);font-weight:600}
 .topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted)}
 .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:5px}
-.btn{border:1px solid #d6dce6;background:#fff;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500}
+.btn{border:1px solid #d6dce6;background:#fff;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500;text-decoration:none;display:inline-block}
 .btn:hover{border-color:#b9c4d4}
-.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
-.btn.primary:hover{background:#1d54cf}
 .content{padding:20px 24px 40px;overflow:auto}
 h1.page{font-size:22px;margin-bottom:16px}
-/* ---------- 筛选栏 ---------- */
-.filterbar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-bottom:16px}
-.filterbar select,.filterbar input{min-height:34px;border:1px solid #d8dee9;border-radius:8px;background:#fff;padding:6px 10px;font-size:13px;color:var(--text)}
-.filterbar .search{flex:1;min-width:180px}
-.filterbar .spacer{flex:1}
 /* ---------- 统计卡片 ---------- */
 .stats{display:grid;grid-template-columns:repeat(5,1fr);gap:14px;margin-bottom:16px}
 .stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;gap:12px;align-items:flex-start}
@@ -52,63 +44,20 @@ h1.page{font-size:22px;margin-bottom:16px}
 .ico.teal{background:#e0f4f3;color:var(--teal)}
 .ico.red{background:#fdeaea;color:var(--red)}
 .v.red{color:var(--red)}
-/* ---------- 中部两栏 ---------- */
-.mid{display:grid;grid-template-columns:1.9fr 1fr;gap:14px;margin-bottom:16px}
-.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
-.card h3{font-size:14.5px;margin-bottom:14px;display:flex;align-items:center;gap:8px}
+/* ---------- 两栏 ---------- */
+.mid{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+.card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
+.card h3{font-size:14.5px;display:flex;align-items:center;gap:8px}
 .card h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--blue)}
-.chan{display:flex;align-items:center;gap:12px;margin-bottom:16px}
-.chan:last-child{margin-bottom:2px}
-.chan .name{width:44px;font-size:13.5px;font-weight:600;flex-shrink:0}
 .bar{flex:1;height:10px;background:#eef1f6;border-radius:999px;overflow:hidden}
 .bar i{display:block;height:100%;border-radius:999px}
-.bar i.g{background:var(--green)} .bar i.o{background:var(--orange)} .bar i.b{background:var(--blue)}
-.chan .pct{width:64px;text-align:right;font-size:13px;font-weight:700}
-.chan .pct.g{color:var(--green)} .chan .pct.o{color:#d97706} .chan .pct.b{color:var(--blue)}
-.chan .amt{width:170px;text-align:right;font-size:12px;color:var(--muted);flex-shrink:0}
-/* ---------- 待处理 ---------- */
-.todo{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
-.todo a{border:1px solid var(--line);border-radius:10px;padding:12px 10px;text-decoration:none;color:var(--text);display:flex;flex-direction:column;gap:8px;align-items:flex-start}
-.todo a:hover{border-color:#c4cedd;background:#fafbfe}
-.todo .ic{width:30px;height:30px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px}
-.todo .ic.b{background:#e8effd} .todo .ic.o{background:#fdf3df} .todo .ic.g{background:#e5f6ee} .todo .ic.p{background:#f0ebfb} .todo .ic.r{background:#fdeaea}
-.todo .t{font-size:12px;color:var(--muted)}
-.todo .n{font-size:20px;font-weight:750}
-.todo .n.b{color:var(--blue)} .todo .n.o{color:#d97706} .todo .n.g{color:var(--green)} .todo .n.p{color:#7c5cd6} .todo .n.r{color:var(--red)}
-.todo a.wide{grid-column:span 1}
-.todo .row2{grid-column:1/-1;display:grid;grid-template-columns:1fr 1fr;gap:10px}
 /* ---------- 表格 ---------- */
-.card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px}
-.card .head h3{margin:0}
-.card .head a{font-size:12.5px;color:var(--blue);text-decoration:none}
 table{width:100%;border-collapse:collapse;font-size:13px}
 th{background:#f7f9fc;text-align:left;padding:9px 10px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;color:#5b6778}
 td{padding:10px;border-bottom:1px solid #f0f3f8;white-space:nowrap}
 tr:hover td{background:#fafbfe}
-.tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
-.tag.wait{background:#fdf1dc;color:#b45309}
-.tag.ok{background:#e5f6ee;color:var(--green)}
 td.num{font-variant-numeric:tabular-nums}
-td .link{color:var(--blue);cursor:pointer;font-size:12.5px}
-/* ---------- 系统更新弹窗 ---------- */
-.upd-backdrop{position:fixed;inset:0;background:rgba(16,24,40,.45);display:none;align-items:center;justify-content:center;z-index:99;padding:20px}
-.upd-backdrop.show{display:flex}
-.upd-modal{background:#fff;border-radius:14px;width:min(580px,96vw);max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(16,24,40,.25)}
-.upd-head{display:flex;align-items:flex-start;justify-content:space-between;padding:18px 20px 12px;border-bottom:1px solid var(--line)}
-.upd-head h2{font-size:17px;margin:0}
-.upd-head .sub{font-size:12px;color:var(--muted);margin-top:4px}
-.upd-close{border:0;background:transparent;font-size:20px;line-height:1;cursor:pointer;color:var(--muted)}
-.upd-body{padding:8px 20px 4px}
-.upd-line{display:flex;justify-content:space-between;gap:16px;padding:9px 0;font-size:13px;border-bottom:1px dashed #eef1f6}
-.upd-line:last-child{border-bottom:0}
-.upd-line>span:first-child{color:var(--muted);flex-shrink:0}
-.upd-line b{font-weight:600}
-.upd-line b.good{color:var(--green)}
-.upd-line b.bad{color:var(--red)}
-.upd-line select{min-height:28px;border:1px solid #d8dee9;border-radius:7px;padding:2px 6px;font-size:12.5px;color:var(--text);background:#fff}
-.upd-actions{display:flex;gap:8px;flex-wrap:wrap;padding:14px 20px 0}
-.upd-note{font-size:12px;color:var(--muted);line-height:1.6;padding:12px 20px 0}
-.upd-log{margin:12px 20px 20px;background:#0f172a;color:#a8c0e0;border-radius:10px;padding:12px;font-size:11px;line-height:1.5;max-height:180px;overflow:auto;white-space:pre-wrap;word-break:break-all}
 </style>
 <script src="/static/embed.js"></script>
 </head>
@@ -116,53 +65,38 @@ td .link{color:var(--blue);cursor:pointer;font-size:12.5px}
 
 <aside class="sidebar">
   <div class="brand"><span class="logo">🛒</span>红盒子供销平台</div>
-  <nav class="nav" id="nav">
-    <a class="active" href="/"><span class="ic">🏠</span>工作台</a>
+  <nav class="nav">
+    <a class="active" href="/"><span class="ic">🏠</span>经营总览</a>
     <a href="/distribution"><span class="ic">🤝</span>分销管理</a>
-    <a href="#" data-soon><span class="ic">💰</span>平台收入</a>
     <a href="/shipments"><span class="ic">🚚</span>发货明细</a>
-    <a href="#" data-soon><span class="ic">📦</span>采购与库存</a>
-    <a href="#" data-soon><span class="ic">🧾</span>费用管理</a>
     <a href="/reports"><span class="ic">📊</span>报表中心</a>
+    <a href="/system-update"><span class="ic">🔄</span>系统更新</a>
   </nav>
 </aside>
 
 <div class="main">
   <div class="topbar">
-    <div class="crumbs">核销管理&nbsp;/&nbsp;<b>工作台</b></div>
+    <div class="crumbs">工作台&nbsp;/&nbsp;<b>经营总览</b></div>
     <div class="topright">
       <span><span class="dot" id="wdtDot"></span><span id="wdtState">旺店通检测中…</span></span>
-      <span>数据更新 <b id="updTime">--:--</b></span>
-      <button class="btn" onclick="openUpdate()">版本 <b id="topVersion">--</b></button>
-      <button class="btn primary" onclick="syncAll()">立即同步</button>
+      <a class="btn" href="/system-update">系统更新</a>
     </div>
   </div>
 
   <div class="content">
-    <h1 class="page">核销工作台</h1>
+    <h1 class="page">经营总览</h1>
 
-    <div class="filterbar">
-      <select id="fMonth"></select>
-      <select id="fChannel"><option>全部渠道</option><option>快手</option><option>抖音</option><option>拼多多</option></select>
-      <select id="fShop"><option>全部店铺</option></select>
-      <select id="fStatus"><option>全部状态</option><option>待确认到账</option><option>已到账</option><option>异常差额</option></select>
-      <input class="search" id="fSearch" placeholder="🔍 搜索店铺核销单">
-      <span class="spacer"></span>
-      <button class="btn" onclick="importBill()">⬆ 导入平台账单</button>
-      <button class="btn primary" onclick="newRecord()">＋ 新建核销</button>
-    </div>
-
-    <div class="card" style="margin-bottom:16px">
+    <div class="card">
       <div class="head"><h3>销售总览 · 旺店通出库</h3><span style="display:flex;gap:8px;align-items:center;font-size:12.5px;color:var(--muted)">核算月份 <select id="soMonth" style="min-height:30px;border:1px solid #d8dee9;border-radius:8px;padding:4px 8px;font-size:13px;background:#fff"></select></span></div>
       <div class="stats" id="soStats" style="margin-bottom:0"></div>
     </div>
 
-    <div class="card" style="margin-bottom:16px">
+    <div class="card">
       <div class="head"><h3>近 6 个月趋势</h3><span style="font-size:12px;color:var(--muted)"><i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#2463eb;margin-right:3px"></i>销售 <i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#f59e0b;margin-right:3px;margin-left:10px"></i>成本 <i style="display:inline-block;width:9px;height:9px;border-radius:2px;background:#18a05e;margin-right:3px;margin-left:10px"></i>毛利<span style="color:var(--red)">(红=负)</span></span></div>
       <div id="soTrend"></div>
     </div>
 
-    <div class="mid" style="grid-template-columns:1fr 1fr;margin-bottom:16px">
+    <div class="mid" style="margin-bottom:0">
       <div class="card" style="margin-bottom:0">
         <div class="head"><h3>店铺分布</h3><span style="font-size:12.5px;color:var(--muted)" id="soShopInfo"></span></div>
         <table>
@@ -180,47 +114,6 @@ td .link{color:var(--blue);cursor:pointer;font-size:12.5px}
         <div id="soPlatEmpty" style="display:none;color:var(--muted);font-size:13px;text-align:center;padding:16px 0">本月暂无数据</div>
       </div>
     </div>
-
-    <div class="stats" id="stats"></div>
-
-    <div class="mid">
-      <div class="card"><h3>渠道目标完成</h3><div id="chanList"></div></div>
-      <div class="card"><h3>待处理事项</h3><div class="todo" id="todoList"></div></div>
-    </div>
-
-    <div class="card">
-      <div class="head"><h3>本月核销明细</h3><a href="#" onclick="alert('跳转核销记录列表（待开发）');return false">查看全部核销记录 ›</a></div>
-      <table>
-        <thead><tr><th>渠道</th><th>核销月份</th><th>8折未税金额</th><th>含税开票金额</th><th>应核销金额</th><th>核销构成</th><th>到账状态</th><th>差异</th><th>操作</th></tr></thead>
-        <tbody id="recRows"></tbody>
-      </table>
-    </div>
-  </div>
-</div>
-
-<div id="updBackdrop" class="upd-backdrop" onclick="if(event.target===this)closeUpdate()">
-  <div class="upd-modal">
-    <div class="upd-head">
-      <div><h2>系统更新中心</h2><div class="sub">对照 GitHub 版本 · 一键升级 · 自动升级</div></div>
-      <button class="upd-close" onclick="closeUpdate()">×</button>
-    </div>
-    <div class="upd-body">
-      <div class="upd-line"><span>本地版本</span><b id="updLocal">--</b></div>
-      <div class="upd-line"><span>GitHub 版本</span><b id="updRemote">未检查</b></div>
-      <div class="upd-line"><span>自动升级</span><span><label style="display:inline-flex;align-items:center;gap:8px;cursor:pointer"><input type="checkbox" id="updAuto" onchange="updToggleAuto()"><span id="updAutoState">读取中</span></label></span></div>
-      <div class="upd-line"><span>检查间隔</span><span><select id="updInterval" onchange="updSaveInterval()"><option value="5">5 分钟</option><option value="15">15 分钟</option><option value="30">30 分钟</option><option value="60">1 小时</option><option value="180">3 小时</option><option value="720">12 小时</option></select></span></div>
-      <div class="upd-line"><span>最近检查</span><b id="updLastCheck" style="text-align:right;max-width:72%;font-weight:500;font-size:12.5px;line-height:1.5">--</b></div>
-      <div class="upd-line"><span>更新状态</span><b id="updState">读取中</b></div>
-      <div class="upd-line"><span>说明</span><span id="updMsg" style="text-align:right;max-width:70%">--</span></div>
-    </div>
-    <div class="upd-actions">
-      <button class="btn" onclick="updAction('check')">检查更新</button>
-      <button class="btn primary" onclick="updAction('apply')">立即升级</button>
-      <label><input id="updZip" type="file" accept=".zip" style="display:none" onchange="updUpload()"><button class="btn" onclick="document.getElementById('updZip').click()">上传更新包</button></label>
-      <button class="btn" onclick="updRollback()" style="color:var(--red)">回滚上一版</button>
-    </div>
-    <div class="upd-note">升级流程：从 GitHub 下载 → 备份数据库 → 由群晖后台任务替换代码并重建容器。更新期间页面会短暂断开，完成后自动恢复。</div>
-    <pre id="updLog" class="upd-log">暂无更新日志</pre>
   </div>
 </div>
 
@@ -229,69 +122,10 @@ const $=id=>document.getElementById(id);
 const fmt=n=>'¥'+Number(n||0).toLocaleString('zh-CN',{maximumFractionDigits:0});
 const fmt2=n=>'¥'+Number(n||0).toLocaleString('zh-CN',{minimumFractionDigits:2,maximumFractionDigits:2});
 
-/* ---------- 演示数据（后续接 API 替换） ---------- */
-const DEMO={
-  updated:'09:32',
-  stats:[
-    {k:'8折未税进货', v:1112422, money:true, ico:'🛒', cls:'blue'},
-    {k:'含税开票金额', v:1257037, money:true, ico:'📄', cls:'green'},
-    {k:'本月应核销', v:483459, money:true, ico:'¥', cls:'amber'},
-    {k:'目标完成率', v:'84.5%', sub:'目标 ¥1,316,500', ico:'🎯', cls:'teal'},
-    {k:'异常差额', v:'3项', red:true, ico:'⚠️', cls:'red'},
-  ],
-  channels:[
-    {name:'快手', pct:165.4, done:854148, target:516500, cls:'g'},
-    {name:'抖音', pct:32.3, done:258274, target:800000, cls:'o'},
-    {name:'合计', pct:84.5, done:1112422, target:1316500, cls:'b'},
-  ],
-  todos:[
-    {t:'待同步账单', n:2, cls:'b', ico:'📄'},
-    {t:'待匹配订单', n:128, cls:'o', ico:'🔗'},
-    {t:'待开票', n:4, cls:'g', ico:'🧾'},
-    {t:'待确认到账', n:2, cls:'p', ico:'🏦'},
-    {t:'异常差额', n:3, cls:'r', ico:'⚠️'},
-  ],
-  records:[
-    {ch:'快手', month:'2026-08', untax:854147.86, invoice:965187.08, writeoff:371212.66, comp:'运营费·物流费·广告费', status:'待确认到账', diff:'¥0.00'},
-    {ch:'抖音', month:'2026-08', untax:258274.27, invoice:291849.92, writeoff:112246.00, comp:'运营费·物流费·广告费', status:'待确认到账', diff:'¥0.00'},
-    {ch:'快手', month:'2026-07', untax:637003.44, invoice:719813.88, writeoff:276841.69, comp:'运营费·物流费·广告费', status:'已到账', diff:'-¥0.54'},
-    {ch:'抖音', month:'2026-07', untax:695135.30, invoice:785502.89, writeoff:302105.80, comp:'运营费·物流费·广告费', status:'已到账', diff:'¥0.00'},
-  ],
-};
-
-function render(){
-  $('updTime').textContent=DEMO.updated;
-  $('stats').innerHTML=DEMO.stats.map(s=>`<div class="stat"><div class="ico ${s.cls}">${s.ico}</div><div><div class="k">${s.k}</div><div class="v ${s.red?'red':''}">${s.money?fmt(s.v):s.v}</div>${s.sub?`<div class="s">${s.sub}</div>`:''}</div></div>`).join('');
-  $('chanList').innerHTML=DEMO.channels.map(c=>{
-    const w=Math.min(c.pct,100);
-    return `<div class="chan"><span class="name">${c.name}</span><div class="bar"><i class="${c.cls}" style="width:${w}%"></i></div><span class="pct ${c.cls}">${c.pct}%</span><span class="amt">${fmt(c.done)} / ${fmt(c.target)}</span></div>`;
-  }).join('');
-  const todoCard=t=>`<a href="#" onclick="event.preventDefault();alert('进入「${t.t}」列表（待开发）')"><span class="ic ${t.cls}">${t.ico}</span><span class="t">${t.t}</span><span class="n ${t.cls}">${t.n}</span></a>`;
-  const top3=DEMO.todos.slice(0,3).map(todoCard).join('');
-  const row2=`<div class="row2">${DEMO.todos.slice(3).map(todoCard).join('')}</div>`;
-  $('todoList').innerHTML=top3+row2;
-  $('recRows').innerHTML=DEMO.records.map(r=>`<tr>
-    <td><b>${r.ch}</b></td><td>${r.month}</td>
-    <td class="num">${fmt2(r.untax)}</td><td class="num">${fmt2(r.invoice)}</td><td class="num">${fmt2(r.writeoff)}</td>
-    <td style="color:var(--muted)">${r.comp}</td>
-    <td><span class="tag ${r.status==='已到账'?'ok':'wait'}">${r.status}</span></td>
-    <td class="num">${r.diff}</td>
-    <td><span class="link" onclick="alert('打开核销单详情（待开发）')">查看</span></td></tr>`).join('');
-  // 月份筛选：近 6 个月，默认选中上月（核销一般处理上月账单）
-  const now=new Date(),opts=[];
-  for(let i=0;i<6;i++){const d=new Date(now.getFullYear(),now.getMonth()-i,1);opts.push(`${d.getFullYear()}年${d.getMonth()+1}月`)}
-  $('fMonth').innerHTML=opts.map((o,i)=>`<option ${i===1?'selected':''}>${o}</option>`).join('');
-}
-
 async function checkWdt(){
   try{const r=await fetch('/api/wdt/test');if(r.ok){$('wdtState').textContent='旺店通已连接';return}}catch(e){}
   $('wdtDot').style.background='#f59e0b';$('wdtState').textContent='旺店通未连接';
 }
-async function syncAll(){$('wdtState').textContent='同步中…';await checkWdt();alert('同步任务已触发（完整同步逻辑待接入）')}
-
-document.querySelectorAll('[data-soon]').forEach(a=>a.addEventListener('click',e=>{e.preventDefault();alert('该模块开发中')}));
-function importBill(){alert('导入平台账单（待开发）')}
-function newRecord(){alert('新建核销（待开发）')}
 
 /* ---------- 销售总览（旺店通出库，真实数据） ---------- */
 const PLATFORM_NAMES={'39':'拼多多','75':'快手','69':'抖音','101':'得物'};
@@ -379,78 +213,8 @@ function soInit(){
   soLoad();
 }
 
-/* ---------- 系统更新 ---------- */
-let updTimer=null;
-function openUpdate(){$('updBackdrop').classList.add('show');updRefresh();updLoadAuto();updAutoCheck()}
-function closeUpdate(){$('updBackdrop').classList.remove('show');if(updTimer){clearTimeout(updTimer);updTimer=null}}
-function updStateLabel(s){return ({idle:'空闲',queued:'等待群晖执行',running:'正在更新',success:'完成',error:'失败'})[s]||s||'未知'}
-async function updRefresh(){
-  try{
-    const d=await (await fetch('/api/system-update/status',{cache:'no-store'})).json();
-    const cv=d.current_version||'--';
-    $('updLocal').textContent='v'+cv;
-    const tv=document.getElementById('topVersion'); if(tv)tv.textContent='v'+cv;
-    $('updRemote').textContent=d.remote_version?('v'+d.remote_version+(d.has_update?'（有新版）':'（已最新）')):'未检查';
-    $('updRemote').className=d.remote_version?(d.has_update?'bad':'good'):'';
-    $('updState').textContent=updStateLabel(d.state);
-    $('updState').className=d.state==='error'?'bad':(d.state==='success'?'good':'');
-    $('updMsg').textContent=d.message||'--';
-    $('updLog').textContent=d.log||'暂无更新日志';
-    if(d.state==='queued'||d.state==='running')updTimer=setTimeout(updRefresh,2500);
-  }catch(e){
-    $('updState').textContent='重新连接中…';
-    updTimer=setTimeout(updRefresh,3000);
-  }
-}
-async function updAutoCheck(){
-  // 打开面板时静默拉一次 GitHub 版本，避免「GitHub 版本」长期停在“未检查”。
-  // 有任务在排队/执行时不打扰，避免覆盖进度信息。
-  try{
-    const s=await (await fetch('/api/system-update/status',{cache:'no-store'})).json();
-    if(s.github_configured===false){updRefresh();return}
-    if(s.state==='queued'||s.state==='running')return;
-    await updPost('/api/system-update/check');
-    updRefresh();
-  }catch(e){/* 网络或权限异常保持“未检查”，用户可手动点“检查更新” */}
-}
-async function updLoadAuto(){
-  try{
-    const d=await (await fetch('/api/system-update/auto',{cache:'no-store'})).json();
-    $('updAuto').checked=!!d.enabled;
-    $('updAutoState').textContent=d.enabled?'已开启':'已关闭';
-    $('updInterval').value=String(d.interval_minutes||30);
-    const at=d.last_check_at?d.last_check_at.replace('T',' ').slice(0,19):'未检查';
-    $('updLastCheck').textContent=d.last_result?(at+' · '+d.last_result):at;
-  }catch(e){}
-}
-async function updPost(url,body){
-  const opts={method:'POST'};
-  if(body!==undefined){opts.headers={'Content-Type':'application/json'};opts.body=JSON.stringify(body)}
-  const r=await fetch(url,opts);const d=await r.json().catch(()=>({}));
-  if(!r.ok)throw new Error(d.detail||'操作失败');return d;
-}
-async function updAction(a){
-  if(a!=='check'&&!confirm('确定立即升级到 GitHub 最新版本？系统会先备份数据库，期间页面会短暂断开。'))return;
-  try{await updPost('/api/system-update/'+a);updRefresh()}catch(e){alert(e.message)}
-}
-async function updRollback(){
-  if(!confirm('确定回滚到上一版本？数据库也会恢复到上次升级前的备份。'))return;
-  try{await updPost('/api/system-update/rollback');updRefresh()}catch(e){alert(e.message)}
-}
-async function updUpload(){
-  const f=$('updZip').files[0];if(!f)return;
-  if(!confirm('确定上传并安装 '+f.name+'？')){$('updZip').value='';return}
-  const fd=new FormData();fd.append('file',f);
-  try{const r=await fetch('/api/system-update/upload-package',{method:'POST',body:fd});const d=await r.json();if(!r.ok)throw new Error(d.detail||'上传失败');updRefresh()}catch(e){alert(e.message)}finally{$('updZip').value=''}
-}
-async function updSaveAuto(){
-  try{await updPost('/api/system-update/auto',{enabled:$('updAuto').checked,interval_minutes:Number($('updInterval').value)||30})}catch(e){alert(e.message)}
-  await updLoadAuto();
-}
-function updToggleAuto(){updSaveAuto()}
-function updSaveInterval(){updSaveAuto()}
-
-render();checkWdt();soInit();updRefresh();if(location.hash==='#update')openUpdate();
+checkWdt();
+soInit();
 </script>
 </body>
 </html>

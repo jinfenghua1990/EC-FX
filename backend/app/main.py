@@ -18,20 +18,14 @@ from sqlalchemy.orm import Session
 
 from .config import settings
 from .db import get_db
-from .models import ImportBatch, ManualAdjustment, ModuleRawRecord, ModuleStandardRecord, RebateRule, ReconResult, SettlementRow, StockoutItem, StockoutOrder
-from .services.importers import import_bank, import_settlement, read_tabular
-from .services.legacy_logic import latest_legacy_batch, monthly_summary, yearly_series
-from .services.legacy_workbook import import_0610_workbook
-from .services.reconciliation import profit_rows, run_reconciliation
+from .models import ManualAdjustment, StockoutItem, StockoutOrder
+from .services.importers import read_tabular
 from .services.wangdian import WangdianClient, upsert_stockouts
 from .services.sales_outbound import sales_outbound_detail, sales_outbound_facets, sales_outbound_orders, sales_outbound_overview
 from .services.diy_export import distinct_values, export_detail, export_fields_catalog, export_order_level, export_summary, filter_options, summary_result, sync_goods_class_cache
 from .services.system_update import (get_update_status, queue_action, stage_update_zip, github_check, github_download_update, set_update_status, read_auto_config, write_auto_config)
-from .services.module_hub import (
-    MODULES, batch_preview, calculate_purchase_rebate, create_adjustment, create_rebate_rule,
-    effective_stockout_rows, import_module_raw, list_adjustments, list_mapping_profiles,
-    list_module_batches, list_rebate_rules, list_standard_records, module_catalog, module_readiness, rebate_channel_catalog, update_rebate_rule,
-    module_schema, normalize_module_batch, standard_record_lineage, stockout_adjustment_summary,
+from .services.adjustments import (
+    create_adjustment, effective_stockout_rows, list_adjustments, stockout_adjustment_summary,
 )
 from .services.distribution import (
     FX_ORDER_STATUSES, STATUS_LABELS, create_distributor, create_order, create_product,
@@ -58,26 +52,6 @@ class AdjustmentPayload(BaseModel):
     text_value: str = ""
     reason: str
     active: bool = True
-
-
-class MappingPayload(BaseModel):
-    mapping: dict[str, str] = Field(default_factory=dict)
-    profile_name: str = "默认映射"
-    save_profile: bool = True
-
-
-class RebateRulePayload(BaseModel):
-    brand: str = "*"
-    channel: str = "*"
-    category: str = "渠道返利"
-    basis_field: str = "invoice_amount_untaxed"
-    rate: Decimal = Decimal("0")
-    tax_factor: Decimal = Decimal("1")
-    effective_from: str = ""
-    effective_to: str = ""
-    priority: int = 100
-    active: bool = True
-    note: str = ""
 
 
 class FxDistributorPayload(BaseModel):
@@ -377,37 +351,11 @@ async def _stop_auto_update_loop() -> None:
 
 @app.get("/api/status")
 def status(db: Session = Depends(get_db)):
-    legacy = latest_legacy_batch(db)
     return {
         "wdt_configured": WangdianClient().configured,
         "stockout_orders": db.scalar(select(func.count()).select_from(StockoutOrder)) or 0,
         "stockout_items": db.scalar(select(func.count()).select_from(StockoutItem)) or 0,
-        "settlement_rows": db.scalar(select(func.count()).select_from(SettlementRow)) or 0,
-        "imports": db.scalar(select(func.count()).select_from(ImportBatch)) or 0,
-        "legacy_workbook": ({"batch_id": legacy.id, "filename": legacy.filename, "rows": legacy.row_count} if legacy else None),
     }
-
-
-@app.post("/api/import/legacy-workbook")
-async def upload_legacy_workbook(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    if not (file.filename or "").lower().endswith(".xlsx"):
-        raise HTTPException(400, "核销母表仅支持 XLSX")
-    content = await file.read()
-    try:
-        batch, counts, duplicated = import_0610_workbook(db, file.filename or "核销表0610.xlsx", content)
-    except Exception as exc:
-        raise HTTPException(400, f"核销表导入失败：{exc}") from exc
-    return {"ok": True, "batch_id": batch.id, "counts": counts, "duplicated": duplicated}
-
-
-@app.get("/api/monthly-summary")
-def api_monthly_summary(month: str = Query(pattern=r"^\d{4}-\d{2}$"), db: Session = Depends(get_db)):
-    return monthly_summary(db, month)
-
-
-@app.get("/api/yearly-series")
-def api_yearly_series(year: int = Query(ge=2020, le=2100), db: Session = Depends(get_db)):
-    return yearly_series(db, year)
 
 
 @app.get("/api/wdt/test")
@@ -427,33 +375,13 @@ def test_wdt_connection():
 def sync_wdt(start: datetime, end: datetime, db: Session = Depends(get_db)):
     client = WangdianClient()
     if not client.configured:
-        raise HTTPException(400, "旺店通凭证未配置；当前可以先完整使用0610核销表逻辑")
+        raise HTTPException(400, "旺店通凭证未配置，请在 .env 中填写 WDT_SID / WDT_APPKEY / WDT_APPSECRET")
     try:
         rows = client.stockouts(start, end)
         orders, items = upsert_stockouts(db, rows, "wdt_api")
         return {"ok": True, "orders": orders, "items": items}
     except Exception as exc:
         raise HTTPException(502, str(exc)) from exc
-
-
-@app.post("/api/import/settlement")
-async def upload_settlement(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    content = await file.read()
-    try:
-        batch, count, duplicated = import_settlement(db, file.filename or "settlement.xlsx", content)
-    except Exception as exc:
-        raise HTTPException(400, str(exc)) from exc
-    return {"ok": True, "batch_id": batch.id, "rows": count, "duplicated": duplicated}
-
-
-@app.post("/api/import/bank")
-async def upload_bank(file: UploadFile = File(...), db: Session = Depends(get_db)):
-    content = await file.read()
-    try:
-        batch, count, duplicated = import_bank(db, file.filename or "bank.xlsx", content)
-    except Exception as exc:
-        raise HTTPException(400, str(exc)) from exc
-    return {"ok": True, "batch_id": batch.id, "rows": count, "duplicated": duplicated}
 
 
 @app.post("/api/import/wdt-stockout")
@@ -490,101 +418,6 @@ async def upload_wdt_stockout(file: UploadFile = File(...), db: Session = Depend
             })
         orders, items = upsert_stockouts(db, normalized, "wdt_export")
         return {"ok": True, "orders": orders, "items": items}
-    except Exception as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-# --- V0.8 模块化数据中心：原始层 → 字段映射 → 标准层 → 算法层 → 报表层。 ---
-@app.get("/api/data/modules")
-def data_modules(db: Session = Depends(get_db)):
-    raw_counts = {}
-    standard_counts = {}
-    for key in MODULES:
-        raw_counts[key] = db.scalar(select(func.count()).select_from(ModuleRawRecord).where(ModuleRawRecord.module == key)) or 0
-        standard_counts[key] = db.scalar(select(func.count()).select_from(ModuleStandardRecord).where(ModuleStandardRecord.module == key, ModuleStandardRecord.status == "valid")) or 0
-    rows = module_catalog()
-    readiness = {x["module"]: x for x in module_readiness(db)}
-    for row in rows:
-        row["raw_rows"] = raw_counts.get(row["key"], 0)
-        row["standard_rows"] = standard_counts.get(row["key"], 0)
-        row["readiness"] = readiness.get(row["key"], {})
-    return {"port": settings.app_port, "modules": rows}
-
-
-@app.get("/api/data/readiness")
-def data_readiness(db: Session = Depends(get_db)):
-    return {"modules": module_readiness(db), "report_rule": "只有标准化且校验通过的数据才进入后续正式报表；原始层永远保留。"}
-
-
-@app.get("/api/data/{module}/schema")
-def data_module_schema(module: str):
-    try:
-        return module_schema(module)
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@app.get("/api/data/{module}/batches")
-def data_module_batches(module: str, limit: int = 30, db: Session = Depends(get_db)):
-    try:
-        return {"module": module, "batches": list_module_batches(db, module, limit)}
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@app.get("/api/data/{module}/mapping-profiles")
-def data_module_mapping_profiles(module: str, db: Session = Depends(get_db)):
-    return {"module": module, "profiles": list_mapping_profiles(db, module)}
-
-
-@app.get("/api/data/batches/{batch_id}/preview")
-def data_batch_preview(batch_id: int, limit: int = 20, db: Session = Depends(get_db)):
-    try:
-        return batch_preview(db, batch_id, limit)
-    except ValueError as exc:
-        raise HTTPException(404, str(exc)) from exc
-
-
-@app.post("/api/data/batches/{batch_id}/normalize")
-def data_batch_normalize(batch_id: int, payload: MappingPayload, db: Session = Depends(get_db)):
-    try:
-        result = normalize_module_batch(
-            db, batch_id, mapping=payload.mapping, profile_name=payload.profile_name, save_profile=payload.save_profile,
-        )
-        if not result.get("ok", True):
-            return result
-        return {"ok": True, **result}
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@app.get("/api/data/{module}/standard")
-def data_module_standard(module: str, period: str = "", limit: int = 200, db: Session = Depends(get_db)):
-    if module not in MODULES:
-        raise HTTPException(404, "模块不存在")
-    return {"module": module, "period": period, "rows": list_standard_records(db, module, period, limit)}
-
-
-@app.get("/api/data/standard/{record_id}/lineage")
-def data_standard_lineage(record_id: int, db: Session = Depends(get_db)):
-    try:
-        return standard_record_lineage(db, record_id)
-    except ValueError as exc:
-        raise HTTPException(404, str(exc)) from exc
-
-
-@app.post("/api/data/{module}/upload")
-async def module_upload(module: str, file: UploadFile = File(...), db: Session = Depends(get_db)):
-    content = await file.read()
-    try:
-        result = import_module_raw(db, module, file.filename or "upload.xlsx", content, data_root="/app/data")
-        # 能自动识别必需字段时，直接进入标准层；识别不全则停在待映射状态，绝不猜字段。
-        if not result.get("duplicated") and not result.get("missing_required"):
-            normalized = normalize_module_batch(db, result["batch_id"], mapping=result.get("auto_mapping") or {})
-            result["normalization"] = normalized
-            result["status"] = normalized.get("status", result.get("status"))
-            result["standard_rows"] = normalized.get("valid_rows", 0)
-        return {"ok": True, "module": module, **result}
     except Exception as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -762,54 +595,6 @@ def wdt_sync_goods_class(start: str = "2026-01-01"):
         return sync_goods_class_cache(start=start)
     except Exception as exc:
         raise HTTPException(502, str(exc)) from exc
-
-
-@app.get("/api/data/rebate/catalog")
-def data_rebate_catalog(db: Session = Depends(get_db)):
-    return rebate_channel_catalog(db)
-
-
-@app.get("/api/data/rebate/rules")
-def data_rebate_rules(db: Session = Depends(get_db)):
-    return [{
-        "id": x.id, "brand": x.brand, "channel": x.channel, "category": x.category,
-        "basis_field": x.basis_field, "rate": float(x.rate), "tax_factor": float(x.tax_factor),
-        "effective_from": x.effective_from, "effective_to": x.effective_to,
-        "priority": x.priority, "active": bool(x.active), "note": x.note,
-    } for x in list_rebate_rules(db)]
-
-
-@app.post("/api/data/rebate/rules")
-def data_rebate_rule_create(payload: RebateRulePayload, db: Session = Depends(get_db)):
-    try:
-        x = create_rebate_rule(db, payload.model_dump())
-        return {"ok": True, "id": x.id}
-    except ValueError as exc:
-        raise HTTPException(400, str(exc)) from exc
-
-
-@app.put("/api/data/rebate/rules/{rule_id}")
-def data_rebate_rule_update(rule_id: int, payload: RebateRulePayload, db: Session = Depends(get_db)):
-    try:
-        x = update_rebate_rule(db, rule_id, payload.model_dump())
-        return {"ok": True, "id": x.id}
-    except ValueError as exc:
-        raise HTTPException(404 if "不存在" in str(exc) else 400, str(exc)) from exc
-
-
-@app.post("/api/data/rebate/rules/{rule_id}/toggle")
-def data_rebate_rule_toggle(rule_id: int, active: bool = True, db: Session = Depends(get_db)):
-    row = db.get(RebateRule, rule_id)
-    if not row:
-        raise HTTPException(404, "返利规则不存在")
-    row.active = 1 if active else 0
-    db.commit()
-    return {"ok": True, "id": row.id, "active": bool(row.active)}
-
-
-@app.get("/api/data/rebate/calculate")
-def data_rebate_calculate(month: str = Query(pattern=r"^\d{4}-\d{2}$"), db: Session = Depends(get_db)):
-    return calculate_purchase_rebate(db, month)
 
 
 # ============ 红盒子供销平台（原分销系统） ============
@@ -1064,6 +849,12 @@ def workbench_page():
     return FileResponse(STATIC_DIR / "workbench.html")
 
 
+@app.get("/system-update")
+def system_update_page():
+    # 系统更新独立页（原先寄生在核销工作台的弹窗里）
+    return FileResponse(STATIC_DIR / "system-update.html")
+
+
 @app.get("/coming-soon")
 def coming_soon_page():
     # 统一占位页：菜单里已规划、但数据模型/接口尚未建立的功能
@@ -1091,73 +882,10 @@ def distribution_page():
     return FileResponse(STATIC_DIR / "distribution.html")
 
 
-# V0.1 的逐单核销接口继续保留，后续 API 接入时直接使用。
-@app.post("/api/reconciliation/run")
-def reconcile(month: str = Query(pattern=r"^\d{4}-\d{2}$"), db: Session = Depends(get_db)):
-    return run_reconciliation(db, month)
-
-
-@app.get("/api/reconciliation")
-def reconciliation_list(month: str = Query(pattern=r"^\d{4}-\d{2}$"), db: Session = Depends(get_db)):
-    start = month_start(month)
-    end = datetime(start.year + (1 if start.month == 12 else 0), 1 if start.month == 12 else start.month + 1, 1)
-    rows = db.execute(
-        select(ReconResult, SettlementRow, StockoutOrder)
-        .join(SettlementRow, SettlementRow.id == ReconResult.settlement_row_id)
-        .outerjoin(StockoutOrder, StockoutOrder.id == ReconResult.stockout_order_id)
-        .where(SettlementRow.settle_date >= start, SettlementRow.settle_date < end)
-        .order_by(ReconResult.status, SettlementRow.id.desc())
-    ).all()
-    return [{
-        "status": recon.status,
-        "order_no": settlement.order_no,
-        "settled_amount": float(recon.settled_amount),
-        "expected_amount": float(recon.expected_amount),
-        "difference": float(recon.difference),
-        "stockout_no": stockout.stockout_no if stockout else None,
-        "shop_name": stockout.shop_name if stockout else settlement.shop_name,
-        "note": recon.note,
-    } for recon, settlement, stockout in rows]
-
-
-@app.get("/api/profit")
-def profit(month: str = Query(pattern=r"^\d{4}-\d{2}$"), db: Session = Depends(get_db)):
-    """兼容旧接口。若已导入0610母表，优先返回原表口径总览。"""
-    legacy = latest_legacy_batch(db)
-    if legacy:
-        summary = monthly_summary(db, month)
-        t = summary["totals"]
-        return {
-            "month": month,
-            "mode": "0610_workbook_logic",
-            "totals": {
-                "orders": 0,
-                "revenue": t["settlement_revenue"],
-                "goods_cost": t["goods_cost_8_discount_untaxed"],
-                "post_cost": t["logistics"],
-                "package_cost": 0,
-                "gross_profit": t["sales_gross_profit"],
-                "gross_margin_pct": (t["sales_gross_profit"] / t["settlement_revenue"] * 100) if t["settlement_revenue"] else 0,
-            },
-            "rows": [],
-        }
-    rows = profit_rows(db, month)
-    totals = {
-        "orders": len(rows),
-        "revenue": round(sum(r["revenue"] for r in rows), 2),
-        "goods_cost": round(sum(r["goods_cost"] for r in rows), 2),
-        "post_cost": round(sum(r["post_cost"] for r in rows), 2),
-        "package_cost": round(sum(r["package_cost"] for r in rows), 2),
-        "gross_profit": round(sum(r["gross_profit"] for r in rows), 2),
-    }
-    totals["gross_margin_pct"] = round((totals["gross_profit"] / totals["revenue"] * 100), 2) if totals["revenue"] else 0
-    return {"month": month, "mode": "wdt_v01", "totals": totals, "rows": rows}
-
-
 @app.get("/")
 def index():
     # 首页 = 外壳框架（顶部一级菜单 + 左侧二级菜单 + 多标签 iframe）
-    # 原来的核销工作台仍可通过 /workbench 直接访问
+    # /workbench 为「经营总览」页，也可直接访问
     return FileResponse(STATIC_DIR / "shell.html")
 
 

@@ -210,7 +210,6 @@ const MENUS = [
     { key: 'report-dist-ops', label: '分销商经营报表', icon: '🏢', url: ph('分销商经营报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
     { key: 'report-stock-ship', label: '库存与发货报表', icon: '🚚', url: ph('库存与发货报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
     { key: 'report-finance', label: '财务统计报表', icon: '💳', url: ph('财务统计报表', '报表中心', 'P6'), planned: true, phase: 'P6' },
-    { key: 'report-legacy', label: '核销报表（历史）', icon: '🧮', url: '/reports?embed=1', badge: '历史' },
   ]},
   { key: 'system', label: '系统设置', icon: '⚙️', children: [
     { key: 'sys-users', label: '用户与角色', icon: '👥', url: ph('用户与角色', '系统设置', 'P5'), planned: true, phase: 'P5' },
@@ -219,7 +218,7 @@ const MENUS = [
     { key: 'sys-params', label: '系统参数', icon: '⚙️', url: ph('系统参数', '系统设置', 'P6'), planned: true, phase: 'P6' },
     { key: 'sys-logs', label: '操作日志', icon: '📜', url: ph('操作日志', '系统设置', 'P5'), planned: true, phase: 'P5' },
     { key: 'sys-integration', label: '数据接口配置', icon: '🔌', url: ph('数据接口配置', '系统设置', 'P6'), planned: true, phase: 'P6' },
-    { key: 'sys-update', label: '系统更新', icon: '🔄', url: '/workbench?embed=1#update' },
+    { key: 'sys-update', label: '系统更新', icon: '🔄', url: '/system-update?embed=1' },
   ]},
 ];
 
@@ -436,7 +435,8 @@ function guessLabel(url) {
     return q.get('label') || '功能规划中';
   }
   const map = { '/': '首页', '/workbench': '经营总览', '/distribution': '分销管理',
-                '/shipments': '发货记录', '/reports': '核销报表（历史）', '/sales-outbound': '销售出库单' };
+                '/shipments': '发货记录', '/reports': '报表中心', '/sales-outbound': '销售出库单',
+                '/system-update': '系统更新' };
   return map[path] || path;
 }
 
@@ -524,7 +524,7 @@ if (state.active && state.tabs.some(t => t.key === state.active)) {
 } else if (state.tabs.length) {
   activate(state.tabs[state.tabs.length - 1].key);
 } else {
-  // 首次进来：默认打开核销工作台
+  // 首次进来：默认打开经营总览
   openChild(MENUS[0].children[0].key);
 }
 

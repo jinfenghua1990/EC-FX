@@ -6,7 +6,7 @@ from sqlalchemy.orm import sessionmaker
 
 from app.db import Base
 from app.models import StockoutItem, StockoutOrder
-from app.services.module_hub import create_adjustment
+from app.services.adjustments import create_adjustment
 from app.services.sales_outbound import sales_outbound_detail, sales_outbound_facets, sales_outbound_orders, sales_outbound_overview
 
 

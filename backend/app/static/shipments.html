@@ -91,7 +91,7 @@ td.num{font-variant-numeric:tabular-nums}
 
 <div class="main">
   <div class="topbar">
-    <div class="crumbs">核销管理&nbsp;/&nbsp;<b>发货明细</b></div>
+    <div class="crumbs">发货管理&nbsp;/&nbsp;<b>发货明细</b></div>
     <div class="topright">
       <span><span class="dot" id="wdtDot"></span><span id="wdtState">旺店通检测中…</span></span>
       <button class="btn primary" id="syncBtn" onclick="syncMonth()">⟳ 同步本月旺店通</button>
@@ -222,7 +222,7 @@ async function detail(no){
     const row=(k,a,b)=>`<tr><td>${k}</td><td class="num">${a}</td><td class="num">${b}</td></tr>`;
     $('detailBody').innerHTML=`<h3>出库单 ${esc(no)}</h3>
     <div style="font-size:13px;color:var(--muted);margin-bottom:10px">店铺 ${esc(o.shop_name||'-')} · 平台 ${esc(pname(o.platform_id)||'-')} · 发货 ${esc((o.consign_time||'').replace('T',' ').slice(0,16))} · 状态 ${esc(o.status||'-')}</div>
-    <table><thead><tr><th>项目</th><th>旺店通原始</th><th>核销生效值</th></tr></thead><tbody>
+    <table><thead><tr><th>项目</th><th>旺店通原始</th><th>调整后生效值</th></tr></thead><tbody>
     ${row('销售金额',fmt2(rw.goods_total_amount),fmt2(e.goods_total_amount))}
     ${row('货品成本',fmt2(rw.goods_total_cost),fmt2(e.goods_total_cost))}
     ${row('物流成本',fmt2(rw.post_cost),fmt2(e.post_cost))}
