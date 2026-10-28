@@ -19,13 +19,13 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 .brand{display:flex;align-items:center;gap:9px;color:#fff;font-size:15.5px;font-weight:700;letter-spacing:.2px;padding-right:14px;white-space:nowrap}
 .brand .logo{width:30px;height:30px;border-radius:9px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:15px;box-shadow:0 2px 8px rgba(36,99,235,.45)}
 /* 品牌维度切换：选中的品牌会成为全局上下文，所有标签页都按它过滤 */
-.brandpick{display:flex;align-items:center;gap:6px;height:30px;padding:0 6px 0 9px;margin-right:10px;border-radius:8px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);flex-shrink:0;transition:background .15s,border-color .15s}
-.brandpick:hover{background:rgba(255,255,255,.14)}
-.brandpick.on{background:rgba(36,99,235,.55);border-color:rgba(36,99,235,.75)}
-.brandpick .bp-ic{font-size:12.5px;line-height:1;opacity:.85}
-.brandpick select{background:transparent;border:0;color:#fff;font-size:12.5px;font-family:inherit;font-weight:600;max-width:132px;outline:none;cursor:pointer;padding:0;appearance:none;-webkit-appearance:none}
+.brandpick{display:flex;align-items:center;gap:7px;height:34px;padding:0 9px 0 6px;margin-right:10px;border-radius:9px;background:rgba(255,255,255,.09);border:1px solid rgba(255,255,255,.14);flex-shrink:0;transition:background .15s,border-color .15s}
+.brandpick:hover{background:rgba(255,255,255,.16)}
+.brandpick.on{background:rgba(36,99,235,.6);border-color:rgba(96,140,250,.9)}
+.bp-logo{width:23px;height:23px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;line-height:1;flex-shrink:0;background:transparent;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.brandpick select{background:transparent;border:0;color:#fff;font-size:13.5px;font-family:inherit;font-weight:700;max-width:150px;outline:none;cursor:pointer;padding:0;appearance:none;-webkit-appearance:none}
 .brandpick select option{color:#1c2740;background:#fff;font-weight:500}
-.brandpick .bp-arrow{font-size:9px;color:#a9b7ca;line-height:1;pointer-events:none}
+.brandpick .bp-arrow{font-size:10px;color:#a9b7ca;line-height:1;pointer-events:none}
 .primary{display:flex;align-items:center;gap:2px;flex:1;min-width:0;overflow-x:auto;scrollbar-width:none}
 .primary::-webkit-scrollbar{display:none}
 .pitem{display:flex;align-items:center;gap:6px;height:38px;padding:0 10px;border-radius:9px;color:#c2cddd;font-size:13.5px;font-weight:500;cursor:pointer;white-space:nowrap;border:0;background:transparent;font-family:inherit;transition:background .15s,color .15s}
@@ -103,7 +103,7 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 <header class="topbar">
   <div class="brand"><span class="logo">🤝</span><span class="brandname">红盒子供销平台</span></div>
   <div class="brandpick" id="brandPick" title="选择品牌后，所有页面只处理这个品牌的数据">
-    <span class="bp-ic">🏷</span>
+    <span class="bp-logo" id="bpLogo">🏷</span>
     <select id="brandSelect" onchange="switchBrand(this.value)" aria-label="品牌">
       <option value="">全部品牌</option>
     </select>
@@ -182,13 +182,6 @@ const MENUS = [
   { key: 'purchase', label: '采购与到货', icon: '🚛', children: [
     { key: 'purchase-orders', label: '采购单订单情况', icon: '🧾', url: '/purchase?embed=1' },
   ]},
-  { key: 'ship', label: '发货管理', icon: '📮', children: [
-    { key: 'ship-todo', label: '待发货任务', icon: '⏳', url: ph('待发货任务', '发货管理', 'P6'), planned: true, phase: 'P6' },
-    { key: 'ship-outbound', label: '销售出库单', icon: '📤', url: '/sales-outbound?embed=1', badge: '历史' },
-    { key: 'ship-records', label: '发货记录', icon: '📦', url: '/shipments?embed=1', badge: '历史' },
-    { key: 'ship-tracking', label: '物流跟踪', icon: '🚚', url: ph('物流跟踪', '发货管理', 'P6'), planned: true, phase: 'P6' },
-    { key: 'ship-abnormal', label: '发货异常', icon: '⚠️', url: ph('发货异常', '发货管理', 'P6'), planned: true, phase: 'P6' },
-  ]},
   { key: 'finance', label: '财务对账', icon: '💳', children: [
     { key: 'fin-reconcile', label: '分销商对账', icon: '📑', url: '/distribution?embed=1&tab=statements' },
     { key: 'fin-ar', label: '应收账款', icon: '💳', url: ph('应收账款', '财务对账', 'P4'), planned: true, phase: 'P4' },
@@ -252,6 +245,17 @@ async function loadBrands() {
   renderBrandSelect();
 }
 
+/* 品牌彩色徽标：每个品牌一个主色 + 首字，让顶栏一眼认出当前品牌 */
+const BRAND_COLORS = {
+  '格力高': '#e60012', '雀巢': '#3f6fa8', '桂格': '#b5442d', '瑞士莲': '#c8102e',
+  '乐事': '#e0a400', '三养': '#d94f2b', '海兴': '#0e9488', '奇多': '#f26f21',
+  '乐多飞': '#7c5cbf', '爱思得': '#2b7de9', '特百惠': '#e0468c', '伯纳天纯': '#3f9142',
+};
+function brandMark(brand) {
+  const s = shortBrand(brand);
+  return { ch: (s || '?')[0], c: BRAND_COLORS[s] || '#5b6b84' };
+}
+
 function renderBrandSelect() {
   const sel = $('brandSelect');
   if (!sel) return;
@@ -261,6 +265,12 @@ function renderBrandSelect() {
     const sel0 = b.brand === cur ? ' selected' : '';
     return `<option value="${esc(b.brand)}"${sel0}>${name}（${b.count}）</option>`;
   }).join('');
+  // 顶栏品牌 LOGO 徽标：选中品牌显示品牌色+首字，全部品牌显示 🏷
+  const lg = $('bpLogo');
+  if (lg) {
+    if (cur) { const m = brandMark(cur); lg.textContent = m.ch; lg.style.background = m.c; }
+    else { lg.textContent = '🏷'; lg.style.background = 'transparent'; lg.style.boxShadow = 'none'; }
+  }
   // 选中的品牌如果已不在列表里（商品改名/停用），回落到「全部品牌」
   if (cur && !brandList.some(b => b.brand === cur)) {
     state.brand = '';
