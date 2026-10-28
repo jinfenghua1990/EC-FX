@@ -418,6 +418,8 @@ def main(xlsx):
     unmatched = Counter()
     month_totals = {}
     push_counts = Counter()
+    # 旺店通单号首次出现在哪个块：同一个号落在两个块 = 同一批出库被认领两次
+    wdt_owner = {}
 
     def norm_payer(name):
         """付款方名归一：谢建华的变体（谢建华-已付款、谢建华&彩霞…）归一成谢建华。"""
@@ -607,6 +609,18 @@ def main(xlsx):
             wdts = sorted({l["wdt_no"] for l in lines if l["wdt_no"]})
             wdt_full = ",".join(wdts)
             wdt = wdt_full[:120]
+            # 同一张旺店通销售单只能对应一张分销订单。2026-10-28 查到原表把
+            # 202610201430 同时写在两个送货块里，导入后生成两张明细重叠、金额
+            # 互相打架的重复单。这里显式查重：保留原单号（数据真实），但把冲突
+            # 块打进 stats，并在 push_message 里标出来，不让它悄悄过去。
+            dup_wdts = [t for t in wdts if t in wdt_owner]
+            if dup_wdts:
+                stats.setdefault("duplicate_wdt_blocks", []).append(
+                    f"{sheet}·{str(blk['addr'])[:30]}："
+                    + "、".join(f"{t} 与 {wdt_owner[t]} 共用" for t in dup_wdts)
+                )
+            for t in wdts:
+                wdt_owner.setdefault(t, f"{sheet}·{str(blk['addr'])[:20]}")
             # 推送状态：原表这一列叫「出库-旺店通销售」，有单号就说明这单早就在
             # 旺店通出过库了，属于历史单，系统里不该再出现「推送旺店通」按钮。
             # 没有单号的（2月/26年2月两张表压根没有这一列）单独标 history，
@@ -616,6 +630,7 @@ def main(xlsx):
                 push_message = (
                     f"历史团单·原表已含旺店通单号 {wdts[0]}"
                     + (f" 等 {len(wdts)} 个" if len(wdts) > 1 else "")
+                    + ("；⚠ 与其它送货块共用同一单号，疑似重复单，需人工核对" if dup_wdts else "")
                     + "，无需重复推送"
                 )[:480]
                 pushed_at = odate.isoformat()
@@ -722,6 +737,10 @@ def main(xlsx):
     if stats.get("multi_payer_blocks"):
         print("  ⚠ 有块里混了多个付款公司（已取行数最多的一家落到订单上，请核对）：")
         for line in stats["multi_payer_blocks"]:
+            print("    - " + line)
+    if stats.get("duplicate_wdt_blocks"):
+        print("  ⚠ 有多张订单共用同一个旺店通单号（同一批出库被重复认领，请核对后删除/拆分明细）：")
+        for line in stats["duplicate_wdt_blocks"]:
             print("    - " + line)
     print(
         f"推送状态: 已推送旺店通(原表有单号) {push_counts.get('sent', 0)}，"

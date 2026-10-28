@@ -2153,6 +2153,30 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
         raise ValueError("只有已审核的订单可以推送旺店通")
     if order.push_status == "sent":
         raise ValueError(f"订单已推送过（单号 {order.wdt_tid or order.order_no}），不要重复推送")
+    # 重复单拦截：旺店通单号是销售/出库单的唯一凭据，一张单只能被一个分销订单认领。
+    # 团单 Excel 里出现过同一单号（如 202610201430）落在两个送货块，导入后生成两张
+    # 明细重叠的订单；trade_push 是 update 语义，推过去只会互相覆盖明细、金额对不上。
+    tids = [t.strip() for t in (order.wdt_tid or "").split(",") if t.strip()]
+    if tids:
+        conflicts = []
+        for other in db.scalars(
+            select(FxOrder)
+            .where(
+                FxOrder.id != order.id,
+                FxOrder.wdt_tid.isnot(None),
+                FxOrder.wdt_tid != "",
+            )
+            .order_by(FxOrder.order_no)
+        ).all():
+            hit = {t.strip() for t in (other.wdt_tid or "").split(",") if t.strip()} & set(tids)
+            if hit:
+                conflicts.append(f"{other.order_no}（{'、'.join(sorted(hit))}）")
+        if conflicts:
+            raise ValueError(
+                f"旺店通单号 {'、'.join(tids)} 已被 {'、'.join(conflicts)} 占用，"
+                "同一张旺店通单不能由多张分销订单重复认领；"
+                "请先核对并清理重复单（订单详情 → 改单号/删除）后再推送"
+            )
     distributor = order.distributor
     if not distributor:
         raise ValueError("订单缺少分销商信息，无法推送")
