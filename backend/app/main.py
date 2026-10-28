@@ -80,6 +80,8 @@ class FxDistributorPayload(BaseModel):
     contact: str = ""
     phone: str = ""
     email: str = ""
+    # 收货地址：发货送到这里，和开票要求/合作说明那种「备注」分开
+    delivery_address: str = ""
     tax_no: str = ""
     # 授权分销的品牌（可多个）。空数组 = 没录授权，选了具体品牌时这个分销商不出现
     brands: list[str] = Field(default_factory=list)

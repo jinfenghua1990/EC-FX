@@ -202,6 +202,7 @@ def _distributor_view(row: FxDistributor) -> dict:
         "contact": row.contact,
         "phone": row.phone,
         "email": row.email,
+        "delivery_address": row.delivery_address or "",
         "tax_no": row.tax_no or "",
         "brands": brand_list_of(row),
         "pay_accounts": _text_to_list(getattr(row, "pay_accounts", "") or ""),
@@ -259,6 +260,7 @@ def create_distributor(db: Session, data: dict) -> dict:
         contact=(data.get("contact") or "").strip(),
         phone=(data.get("phone") or "").strip(),
         email=(data.get("email") or "").strip(),
+        delivery_address=(data.get("delivery_address") or "").strip(),
         tax_no=(data.get("tax_no") or "").strip(),
         brands=_brands_to_text(data.get("brands")),
         pay_accounts=_brands_to_text(data.get("pay_accounts")),
@@ -280,7 +282,7 @@ def update_distributor(db: Session, distributor_id: int, data: dict) -> dict:
         if dup:
             raise ValueError(f"分销商编码已存在: {new_code}")
         row.code = new_code
-    for field in ("name", "contact", "phone", "email", "tax_no", "note"):
+    for field in ("name", "contact", "phone", "email", "tax_no", "note", "delivery_address"):
         if field in data and data[field] is not None:
             setattr(row, field, str(data[field]).strip())
     if "brands" in data and data["brands"] is not None:
@@ -344,6 +346,9 @@ def merge_distributors(db: Session, target_id: int, source_ids: list[int]) -> di
             if acc and acc not in accounts:
                 accounts.append(acc)
     target.pay_accounts = ",".join(accounts)
+    # 收货地址：源客户有、目标没有的收货点也并进来（同一客户多个收货点不能丢）
+    addrs = [a for a in dict.fromkeys([target.delivery_address] + [s.delivery_address for s in sources]) if a]
+    target.delivery_address = "；".join(addrs)
     merged_names = "、".join(s.name for s in sources)
     target.note = (f"{target.note or ''}｜合并入档：{merged_names}（{datetime.utcnow():%Y-%m-%d}）").strip("｜")
     # 4) 删除被并行（订单/专属价已转移）

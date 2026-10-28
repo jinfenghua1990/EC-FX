@@ -88,6 +88,9 @@ class FxDistributor(Base):
     contact: Mapped[str] = mapped_column(String(80), default="")
     phone: Mapped[str] = mapped_column(String(60), default="")
     email: Mapped[str] = mapped_column(String(160), default="")
+    # 收货地址：发货送到这里。2026-10-28 起从备注里独立出来单独一个字段
+    # （原来只能写进 note，例如「B2B团单导入｜收货：上海市松江区盛龙路755号7栋1楼、13817654550、林」）。
+    delivery_address: Mapped[str] = mapped_column(String(500), default="")
     # 税号：开票用。新建时可作为识别码，允许为空（很多小分销商没有/不提供）
     tax_no: Mapped[str] = mapped_column(String(80), default="", index=True)
     # brands：该分销商被授权分销的品牌，逗号分隔存（如 "格力高,桂格"）。

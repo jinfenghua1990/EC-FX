@@ -316,6 +316,8 @@ tr.pick-on td{background:#f2f7ff}
 .dist-grid{display:grid;grid-template-columns:116px minmax(190px,1.6fr) 146px 96px 126px 166px;gap:10px}
 .dist-field{min-width:0}
 .dist-field.full{grid-column:1/-1}
+/* 收货地址 / 备注 单独一行：地址长，给它更宽的一格 */
+.dist-grid2{display:grid;grid-template-columns:1.7fr 1fr;gap:10px;margin-top:10px}
 .dist-field>label{display:block;font-size:11.5px;color:#667085;font-weight:600;margin:0 0 4px}
 .dist-field>label .req{color:var(--red);margin-left:2px}
 .dist-field input{width:100%;height:33px;border:1px solid #dce2ec;border-radius:7px;padding:0 9px;font-size:13px;font-family:inherit;background:#fff;transition:border-color .12s,box-shadow .12s}
@@ -687,7 +689,10 @@ toast{display:none}
           <div class="dist-field"><label>联系人</label><input id="dContact" placeholder="选填"></div>
           <div class="dist-field"><label>电话</label><input id="dPhone" placeholder="选填"></div>
           <div class="dist-field"><label>邮箱</label><input id="dEmail" type="email" placeholder="选填"></div>
-          <div class="dist-field full"><label>备注</label><input id="dNote" placeholder="选填，例如开票要求、合作说明"></div>
+        </div>
+        <div class="dist-grid2">
+          <div class="dist-field"><label>收货地址</label><input id="dAddr" placeholder="选填，例如 上海市松江区盛龙路755号7栋1楼" title="发货送到这里；以前只能写进备注，现在单独一栏"></div>
+          <div class="dist-field"><label>备注</label><input id="dNote" placeholder="选填，例如开票要求、合作说明"></div>
         </div>
       </div>
     </div>
@@ -1169,7 +1174,7 @@ function renderDistributors(){
   const kw = ($("distSearch").value || "").toLowerCase();
   const body = $("distBody"), empty = $("distEmpty");
   const rows = state.distributors.filter(d => !kw
-    || (d.code + (d.tax_no || "") + d.name + d.contact + d.phone + (d.brands || []).join(" ") + paySearchText(d)).toLowerCase().includes(kw));
+    || (d.code + (d.tax_no || "") + d.name + d.contact + d.phone + (d.delivery_address || "") + (d.brands || []).join(" ") + paySearchText(d)).toLowerCase().includes(kw));
   empty.style.display = rows.length ? "none" : "";
   body.innerHTML = rows.map(d => {
     const picked = state.distPick.has(d.id);
@@ -1435,7 +1440,7 @@ function openDistModal(id){
   state.distEditId = id || null;
   const d = id ? state.distributors.find(x => x.id === id) : null;
   $("distModalTitle").textContent = d ? "编辑分销商 · " + d.name : "新建分销商";
-  ["dCode","dTaxNo","dName","dContact","dPhone","dEmail","dNote"].forEach(k => $(k).value = "");
+  ["dCode","dTaxNo","dName","dContact","dPhone","dEmail","dAddr","dNote"].forEach(k => $(k).value = "");
   const accounts = d ? paymentAccountsOf(d) : [];
   state.payAcc = accounts.length ? accounts.map(normalizePayAcc) : [emptyPayAcc(true)];
   if (!state.payAcc.some(a => a.is_default)) state.payAcc[0].is_default = true;
@@ -1443,7 +1448,8 @@ function openDistModal(id){
   fillDistBrandChecks(d ? (d.brands || []) : []);
   if (d) {
     $("dCode").value = d.code; $("dTaxNo").value = d.tax_no || ""; $("dName").value = d.name; $("dContact").value = d.contact;
-    $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dNote").value = d.note;
+    $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dAddr").value = d.delivery_address || "";
+    $("dNote").value = d.note;
   }
   updateDistMeta();
   showError("distErr", ""); openModal("distModal");
@@ -1468,6 +1474,7 @@ async function saveDist(){
     payment_accounts: cleanDetails,
     pay_accounts: cleanDetails.map(a => a.account_name),
     note: $("dNote").value.trim(),
+    delivery_address: $("dAddr").value.trim(),
   };
   try {
     if (state.distEditId) await api("/api/fx/distributors/" + state.distEditId, { method: "PUT", body: JSON.stringify(body) });
@@ -2727,7 +2734,7 @@ function openImportModal(kind){
   const isDist = kind === "dist";
   $("importTitle").textContent = isDist ? "批量导入分销商" : "批量导入商品";
   $("importHint").innerHTML = isDist
-    ? `每行一个分销商，逗号分隔：<b>编码, 名称, 税号, 联系人, 电话, 备注</b><br>例如：<code>, 上海xx商贸, 91310115XXXXXXXXXX, 王经理, 13800000000, 月结30天</code><br><b>编码留空会自动生成</b>（D001、D002…）；已存在的编码自动跳过，不会重复。`
+    ? `每行一个分销商，逗号分隔：<b>编码, 名称, 税号, 联系人, 电话, 备注, 收货地址</b><br>例如：<code>, 上海xx商贸, 91310115XXXXXXXXXX, 王经理, 13800000000, 月结30天, 上海市松江区XX路1号</code><br><b>编码留空会自动生成</b>（D001、D002…）；已存在的编码自动跳过，不会重复。收货地址可以不填。`
     : `每行一个商品，逗号分隔：<b>SKU, 名称, 规格, 单位, 标价, 备注, 箱规, 一级分销价</b><br>例如：<code>GL001, 巧克力礼盒, 24×100g, 件, 168.00, , 24/箱, 188.00</code><br>箱规写「24/箱」或直接写数字 24；一级分销价留空 = 待定。已存在的 SKU 自动跳过，不会重复。`;
   $("importText").value = "";
   showError("importErr", "");
@@ -2744,7 +2751,7 @@ async function runImport(){
   const rows = parseImportLines($("importText").value);
   if (!rows.length) { showError("importErr", "没有可导入的内容（每行一条，字段用逗号分隔）"); return; }
   const items = importKind === "dist"
-    ? rows.map(f => ({ code: f[0] || "", name: f[1] || "", tax_no: f[2] || "", contact: f[3] || "", phone: f[4] || "", note: f[5] || "" }))
+    ? rows.map(f => ({ code: f[0] || "", name: f[1] || "", tax_no: f[2] || "", contact: f[3] || "", phone: f[4] || "", note: f[5] || "", delivery_address: f[6] || "" }))
     : rows.map(f => {
         // 箱规支持「24/箱」「24」两种写法：斜杠前是数量，斜杠后是单位
         const pack = (f[6] || "").replace(/\s/g, "");
