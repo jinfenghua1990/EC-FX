@@ -1257,8 +1257,8 @@ def _validate_lines(db: Session, lines: list[dict], distributor_id: int | None =
         normalized.append(
             {
                 "product_id": product.id,
-                "goods_no": product.sku,
-                "spec_no": product.spec,
+                "goods_no": (product.goods_no or product.sku or "").strip(),
+                "spec_no": (product.spec_no or product.sku or "").strip(),
                 "goods_name": product.name,
                 "spec_name": product.spec,
                 "quantity": quantity,
@@ -1879,7 +1879,7 @@ def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str)
     lines: list[dict] = []
     for index, line in enumerate(order.lines or [], start=1):
         goods_no = (line.goods_no or "").strip()
-        spec_no = (goods_no or line.spec_no or "").strip()
+        spec_no = (line.spec_no or goods_no or "").strip()
         goods_name = (line.goods_name or spec_no or goods_no or "").strip()[:255]
         lines.append({
             "oid": f"{order.order_no}-{index:03d}",

@@ -165,3 +165,35 @@ def test_push_without_any_shop_fails_clearly(seeded, monkeypatch):
     assert result["pushed"] is False
     assert "未选择推送店铺" in result["push_error"]
     assert result["order"]["status"] == "approved"
+
+
+def test_wdt_codes_are_preserved_in_order_and_push(seeded):
+    """旺店通货品编码和规格编码必须分开，不可用人读规格名替代。"""
+    db, distributor, product, _ = seeded
+    product.goods_no = "WDT-GOODS-001"
+    product.spec_no = "WDT-SPEC-001"
+    product.spec = "55g×36盒"
+    db.commit()
+
+    view = dist.create_order(db, distributor.id, lines=[{"product_id": product.id, "quantity": 2}])
+    line = view["lines"][0]
+    assert line["goods_no"] == "WDT-GOODS-001"
+    assert line["spec_no"] == "WDT-SPEC-001"
+    assert line["spec_name"] == "55g×36盒"
+
+    from app.models import FxOrder
+    order = db.get(FxOrder, view["id"])
+    payload = dist._build_sales_trade(order, distributor, "SHOP-TEST")
+    pushed_line = payload["trade_list"][0]["order_list"][0]
+    assert pushed_line["goods_no"] == "WDT-GOODS-001"
+    assert pushed_line["spec_no"] == "WDT-SPEC-001"
+    assert pushed_line["spec_id"] == "WDT-SPEC-001"
+
+
+def test_manual_product_order_codes_fall_back_to_sku(seeded):
+    """手工商品没有旺店通编码时，用本地 SKU，不把“盒”等规格名当编码。"""
+    db, distributor, product, _ = seeded
+    view = dist.create_order(db, distributor.id, lines=[{"product_id": product.id, "quantity": 1}])
+    assert view["lines"][0]["goods_no"] == "SKU-1"
+    assert view["lines"][0]["spec_no"] == "SKU-1"
+    assert view["lines"][0]["spec_name"] == "盒"
