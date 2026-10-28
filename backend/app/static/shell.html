@@ -175,6 +175,7 @@ const MENUS = [
   ]},
   { key: 'product', label: '商品管理', icon: '📦', children: [
     { key: 'prod-archive', label: '商品档案', icon: '📦', url: '/distribution?embed=1&tab=products' },
+    { key: 'prod-brand', label: '品牌管理', icon: '🏷', url: '/brand-management?embed=1' },
     { key: 'prod-category', label: '商品分类', icon: '🏷', url: ph('商品分类', '商品管理', 'P6'), planned: true, phase: 'P6' },
     { key: 'prod-sku', label: 'SKU 管理', icon: '🔖', url: '/distribution?embed=1&tab=products', badge: '页内' },
     { key: 'prod-shelf', label: '商品上下架', icon: '🔀', url: '/distribution?embed=1&tab=products', badge: '页内' },
@@ -185,14 +186,13 @@ const MENUS = [
     { key: 'order-entry', label: '分销下单', icon: '🛒', url: '/distribution?embed=1&tab=entry' },
     { key: 'order-all', label: '分销订单', icon: '🧾', url: '/distribution?embed=1&tab=orders' },
     { key: 'order-status', label: '订单状态处理', icon: '🔧', url: '/distribution?embed=1&tab=ostatus' },
-    { key: 'order-search', label: '订单查询', icon: '🔎', url: '/distribution?embed=1&tab=orders', badge: '页内' },
   ]},
   { key: 'purchase', label: '采购与到货', icon: '🚛', children: [
     { key: 'purchase-orders', label: '采购单订单情况', icon: '🧾', url: '/purchase?embed=1' },
   ]},
   { key: 'finance', label: '财务对账', icon: '💳', children: [
     { key: 'fin-reconcile', label: '分销商对账', icon: '📑', url: '/distribution?embed=1&tab=statements' },
-    { key: 'fin-ar', label: '应收账款', icon: '💳', url: ph('应收账款', '财务对账', 'P4'), planned: true, phase: 'P4' },
+    { key: 'fin-ar', label: '应收账款', icon: '💳', url: '/distribution?embed=1&tab=receivables' },
     { key: 'fin-rebate', label: '返利核算', icon: '％', url: ph('返利核算', '财务对账', 'P4'), planned: true, phase: 'P4' },
     { key: 'fin-receipts', label: '收付款记录', icon: '💵', url: ph('收付款记录', '财务对账', 'P4'), planned: true, phase: 'P4' },
     { key: 'fin-statement', label: '对账单管理', icon: '🗂', url: '/distribution?embed=1&tab=statements', badge: '部分' },
@@ -250,8 +250,12 @@ async function loadBrands() {
     const data = await res.json();
     brandList = Array.isArray(data.brands) ? data.brands : [];
   } catch (e) { brandList = []; }
+  // 品牌被停用/删除后，顶栏不能继续挂着一个已经不存在的筛选值
+  if (state.brand && !brandList.some(b => b.brand === state.brand)) state.brand = '';
   renderBrandSelect();
 }
+// 品牌管理页保存/停用后通知外壳刷新顶栏品牌清单，不用整页刷新
+window.__fxReloadBrands = loadBrands;
 
 /* 品牌彩色徽标：每个品牌一个主色 + 首字，让顶栏一眼认出当前品牌 */
 const BRAND_COLORS = {
@@ -274,7 +278,7 @@ function renderBrandSelect() {
   if (!sel) return;
   const cur = state.brand || '';
   sel.innerHTML = '<option value="">全部品牌</option>' + brandList.map(b => {
-    const name = esc(shortBrand(b.brand));
+    const name = esc(b.short_name || shortBrand(b.brand));
     const sel0 = b.brand === cur ? ' selected' : '';
     return `<option value="${esc(b.brand)}"${sel0}>${name}（${b.count}）</option>`;
   }).join('');
@@ -282,7 +286,8 @@ function renderBrandSelect() {
   const lg = $('bpLogo');
   if (lg) {
     const short = cur ? shortBrand(cur) : '';
-    const logoFile = short ? BRAND_LOGOS[short] : '';
+    const current = cur ? brandList.find(b => b.brand === cur) : null;
+    const logoFile = (current && current.logo) || (short ? BRAND_LOGOS[short] : '');
     if (logoFile) {
       lg.classList.add('has-img');
       lg.innerHTML = `<img src="/static/brand-logos/${logoFile}" alt="${esc(short)}">`;
@@ -460,6 +465,7 @@ function guessLabel(url) {
     return q.get('label') || '功能规划中';
   }
   const map = { '/': '首页', '/workbench': '经营总览', '/distribution': '分销管理',
+                '/brand-management': '品牌管理',
                 '/shipments': '发货记录', '/reports': '报表中心', '/sales-outbound': '销售出库单',
                 '/system-update': '系统更新' };
   return map[path] || path;

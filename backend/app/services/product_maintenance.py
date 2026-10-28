@@ -121,7 +121,10 @@ def maintenance_of(product: FxProduct) -> dict:
 
 
 def maintenance_summary(products: list[FxProduct]) -> dict:
-    """汇总所有商品的缺项，给页面顶部横幅用。
+    """汇总在售商品的缺项，给页面顶部横幅用。
+
+    停用商品不参与维护提醒：它们不卖，页面也不展示；牌价仍留在明细里备查，
+    但不应该把顶部横幅一直卡成“缺标价”。
 
     分「必须处理」和「无法自动算」两层：
     - 必须处理：缺牌价（仅格力高正常商品）/ 缺分销价 / 成本待核对
@@ -129,8 +132,10 @@ def maintenance_summary(products: list[FxProduct]) -> dict:
     """
     no_list = no_tier1 = pending = 0
     list_with_purchase = 0  # 缺牌价但已有采购价的，可按 8 折反推
-    active_products = 0
+    active_products = sum(1 for product in products if product.active)
     for product in products:
+        if not product.active:
+            continue
         info = maintenance_of(product)
         if info["need_list_price"]:
             no_list += 1
@@ -140,8 +145,6 @@ def maintenance_summary(products: list[FxProduct]) -> dict:
             no_tier1 += 1
         if info["need_cost_check"]:
             pending += 1
-        if product.active:
-            active_products += 1
 
     total = len(products)
     blocking = no_list + no_tier1 + pending

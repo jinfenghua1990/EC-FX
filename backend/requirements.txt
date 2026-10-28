@@ -7,3 +7,7 @@ python-multipart==0.0.20
 httpx==0.28.1
 openpyxl==3.1.5
 psycopg[binary]==3.2.10
+# 打款凭证 OCR（用户 2026-10-28）：本地离线识别微信/支付宝转账截图、银行回单。
+# 没装也能跑：凭证照样能存，只是 ocr_status=unavailable，金额手填。
+rapidocr-onnxruntime==1.4.4
+pillow==13.0.0

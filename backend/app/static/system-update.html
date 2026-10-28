@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>系统更新 · 红盒子供销平台</title>
+<script>
+/* 直接打开本页（未被主壳 iframe 嵌入）时，同一个标签内跳回主壳，避免多出一份"平台"页面 */
+(function(){
+  if (window.self !== window.top) return;
+  location.replace('/?open=' + encodeURIComponent('sys-update'));
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{

@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>采购单订单情况 · 红盒子供销平台</title>
+<script>
+/* 直接打开本页（未被主壳 iframe 嵌入）时，同一个标签内跳回主壳，避免多出一份"平台"页面 */
+(function(){
+  if (window.self !== window.top) return;
+  location.replace('/?open=' + encodeURIComponent('purchase-orders'));
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -51,6 +58,7 @@ th.num{text-align:right}
 .tag.off{background:#eef1f6;color:#5b6778}
 .tag.warn{background:#fdeaea;color:var(--red)}
 .tag.blue{background:#e8effd;color:var(--blue)}
+.tag.brandtag{background:#eef1fd;color:#4a56b8;font-weight:600}
 .empty{padding:34px;text-align:center;color:var(--muted);font-size:13px}
 /* 弹窗 */
 .backdrop{position:fixed;inset:0;background:rgba(16,24,40,.45);display:none;align-items:center;justify-content:center;z-index:60}
@@ -65,6 +73,11 @@ th.num{text-align:right}
 #toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
 .sw{display:inline-flex;align-items:center;gap:6px;font-size:12.5px;color:var(--muted);cursor:pointer}
 .sw input{width:15px;height:15px;accent-color:var(--blue);cursor:pointer}
+/* 顶栏品牌上下文：选了品牌就把它钉在标题旁边，避免和页内筛选混淆 */
+.bchip{display:inline-flex;align-items:center;gap:6px;height:28px;padding:0 11px;border-radius:999px;background:#e8effd;color:var(--blue);font-size:12.5px;font-weight:700;white-space:nowrap}
+.bchip::before{content:"品牌";font-size:10.5px;font-weight:600;color:#5b7fd4;background:#fff;border-radius:999px;padding:1px 6px}
+.bchip .x{cursor:pointer;color:#7c9ae0;font-weight:700;margin-left:2px}
+.bchip .x:hover{color:var(--blue)}
 </style>
 <link rel="stylesheet" href="/static/ui-type.css?v=20261028">
 </head>
@@ -84,8 +97,10 @@ th.num{text-align:right}
     <div class="card">
       <div class="head">
         <h3>旺店通采购单</h3>
+        <span class="bchip" id="brandChip" style="display:none" title="品牌来自顶栏的品牌选择器，切换请用顶栏"></span>
+        <select id="fBrand" style="width:160px" onchange="loadList()"></select>
         <select id="fMonth" style="width:120px" onchange="loadList()"></select>
-        <input id="fKw" placeholder="搜索单号 / 供应商 / 仓库" style="width:220px" oninput="onKwInput()">
+        <input id="fKw" placeholder="采购单号 / 品牌 / 货品 / 供应商" style="width:240px" oninput="onKwInput()">
         <select id="fAbn" style="width:120px" onchange="loadList()">
           <option value="-1">全部单据</option>
           <option value="0">只看正常</option>
@@ -99,11 +114,11 @@ th.num{text-align:right}
         <button class="btn primary" id="btnSync" onclick="syncNow()">⟳ 同步旺店通采购单</button>
         <label class="sw" title="打开页面时自动拉一次旺店通采购单"><input type="checkbox" id="autoSync" checked onchange="onAutoChange()">打开自动同步</label>
       </div>
-      <div class="hint">采购单是<b>商品成本</b>的唯一来源：同步后会自动刷新商品的采购价（含税/基本单位）。<b>异常单</b>（残次、赠品、样品、试吃、临期、退货等）不参与算成本，单列出来只是让你知道有这批货。点击任意一行看这张单进了哪些货。</div>
+      <div class="hint">采购单是<b>商品成本</b>的唯一来源：同步后会自动刷新商品的采购价（含税/基本单位）。<b>异常单</b>（残次、赠品、样品、试吃、临期、退货等）不参与算成本，单列出来只是让你知道有这批货。点击任意一行看这张单进了哪些货。选了<b>品牌</b>之后，列表只留含该品牌货品的采购单，数量、金额、明细都只算这个品牌。</div>
       <div class="tbl">
         <table>
           <thead><tr>
-            <th>采购单号</th><th>供应商</th><th>仓库</th><th>采购员</th><th>状态</th>
+            <th>采购单号</th><th>品牌</th><th>供应商</th><th>仓库</th><th>采购员</th><th>状态</th>
             <th>审核时间</th><th class="num">数量</th><th class="num">金额（含税）</th>
             <th class="num">明细</th><th>异常</th>
           </tr></thead>
@@ -138,10 +153,35 @@ th.num{text-align:right}
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
 const money = v => { const n = parseFloat(v); return isNaN(n) ? "-" : "¥" + n.toLocaleString("zh-CN", {minimumFractionDigits:2, maximumFractionDigits:2}); };
+const qty = v => { const n = parseFloat(v); return isNaN(n) ? "-" : n.toLocaleString("zh-CN", {maximumFractionDigits:2}); };
 function toast(msg){ const t = $("toast"); t.textContent = msg; t.classList.add("show"); setTimeout(() => t.classList.remove("show"), 2600); }
 
-const state = { orders: [], summary: {}, months: [], synced: false };
+/* 品牌来自顶栏（shell.html 会把 ?brand= 拼进 iframe 地址）。
+   页面不再自己造一个品牌下拉去和顶栏打架：有顶栏品牌就只显示一枚只读徽标，
+   单独打开本页（没有 brand 参数）时才退回页内下拉。 */
+const URL_BRAND = new URLSearchParams(location.search).get("brand") || "";
+const state = { orders: [], summary: {}, brand: URL_BRAND, synced: false };
 let kwTimer = null;
+
+const shortBrand = b => { const s = String(b || ""); const i = s.indexOf("/"); return i > 0 ? s.slice(0, i) : s; };
+
+function brandCell(brands){
+  const list = (brands || []).map(shortBrand).filter(Boolean);
+  if (!list.length) return "-";
+  return list.map(n => `<span class="tag brandtag">${esc(n)}</span>`).join(" ");
+}
+
+function applyBrandContext(){
+  const chip = $("brandChip"), sel = $("fBrand");
+  if (state.brand){
+    chip.style.display = "";
+    chip.innerHTML = `${esc(shortBrand(state.brand))}`;
+    sel.style.display = "none";
+  } else {
+    chip.style.display = "none";
+    sel.style.display = "";
+  }
+}
 
 async function api(path, options){
   const res = await fetch(path, Object.assign({ headers: {"Content-Type":"application/json"} }, options || {}));
@@ -157,6 +197,7 @@ function onAutoChange(){
 
 async function loadList(){
   const p = new URLSearchParams();
+  if (state.brand) p.set("brand", state.brand);
   if ($("fMonth").value) p.set("month", $("fMonth").value);
   if ($("fKw").value.trim()) p.set("keyword", $("fKw").value.trim());
   p.set("abnormal", $("fAbn").value);
@@ -164,22 +205,39 @@ async function loadList(){
   const data = await api("/api/fx/purchase-orders?" + p.toString());
   state.orders = data.orders || [];
   state.summary = data.summary || {};
+  fillBrands(data.brands || []);
+  fillMonths(data.months || []);
   renderSummary();
-  // 月份候选要在「不限月份」时取全量，这里单独拉一次全量月份
-  const all = await api("/api/fx/purchase-orders?limit=1000&abnormal=-1");
-  const mset = new Set((all.orders || []).map(o => (o.check_time || "").slice(0, 7)).filter(Boolean));
-  const sel = $("fMonth"), keep = sel.value;
-  const months = [...mset].sort().reverse();
-  sel.innerHTML = `<option value="">全部月份</option>` + months.map(m => `<option value="${m}">${m}</option>`).join("");
-  if (months.indexOf(keep) >= 0) sel.value = keep;
   render();
 }
 
+// 只有「单独打开本页、没有顶栏品牌」时才用这个下拉，否则下拉隐藏
+function fillBrands(brands){
+  const sel = $("fBrand"), keep = sel.value;
+  if (state.brand) return;
+  if (!sel.dataset.ready){
+    sel.innerHTML = `<option value="">全部品牌</option>`
+      + brands.map(b => `<option value="${esc(b.name)}">${esc(shortBrand(b.name))}（${b.items}）</option>`).join("");
+    sel.dataset.ready = "1";
+  }
+  if (keep) sel.value = keep;
+}
+
+function fillMonths(months){
+  const sel = $("fMonth"), keep = sel.value;
+  sel.innerHTML = `<option value="">全部月份</option>` + months.map(m => `<option value="${m}">${m}</option>`).join("");
+  if (months.indexOf(keep) >= 0) sel.value = keep;
+}
+
 function renderSummary(){
-  const s = state.summary;
+  const s = state.summary, scoped = !!s.brand, bn = shortBrand(s.brand);
   $("sOrders").textContent = s.orders ?? "—";
-  $("sAmount").textContent = s.goods_amount ? money(s.goods_amount) : "—";
-  $("sAmountSub").textContent = s.orders ? `共 ${s.orders} 张单的不含税货款合计` : "—";
+  $("sOrdersSub").textContent = scoped ? `${bn} · 含该品牌的采购单` : "库内累计";
+  const amount = scoped ? s.brand_tax_amount : s.tax_goods_amount;
+  $("sAmount").textContent = amount ? money(amount) : "—";
+  $("sAmountSub").textContent = scoped
+    ? `${bn} 明细含税货款合计`
+    : (s.orders ? `共 ${s.orders} 张单的含税货款合计` : "—");
   $("sAbn").textContent = s.abnormal_orders ?? "—";
   $("sLatest").textContent = s.latest_check_time || "—";
   if (state.synced) $("sSync").textContent = "本次已同步旺店通";
@@ -187,15 +245,20 @@ function renderSummary(){
 
 function render(){
   const rows = state.orders;
-  $("empty").style.display = rows.length ? "none" : "";
-  $("body").innerHTML = rows.map(o => `<tr class="${o.abnormal ? "abn" : ""}" onclick="viewDetail(${o.id})" title="点击查看这张采购单进了哪些货" style="cursor:pointer">
+  const empty = $("empty");
+  empty.style.display = rows.length ? "none" : "";
+  empty.textContent = state.brand
+    ? `「${shortBrand(state.brand)}」在当前筛选条件下没有采购单`
+    : "还没有采购单 —— 点右上「同步旺店通采购单」拉一次";
+  $("body").innerHTML = rows.map(o => `<tr class="${o.abnormal ? "abn" : ""}" ondblclick="viewDetail(${o.id})" title="双击查看这张采购单进了哪些货" style="cursor:pointer">
     <td><b>${esc(o.purchase_no)}</b></td>
+    <td>${brandCell(o.brands)}</td>
     <td>${esc(o.provider_name) || "-"}</td>
     <td>${esc(o.warehouse_name) || "-"}</td>
     <td>${esc(o.purchaser_name) || "-"}</td>
     <td><span class="tag ${o.status === "80" ? "on" : "blue"}">${esc(o.status_label)}</span></td>
     <td>${esc(o.check_time) || "-"}</td>
-    <td class="num">${esc(o.goods_count)}</td>
+    <td class="num">${qty(o.goods_count)}</td>
     <td class="num"><b>${money(o.tax_goods_amount)}</b></td>
     <td class="num">${o.item_count}</td>
     <td>${o.abnormal ? `<span class="tag warn" title="${esc(o.abnormal_reason)}">${esc(o.abnormal_reason)}</span>` : `<span class="tag off">正常</span>`}</td>
@@ -225,15 +288,15 @@ async function syncNow(auto){
 function viewDetail(id){
   const o = state.orders.find(x => x.id === id);
   if (!o) return;
-  $("dTitle").textContent = `采购单明细 · ${o.purchase_no}`;
+  $("dTitle").textContent = `采购单明细 · ${o.purchase_no}` + (o.brand_scoped ? ` · ${shortBrand(o.items[0]?.brand_name || state.brand)}` : "");
   $("dMeta").innerHTML = [
     ["供应商", o.provider_name], ["仓库", o.warehouse_name], ["采购员", o.purchaser_name], ["状态", o.status_label],
-    ["审核时间", o.check_time], ["数量", o.goods_count], ["金额（含税）", money(o.tax_goods_amount)], ["备注", o.remark || "-"],
+    ["审核时间", o.check_time], ["数量", qty(o.goods_count)], ["金额（含税）", money(o.tax_goods_amount)], ["备注", o.remark || "-"],
   ].map(([k, v]) => `<div>${k}：<b>${esc(v || "-")}</b></div>`).join("")
    + (o.abnormal ? `<div style="grid-column:1/-1;color:var(--red)">异常原因：<b>${esc(o.abnormal_reason)}</b>（该单不计入成本）</div>` : "");
   $("dBody").innerHTML = (o.items || []).map(it => `<tr>
     <td>${esc(it.spec_no)}</td><td>${esc(it.goods_name)}</td><td>${esc(it.spec_name)}</td><td>${esc(it.brand_name) || "-"}</td>
-    <td class="num">${esc(it.num)}</td><td>${esc(it.purchase_unit) || "-"}</td>
+    <td class="num">${qty(it.num)}</td><td>${esc(it.purchase_unit) || "-"}</td>
     <td class="num">${money(it.unit_price)}</td><td class="num">${money(it.amount)}</td>
     <td class="num">${money(it.last_price)}</td><td class="num">${money(it.lowest_price)}</td>
   </tr>`).join("") || `<tr><td colspan="10" class="empty">这张单没有明细</td></tr>`;
@@ -243,6 +306,7 @@ function closeModal(){ $("detailModal").classList.remove("show"); }
 $("detailModal").addEventListener("click", e => { if (e.target.id === "detailModal") closeModal(); });
 
 (async function init(){
+  applyBrandContext();
   try {
     const saved = localStorage.getItem("fx_purchase_autosync");
     $("autoSync").checked = saved !== "0";   // 默认开：打开页面就自动取旺店通
@@ -253,6 +317,11 @@ $("detailModal").addEventListener("click", e => { if (e.target.id === "detailMod
     $("syncMonths").value = "3";
     await syncNow(true);
   }
+})();
+
+/* 双击表头排序（行内已绑 ondblclick 看明细，这里只补排序） */
+(function initFxTable(){
+  if (window.fxTable) fxTable.sort(document.querySelector(".tbl table"));
 })();
 </script>
 </body>

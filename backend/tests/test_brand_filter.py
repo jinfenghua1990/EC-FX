@@ -47,7 +47,10 @@ def test_list_brands_skips_empty_brand_and_inactive_products(db):
     _add(db, "S2", "无品牌", "")
     _add(db, "S3", "停用商品", "雀巢/Nestle", active=0)
 
-    assert list_brands(db) == [{"brand": "雀巢/Nestle", "count": 1}]
+    brands = list_brands(db)
+    assert [(b["brand"], b["count"]) for b in brands] == [("雀巢/Nestle", 1)]
+    assert brands[0]["short_name"] == "雀巢"
+    assert brands[0]["managed"] is False  # 还没在品牌管理里建档，页面可一键纳入
 
 
 def test_list_products_filters_by_brand(db):
@@ -74,7 +77,8 @@ def test_create_product_keeps_brand_and_category(db):
     )
     assert view["brand"] == "自建品牌"
     assert view["category"] == "零食"
-    assert list_brands(db) == [{"brand": "自建品牌", "count": 1}]
+    brands = list_brands(db)
+    assert [(b["brand"], b["count"]) for b in brands] == [("自建品牌", 1)]
 
 
 def test_create_product_without_brand_is_allowed(db):

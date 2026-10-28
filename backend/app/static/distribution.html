@@ -70,6 +70,8 @@ h1.page{font-size:22px;margin-bottom:4px}
 /* 卡片与表格 */
 .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;display:flex;flex-direction:column;min-height:0;flex:1}
 .card .head{display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;gap:10px;flex-wrap:wrap;flex-shrink:0}
+/* 下单页第二行：商品筛选（搜索/分类/品牌/现货），低频控件与主流程分行 */
+.entry-filters{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:12px;flex-shrink:0;padding:8px 10px;background:#f7f9fc;border:1px solid #e3e8f0;border-radius:10px}
 .card h3{font-size:14.5px;display:flex;align-items:center;gap:8px}
 .card h3::before{content:"";width:4px;height:14px;border-radius:2px;background:var(--blue)}
 .card input,.card select{min-height:32px;border:1px solid #d8dee9;border-radius:8px;background:#fff;padding:5px 10px;font-size:13px}
@@ -148,11 +150,12 @@ table.cols th.col-off,table.cols td.col-off{display:table-cell!important;width:0
 .colset-row input{width:15px;height:15px;min-height:0;padding:0;border:0;flex-shrink:0;accent-color:#2463eb;cursor:pointer}
 .tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
 .mini-tag{padding:1px 6px;font-size:10px;background:#eef4ff;color:#2463eb;margin-left:4px;vertical-align:1px}
-/* 分销商列表的付款账户摘要：第一个账户 + 账户数，详情放 title 里 */
-.pay-cell{display:flex;align-items:center;gap:5px;min-width:0;max-width:220px}
-.pay-main{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#344054}
+/* 分销商列表的付款账户：全部抬头逐行列出（默认抬头带标记），不再只显示第一个+数量 */
+.pay-cell{display:flex;flex-direction:column;gap:2px;min-width:0;max-width:260px}
+.pay-line{display:flex;align-items:center;gap:5px;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:#344054}
+.pay-line .default-badge{flex-shrink:0;font-size:9.5px;font-weight:700;color:#0f9d6e;background:#e5f6ee;border-radius:999px;padding:0 5px}
 .pay-more{flex-shrink:0;font-size:10.5px;font-weight:700;color:#1d4ed8;background:#eef4ff;border-radius:999px;padding:1px 6px}
-.pay-sub{font-size:10.5px;color:#98a2b3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
+.pay-sub{font-size:10.5px;color:#98a2b3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:260px}
 .tag.draft{background:#eef1f6;color:#5b6778}
 .tag.submitted{background:#fdf1dc;color:#b45309}
 .tag.approved{background:#e5f6ee;color:var(--green)}
@@ -161,6 +164,7 @@ table.cols th.col-off,table.cols td.col-off{display:table-cell!important;width:0
 .tag.off{background:#eef1f6;color:#5b6778}
 /* 成本待核对：采购价存疑（源单录错），该行不算毛利，必须一眼看得出 */
 .tag.warn{background:#fdeaea;color:var(--red)}
+.tag.hot{background:#fff1e6;color:#c2410c}
 /* 待核对行：整行标红（浅红底 + 左侧红条），毛利不出数（拿错价算利润更糟） */
 tr.row-pending{background:#fff0f0}
 tr.row-pending td{background:#fff0f0;border-top-color:#f0b4b6;box-shadow:inset 3px 0 0 rgba(229,72,77,.55)}
@@ -222,6 +226,46 @@ tr.row-pending:hover td{background:#ffe6e6}
 #detailModal .order-lines tr.arriving td:first-child{box-shadow:inset 3px 0 0 var(--orange)}
 #detailModal .order-lines tr.short td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 .lp-ref{color:#a8b2c2;border-bottom:1px dashed #cfd6e0;cursor:help}
+/* 分销订单：原始单号 / 收款 / 发货 / 行内展开 */
+tr.order-row{cursor:pointer}
+td.orig-cell{white-space:normal!important}
+.orig-wrap{display:flex;flex-wrap:wrap;gap:2px;align-items:center;min-width:0}
+.orig-no{display:inline-block;max-width:100%;padding:1px 5px;border-radius:5px;background:#eef4ff;color:#2457b8;font-size:11px;font-weight:650;font-variant-numeric:tabular-nums;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:16px}
+.orig-more{font-size:10.5px;color:#7c8aa3}
+.cell-sub{display:block;font-size:10.5px;color:#8a96a8;line-height:1.25;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.tag.pay-received{background:#e5f6ee;color:var(--green)}
+.tag.pay-unpaid{background:#fdeaea;color:var(--red)}
+.tag.pay-partial{background:#fff4e5;color:#b45309}
+.tag.pay-refunded{background:#eef1f6;color:#5b6778}
+.tag.ship-shipped{background:#e5f6ee;color:var(--green)}
+.tag.ship-unshipped{background:#fff4e5;color:#b45309}
+.tag.ship-partial{background:#fff4e5;color:#b45309}
+.tag.ship-returned{background:#eef1f6;color:#5b6778}
+tr.order-detail-row > td{position:static!important;right:auto!important;background:#f7faff!important;box-shadow:none!important;padding:0!important;border-top:0!important;white-space:normal!important;overflow:visible!important;max-width:none!important;z-index:auto!important}
+.od-panel{padding:18px 20px 20px;border-top:2px solid #dbe7ff;border-bottom:1px solid #dbe7ff;background:linear-gradient(#f8fbff,#fff)}
+.od-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+.od-top .od-internal{font-size:13px;color:#5b6778}
+.od-top .od-internal b{font-size:15px;color:#243b66;font-variant-numeric:tabular-nums}
+.od-top .od-spacer{flex:1}
+.od-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px 22px;margin-bottom:14px}
+.od-item{display:flex;gap:8px;align-items:baseline;min-width:0;font-size:12.5px}
+.od-item .k{color:#8a96a8;flex:0 0 66px}
+.od-item .v{color:#344054;min-width:0;word-break:break-word}
+.od-item.span{grid-column:1/-1}
+.od-lines{width:100%;table-layout:auto;border-collapse:collapse;background:#fff;border:1px solid #e3eaf5;border-radius:8px;overflow:hidden;font-size:12.5px}
+.od-lines th{background:#f2f6fd;color:#5b6778;text-align:left;padding:8px 10px;font-weight:600;white-space:nowrap}
+.od-lines td{padding:8px 10px;border-top:1px solid #edf1f7;white-space:normal;word-break:break-word}
+.od-lines .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+.od-total{display:flex;justify-content:flex-end;align-items:baseline;gap:18px;flex-wrap:wrap;padding-top:12px;font-size:13px;color:#5b6778}
+.od-total b{font-size:18px;color:#1f4fae;font-variant-numeric:tabular-nums}
+.od-total .paid{color:#0f9d6e}
+.od-total .out{color:#b45309}
+.od-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:12px;flex-wrap:wrap}
+.od-empty{padding:18px;text-align:center;color:#98a2b3}
+#fulfillModal .modal{width:min(720px,96vw)}
+#fulfillModal .form-grid{gap:0 18px}
+#fulfillModal .form-grid > div{padding-bottom:10px}
+#fulfillModal .form-grid .fo-span{grid-column:1/-1}
 .empty{padding:40px 0;text-align:center;color:var(--muted);font-size:13px}
 .hint{padding:9px 12px;margin:0 0 10px;border-radius:8px;background:#f7f9fc;border:1px solid var(--line);color:#5b6778;font-size:12.5px;line-height:1.5;word-break:break-all;flex-shrink:0}
 
@@ -254,6 +298,14 @@ tr.row-pending:hover td{background:#ffe6e6}
 .topcat-in::placeholder{color:#b6bfcc}
 .topcat-in:focus{outline:0;border-color:#0f9d6e;box-shadow:0 0 0 3px rgba(15,157,110,.14)}
 tr.dirty .topcat-in{border-color:#e8a33a;background:#fffaef}
+/* 商品表默认只读：大类、一级价显示成固定文字；双击整行才切换成输入控件 */
+.tier-value{font-size:12.5px;font-weight:600;font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap;min-width:52px}
+.tier-value.na{color:#b6bfcc;font-weight:500}
+.tier-value.need{color:var(--red);font-weight:700}
+.topcat-value{font-size:12.5px;color:var(--text);white-space:nowrap}
+.topcat-value.empty{color:#b6bfcc}
+tr.row-edit td{background:#f7faff}
+tr.row-edit td:last-child{background:#f7faff}
 .tab-badge{display:inline-block;min-width:17px;padding:0 5px;margin-left:5px;border-radius:999px;
   background:var(--red);color:#fff;font-size:10.5px;line-height:17px;text-align:center;font-weight:700;vertical-align:1px}
 /* 弹窗 */
@@ -378,6 +430,7 @@ select.pcell{cursor:pointer;padding:0 4px}
 @media(max-width:820px){
   .modal.dist .mb{padding:12px}
   .dist-grid{grid-template-columns:1fr 1fr}
+  .dist-grid2{grid-template-columns:1fr}
   .modal.dist .mf{padding:10px 12px}
 }
 @media(max-width:560px){
@@ -427,6 +480,99 @@ select.pcell{cursor:pointer;padding:0 4px}
 toast{display:none}
 #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#1c2740;color:#fff;font-size:13px;padding:10px 18px;border-radius:10px;opacity:0;transition:opacity .25s;z-index:120;pointer-events:none}
 #toast.show{opacity:.95}
+
+/* ---------- 下单页订单头（2026-10-28 重做）----------
+   用户要求：下单时间 / 经销商 / 渠道 / 发货仓库 / 发货要求 / 自提送货 / 刮码
+   都要在订单维度录清楚，并且「常用客户」要能形成记忆、一点就选。 */
+.entry-head{background:linear-gradient(180deg,#fbfcfe,#f6f9fd);border:1px solid #e3e9f3;border-radius:12px;padding:12px 14px;margin-bottom:12px;flex-shrink:0}
+.eh-title{display:flex;align-items:baseline;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+.eh-title h3{margin:0;font-size:15px}
+.eh-sub{font-size:12px;color:var(--muted)}
+.eh-quick{display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:8px 10px;background:#fff;border:1px solid #e6ecf5;border-radius:10px;margin-bottom:10px}
+.eh-label{font-size:12px;color:var(--muted);white-space:nowrap;font-weight:600}
+.eh-chips{display:flex;gap:6px;flex-wrap:wrap}
+.eh-chip{display:inline-flex;align-items:center;gap:6px;border:1px solid #d9e2ef;background:#fff;color:#2b3a52;border-radius:999px;padding:4px 11px;font-size:12.5px;cursor:pointer;transition:.15s}
+.eh-chip:hover{border-color:var(--blue);color:var(--blue)}
+.eh-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.eh-chip b{font-weight:600}
+.eh-chip .n{font-size:11px;opacity:.7}
+.eh-last{font-size:12px;color:var(--muted);margin-left:auto;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.eh-last .btn.mini{font-size:11.5px;padding:3px 9px}
+.eh-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}
+.eh-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.eh-f>span{font-size:11.5px;color:#63708a;font-weight:600}
+.eh-f>span i{color:var(--red);font-style:normal}
+.eh-f input,.eh-f select{min-height:32px;border:1px solid #d8dee9;border-radius:8px;padding:4px 9px;font-size:12.5px;background:#fff;width:100%;box-sizing:border-box}
+.eh-f input:focus,.eh-f select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(36,99,235,.1)}
+.eh-wide{grid-column:span 2}
+.eh-seg{display:inline-flex;align-self:flex-start;border:1px solid #d8dee9;border-radius:8px;overflow:hidden;background:#fff;min-height:32px}
+.eh-seg button{border:0;background:#fff;color:#5b6778;font-size:12.5px;padding:0 20px;min-width:68px;cursor:pointer;border-right:1px solid #e6ecf5;transition:background .12s,color .12s}
+.eh-seg button:hover{background:#f2f6fd}
+.eh-seg button.on{background:var(--blue);color:#fff;font-weight:600}
+.eh-seg button:last-child{border-right:0}
+.eh-check{display:inline-flex;align-self:flex-start;align-items:center;gap:7px;font-size:12.5px;color:#2b3a52;min-height:32px;border:1px solid #d8dee9;border-radius:8px;padding:0 11px;background:#fff;cursor:pointer}
+.eh-check:hover{border-color:#b9c6da}
+.eh-check input{width:14px;height:14px;min-height:0;margin:0;accent-color:var(--orange)}
+.eh-check.on{border-color:var(--orange);background:#fff8ec;color:#b45309;font-weight:600}
+.eh-receiver{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-top:10px;padding:8px 10px;border:1px solid #e6ecf5;border-radius:9px;background:#fff;font-size:12px;color:#5b6778}
+.eh-receiver .eh-receiver-text{flex:1;min-width:220px;line-height:1.5}
+.eh-receiver .eh-receiver-text b{color:#2b3a52}
+.eh-receiver .eh-bad{color:#c2410c;font-weight:600}
+.eh-foot{display:flex;align-items:center;justify-content:flex-end;gap:16px;margin-top:12px;padding-top:10px;border-top:1px dashed #e2e9f4;flex-wrap:wrap}
+.eh-total{font-size:13px;color:#5b6778}
+.eh-total b{font-size:17px;color:var(--blue);font-variant-numeric:tabular-nums;margin-left:4px}
+.disc-rate{font-size:11.5px;color:#8a94a6;white-space:nowrap}
+.disc-rate b{color:#5b6778}
+@media (max-width:1280px){.eh-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.eh-wide{grid-column:span 2}}
+/* 订单详情里的「订单头补录」：4 列小表单，跟下单页同一套字段 */
+.oh-edit{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px 12px}
+.oh-f{display:flex;flex-direction:column;gap:4px;min-width:0}
+.oh-f .oh-l{font-size:11.5px;color:#63708a;font-weight:600}
+.oh-f input,.oh-f select{min-height:32px;border:1px solid #d8dee9;border-radius:8px;padding:4px 9px;font-size:12.5px;background:#fff;width:100%;box-sizing:border-box}
+.oh-f input:focus,.oh-f select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(36,99,235,.1)}
+.oh-wide{grid-column:span 2}
+.oh-box{display:inline-flex;align-items:center;gap:7px;min-height:32px;border:1px solid #d8dee9;border-radius:8px;padding:0 11px;background:#fff;font-size:12.5px;color:#2b3a52}
+.oh-box input{width:14px;height:14px;min-height:0;margin:0;accent-color:var(--orange)}
+.oh-btn{align-items:flex-end}
+.oh-cell{line-height:1.45}
+.oh-cell .tag{margin:0 3px 2px 0}
+/* ---------- 应收账款 + 打款凭证（用户 2026-10-28 要求） ---------- */
+.ar-metrics{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px;margin:10px 0 12px}
+.ar-metric{background:#f7f9fd;border:1px solid #e4eaf4;border-radius:10px;padding:9px 12px}
+.ar-metric .k{font-size:11.5px;color:#63708a;font-weight:600}
+.ar-metric .v{font-size:19px;font-weight:700;color:#1f2d3d;font-variant-numeric:tabular-nums;margin-top:2px}
+.ar-metric.warn .v{color:#d97706}
+.ar-metric.danger .v{color:#e5484d}
+.ar-metric.ok .v{color:#0e9f6e}
+.ar-unclaimed{margin-bottom:10px;background:#fff8ec;border:1px solid #f2d9a8;border-radius:10px;padding:8px 12px;font-size:12.5px;color:#8a5a00;display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.pv-thumbs{display:flex;flex-wrap:wrap;gap:6px;align-items:center}
+.pv-thumb{position:relative;width:56px;height:56px;border-radius:8px;overflow:hidden;border:1px solid #dbe2ee;cursor:zoom-in;background:#fff}
+.pv-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.pv-thumb .pv-badge{position:absolute;left:0;right:0;bottom:0;font-size:9px;text-align:center;color:#fff;background:rgba(14,159,110,.9);line-height:14px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding:0 2px}
+.pv-thumb.pending .pv-badge{background:rgba(217,119,6,.92)}
+.pv-drop{width:56px;height:56px;border:1.5px dashed #c6d2e4;border-radius:8px;display:flex;align-items:center;justify-content:center;color:#8a94a6;font-size:10.5px;cursor:pointer;background:#fafcff;text-align:center;line-height:1.25;padding:2px;box-sizing:border-box}
+.pv-drop:hover,.pv-drop.on{border-color:var(--blue);color:var(--blue);background:#eef4ff}
+.pv-item{display:flex;gap:10px;padding:9px;border:1px solid #e9eef7;border-radius:10px;background:#fff;margin-bottom:8px}
+.pv-item>img{width:104px;height:104px;object-fit:cover;border-radius:8px;cursor:zoom-in;border:1px solid #e4eaf4;flex:none;background:#f7f9fd}
+.pv-meta{flex:1;min-width:0}
+.pv-head{display:flex;align-items:center;gap:6px;flex-wrap:wrap;font-size:12px;color:#63708a}
+.pv-fields{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px 10px;margin-top:6px}
+.pv-fields label{display:flex;flex-direction:column;gap:2px;font-size:11px;color:#63708a;min-width:0}
+.pv-fields input,.pv-fields select{min-height:28px;border:1px solid #d8dee9;border-radius:6px;padding:2px 7px;font-size:12px;width:100%;box-sizing:border-box}
+.pv-fields input:focus,.pv-fields select:focus{outline:none;border-color:var(--blue);box-shadow:0 0 0 3px rgba(36,99,235,.1)}
+.pv-ops{display:flex;gap:6px;flex-wrap:wrap;margin-top:7px;align-items:center}
+.pv-ops .btn:disabled,.pv-ops button:disabled{opacity:.45;cursor:not-allowed;filter:grayscale(.5)}
+.pv-tag{font-size:10.5px;padding:1px 7px;border-radius:999px;background:#eef1f6;color:#5b6778;font-weight:600}
+.pv-tag.ok{background:#e6f7ef;color:#0e9f6e}
+.pv-tag.warn{background:#fff4e5;color:#b45309}
+.pv-tag.bad{background:#fdeaea;color:#e5484d}
+.pv-text{font-size:11px;color:#8a94a6;max-height:56px;overflow:auto;white-space:pre-wrap;background:#f8fafd;border-radius:6px;padding:4px 6px;margin-top:5px;border:1px solid #eef2f8}
+.pv-lightbox{position:fixed;inset:0;background:rgba(15,23,42,.78);display:flex;align-items:center;justify-content:center;z-index:99999;cursor:zoom-out}
+.pv-lightbox img{max-width:92vw;max-height:92vh;border-radius:8px;box-shadow:0 12px 40px rgba(0,0,0,.5);background:#fff}
+.ar-vcell{display:flex;flex-wrap:wrap;gap:5px;align-items:center}
+.ar-vcell .pv-thumb{width:46px;height:46px}
+.ar-vcell .pv-drop{width:46px;height:46px;font-size:10px}
+@media (max-width:1280px){.oh-edit{grid-template-columns:repeat(2,minmax(0,1fr))}.oh-wide{grid-column:span 2}}
 </style>
 <link rel="stylesheet" href="/static/ui-type.css?v=20261028">
 <script src="/static/embed.js"></script>
@@ -463,6 +609,7 @@ toast{display:none}
       <button class="tab" id="tabProducts" data-tab="products" onclick="switchTab('products')">商品</button>
       <button class="tab" data-tab="entry" onclick="switchTab('entry')">下单</button>
       <button class="tab" data-tab="orders" onclick="switchTab('orders')">分销订单</button>
+      <button class="tab" data-tab="receivables" onclick="switchTab('receivables')">应收账款</button>
       <button class="tab" data-tab="ostatus" onclick="switchTab('ostatus')">订单状态处理</button>
       <button class="tab" data-tab="prices" onclick="switchTab('prices')">价格</button>
       <button class="tab" data-tab="statements" onclick="switchTab('statements')">对账单</button>
@@ -472,19 +619,29 @@ toast{display:none}
     <div class="card" id="panel-distributors">
       <div class="head">
         <h3>分销商档案</h3>
-        <input id="distSearch" placeholder="搜索编码 / 名称 / 付款账户" oninput="renderDistributors()" style="width:200px">
+        <input id="distSearch" placeholder="搜索编码 / 名称 / 付款账户" oninput="renderDistCurrent()" style="width:200px">
+        <button class="btn" id="distViewBtn" onclick="toggleDistView()" title="切换：分销商视角 ⇄ 付款抬头视角（一个抬头被哪些客户用来付款）">⇄ 按付款抬头</button>
         <button class="btn" id="distMergeBtn" onclick="openDistMergeModal()" style="display:none">⇄ 合并所选</button>
         <button class="btn" onclick="openImportModal('dist')">⇪ 批量导入</button>
         <button class="btn primary" onclick="openDistModal()">＋ 新建分销商</button>
       </div>
-      <div class="tbl">
+      <div class="tbl" id="distTblWrap">
         <table class="cols" data-ckey="dist">
-          <colgroup><col style="width:34px"><col style="width:96px"><col style="width:150px"><col style="width:210px"><col style="width:170px"><col style="width:150px"><col style="width:90px"><col style="width:135px"><col style="width:80px"><col style="width:140px"></colgroup>
+          <colgroup><col style="width:34px"><col style="width:96px"><col style="width:230px"><col style="width:250px"><col style="width:150px"><col style="width:90px"><col style="width:135px"><col style="width:80px"><col style="width:140px"></colgroup>
           <thead><tr>
           <th data-col="pick" title="勾选两行以上可合并为同一个客户（同一客户多个付款公司的场景）"><input type="checkbox" id="distPickAll" onchange="distPickAll(this.checked)" title="全选/全不选"></th>
-          <th data-col="code" title="留空自动生成（D001、D002…）">编码</th><th data-col="taxno" title="开票用的纳税人识别号，选填">税号</th><th data-col="name">名称</th><th data-col="payacc" title="这个客户用来付款的账户/公司名，可多个；合并客户时自动汇总">付款账户</th><th data-col="brands" title="该分销商被授权分销的品牌，可多个；没勾 = 选了具体品牌时它不出现">分销品牌</th><th data-col="contact">联系人</th><th data-col="phone">电话</th><th data-col="status">状态</th><th data-col="ops">操作</th>
+          <th data-col="code" title="留空自动生成（H-01、H-02…）">编码</th><th data-col="name">名称</th><th data-col="payacc" title="这个客户用来付款的账户/抬头，可多个；同一抬头全平台只存一份，跨客户共用">付款账户</th><th data-col="brands" title="该分销商被授权分销的品牌，可多个；没勾 = 选了具体品牌时它不出现">分销品牌</th><th data-col="contact">联系人</th><th data-col="phone">电话</th><th data-col="status">状态</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="distBody"></tbody></table>
         <div class="empty" id="distEmpty" style="display:none">还没有分销商，点右上角「新建分销商」开始</div>
+      </div>
+      <!-- 付款抬头视角：抬头主档 × 关联分销商（交叉视图） -->
+      <div class="tbl" id="payEntityTblWrap" style="display:none">
+        <table>
+          <colgroup><col style="width:280px"><col style="width:90px"><col style="width:auto"><col style="width:180px"></colgroup>
+          <thead><tr><th>付款抬头</th><th>类型</th><th>关联分销商（谁在用这个抬头付款）</th><th>收款备注</th></tr></thead>
+          <tbody id="payEntityBody"></tbody>
+        </table>
+        <div class="empty" id="payEntityEmpty" style="display:none">还没有付款抬头</div>
       </div>
     </div>
 
@@ -507,16 +664,17 @@ toast{display:none}
           <button class="btn primary" onclick="applyTierDiscount()" title="一级价 = 标价 × 折扣，批量写入勾选的商品；箱价自动按 一级价×箱规 算">按标价×折扣设一级价</button>
           <input id="selTopCat" list="topcatOptions" placeholder="大类" style="width:78px" title="填一个大类，点右边按钮批量写到勾选的商品上">
           <button class="btn" onclick="applyTopCatToSelected()" title="把左边填的大类写到勾选的商品上（只改大类，绝不动分类）">设大类</button>
+          <button class="btn" onclick="markSelectedHot(true)" title="把勾选的商品标记为热销，下单页会展示它们">🔥 标记热销</button>
+          <button class="btn" onclick="markSelectedHot(false)" title="取消勾选商品的热销标记，不影响在售状态">取消热销</button>
         </span>
         <button class="btn" onclick="openImportModal('prod')">⇪ 批量导入</button>
         <button class="btn primary" onclick="openProdModal()">＋ 新建商品</button>
-        <button class="btn" id="btnSaveTier" onclick="saveTier1Prices()" style="display:none;border-color:#2463eb;color:#2463eb">保存改价 <b id="tierDirtyCount">0</b></button>
-        <button class="btn" id="btnSaveTopCat" onclick="saveTopCategories()" style="display:none;border-color:#0f9d6e;color:#0f9d6e">保存大类 <b id="topcatDirtyCount">0</b></button>
         <datalist id="topcatOptions"></datalist>
       </div>
       <div class="hint" id="wdtSyncHint" style="display:none"></div>
       <!-- 待维护提醒条：由 renderNeedBar() 根据 /api/fx/products 的 maintenance 汇总渲染 -->
       <div class="needbar" id="prodNeed" style="display:none"></div>
+      <div class="hint" style="margin:2px 0 8px">表格默认只读；<b>双击商品行</b>可修改「大类」和「一级分销价」，Enter 保存、Esc 取消；其他资料点行尾「编辑」。</div>
       <div class="tbl">
         <table class="cols" data-ckey="prod">
           <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:110px"><col style="width:120px"><col style="width:104px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:80px"><col style="width:60px"><col style="width:130px"></colgroup>
@@ -530,30 +688,82 @@ toast{display:none}
 
     <!-- 下单：商品目录式一键下单，提交即自动推送旺店通 -->
     <div class="card" id="panel-entry" style="display:none">
-      <div class="head">
-        <h3>分销下单</h3>
-        <select id="entryDist" style="width:190px" onchange="onEntryDistChange()" title="选分销商，价格自动套用专属价/一级价"></select>
-        <select id="entryShop" style="width:200px" onchange="onEntryShopChange()" title="推送目标旺店通店铺；选择会记住，下次默认用它"></select>
-        <input id="entrySearch" placeholder="搜索 SKU / 名称 / 条码" oninput="renderEntry()" style="width:190px">
-        <select id="entryCategory" style="width:120px" onchange="renderEntry()"></select>
-        <select id="entryBrand" style="width:130px" onchange="renderEntry()"></select>
-        <span id="entryBrandTip" style="font-size:12px;color:#8a94a6;white-space:nowrap"></span>
-        <span id="entryStockBadge" class="inv-badge" title="现货 = 最新库存快照；未同步时点「分销订单」页的同步按钮">现货：加载中</span>
-        <input id="entryRemark" placeholder="备注（选填）" style="width:200px">
-        <span style="border-left:1px solid #d8dee9;padding-left:10px;white-space:nowrap">
-          合计 <b id="entryTotal" class="num" style="color:#2463eb;font-size:15px">¥0.00</b>
-          <span id="entryLines" style="color:#8a94a6;font-size:12px">（0 行）</span>
-        </span>
-        <button class="btn primary" id="btnEntrySubmit" onclick="submitEntryOrder()">提交订单并推送旺店通</button>
+      <!-- 订单头：先把「这单是谁的、怎么发、有什么特殊要求」录清楚，再挑商品。
+           用户 2026-10-28 明确：这些信息属于订单维度，不能只写在备注里靠人传话。 -->
+      <div class="entry-head">
+        <div class="eh-title">
+          <h3>分销下单</h3>
+          <span class="eh-sub">先选客户和配送方式，商品价格按客户授权品牌与专属价自动带出</span>
+        </div>
+
+        <!-- 常用客户：按历史下单次数排，点一下就选中；选中后给「再来一单」复用上次明细 -->
+        <div class="eh-quick">
+          <span class="eh-label">常用客户</span>
+          <div class="eh-chips" id="entryQuickChips"></div>
+          <span class="eh-last" id="entryLastHint"></span>
+        </div>
+
+        <div class="eh-grid">
+          <label class="eh-f"><span>下单时间</span>
+            <input type="datetime-local" id="entryOrderDate" onchange="saveEntryForm()"
+                   title="默认当前时间；补录或隔天录单可以改"></label>
+          <label class="eh-f"><span>下单经销商 <i>*</i></span>
+            <select id="entryDist" onchange="onEntryDistChange()" title="选分销商，价格自动套用专属价/一级价"></select></label>
+          <label class="eh-f"><span>下单渠道 / 推送店铺 <i>*</i></span>
+            <select id="entryShop" onchange="onEntryShopChange()" title="下单渠道就是旺店通店铺；选择会记住，下次默认用它"></select></label>
+          <label class="eh-f"><span>发货仓库 <i>*</i></span>
+            <select id="entryWarehouse" onchange="saveEntryForm()" title="只允许红盒子-格力高磐石仓（HHZ-Glico），与旺店通仓库档案对齐"></select></label>
+
+          <div class="eh-f"><span>配送方式 <i>*</i></span>
+            <div class="eh-seg" id="entryDelivery">
+              <button type="button" data-v="delivery" onclick="setEntryDelivery('delivery')">送货</button>
+              <button type="button" data-v="pickup" onclick="setEntryDelivery('pickup')">自提</button>
+            </div>
+          </div>
+          <div class="eh-f"><span>特殊情况</span>
+            <label class="eh-check" id="entryScratchWrap" title="客户要求刮掉条码（防窜货 / 防追溯）">
+              <input type="checkbox" id="entryScratch" onchange="onScratchChange()"> 需要刮码
+            </label>
+          </div>
+          <label class="eh-f eh-wide"><span>发货要求</span>
+            <input id="entryShipNote" placeholder="打包方式 / 随货资料 / 时效要求…"
+                   onchange="saveEntryForm()" title="给仓库的额外要求，会随订单一起留档"></label>
+          <label class="eh-f eh-wide"><span>订单备注</span>
+            <input id="entryRemark" placeholder="选填"></label>
+        </div>
+
+        <!-- 旺店通 trade_push.php 必填的收货信息来自分销商档案；这里显式展示，
+             缺手机/地址时当场提醒，避免推到旺店通才报错。 -->
+        <div class="eh-receiver">
+          <span class="eh-label">收货信息</span>
+          <span class="eh-receiver-text" id="entryReceiverText">选择经销商后自动带出</span>
+          <button type="button" class="btn mini" onclick="openEntryDistProfile()"
+                  title="收货人 / 手机 / 地址在分销商档案里维护">修改档案</button>
+        </div>
+
+        <div class="eh-foot">
+          <span class="eh-total">合计 <b id="entryTotal">¥0.00</b>
+            <span id="entryLines" style="color:#8a94a6;font-size:12px">（0 行）</span></span>
+          <button class="btn primary" id="btnEntrySubmit" onclick="submitEntryOrder()">提交订单并推送旺店通</button>
+        </div>
       </div>
-      <div class="hint">价格自动取值：<b>经销商专属价 &gt; 一级分销价 &gt; 基础价</b>；数量按盒/基本单位填（箱规见列）。订单号自动生成并作为旺店通单号。<b>推送店铺在下拉里选</b>（会记住上次选择，记在订单上，重推不跑偏）。推送失败时订单仍会保留（已审核），到「分销订单」页可重推。</div>
+      <!-- 商品筛选：低频控件放第二行，不和主流程抢位置 -->
+      <div class="entry-filters">
+        <input id="entrySearch" placeholder="搜索 SKU / 名称 / 条码" oninput="renderEntry()" style="width:220px">
+        <select id="entryCategory" style="width:140px" onchange="renderEntry()"></select>
+        <select id="entryBrand" style="width:150px" onchange="renderEntry()"></select>
+        <span id="entryBrandTip" style="font-size:12px;color:#8a94a6;white-space:nowrap"></span>
+        <span style="font-size:12px;color:#c2410c;white-space:nowrap" title="商品档案里标记为热销且在售的商品才会出现在这里">🔥 仅显示热销商品</span>
+        <span id="entryStockBadge" class="inv-badge" title="现货 = 最新库存快照；未同步时点「分销订单」页的同步按钮" style="margin-left:auto">现货：加载中</span>
+      </div>
+      <div class="hint" title="「件」= 商品的基本单位（盒/袋/包，见商品资料的「单位」列）；箱规 = 一件装多少，见「箱规」列。下单数量(件)、下单数量(箱)、箱价 三个格子随便填哪个，另外两个都会自动换算出来；箱价改了就是改这单的成交价（单价 = 箱价 ÷ 箱规），小计永远 = 件数 × 单价。订单号自动生成并作为旺店通单号；推送失败时订单仍保留（已审核），到「分销订单」页可重推。">价格自动取 <b>经销商专属价 &gt; 一级分销价 &gt; 基础价</b>；<b>下单数量(件) ⇄ 下单数量(箱) ⇄ 箱价</b> 三向自动换算，填哪个都行，另外两个立刻跟着变；推送店铺会记住上次选择，推送失败的单可在「分销订单」页重推。</div>
       <div class="tbl">
-        <table class="cols" data-ckey="entry">
-          <colgroup><col style="width:130px"><col style="width:230px"><col style="width:100px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:110px"></colgroup>
+        <table class="cols" data-ckey="entry-v2">
+          <colgroup><col style="width:130px"><col style="width:230px"><col style="width:100px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:90px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:110px"><col style="width:110px"></colgroup>
           <thead><tr>
-          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="price" class="num">单价(含税)</th><th data-col="stock" class="num" title="最新库存快照数量；未同步显示 —">现货</th><th data-col="pack">箱规</th><th data-col="qty">下单数量</th><th data-col="amount" class="num">小计</th>
+          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="price" class="num" title="每件（基本单位，盒/袋）的含税单价">单价(元/件·含税)</th><th data-col="disc" class="num" title="品牌折扣率 = 单价 ÷ 品牌标价。用来一眼看出这单给客户打了多少折（标价为空时显示 —）">品牌折扣率</th><th data-col="boxprice" class="num" title="箱价 = 单价 × 箱规，自动带出；也可以直接改箱价，单价会按「箱价 ÷ 箱规」反算，小计跟着变">箱价(含税)</th><th data-col="stock" class="num" title="最新库存快照数量；未同步显示 —">现货</th><th data-col="pack">箱规</th><th data-col="qty" title="按件（基本单位）填，不是箱数；填了会自动换算右边的箱数">下单数量(件)</th><th data-col="caseqty" title="按箱填；填了会自动换算左边的件数（件 = 箱 × 箱规）">下单数量(箱)</th><th data-col="amount" class="num">小计</th>
         </tr></thead><tbody id="entryBody"></tbody></table>
-        <div class="empty" id="entryEmpty" style="display:none">没有可下单的商品：先在「商品」页签同步/启用商品，再回到这里下单。</div>
+        <div class="empty" id="entryEmpty" style="display:none">请先在右上角选择分销商，商品和价格会按它的授权品牌与专属价自动带出。</div>
       </div>
 
       <!-- 该分销商的近期订单：点一下或双击就弹订单明细，不用跳到「分销订单」页 -->
@@ -588,20 +798,85 @@ toast{display:none}
           <option value="approved">已审核</option>
           <option value="cancelled">已取消</option>
         </select>
-        <select id="orderDist" style="width:180px" onchange="renderOrders()"></select>
+        <select id="orderDist" style="width:170px" onchange="renderOrders()"></select>
+        <select id="orderPay" style="width:120px" onchange="renderOrders()" title="按收款状态筛选">
+          <option value="">全部收款</option>
+          <option value="unpaid">未收到</option>
+          <option value="partial">部分收款</option>
+          <option value="received">已收到</option>
+          <option value="refunded">已退款</option>
+        </select>
+        <select id="orderShip" style="width:120px" onchange="renderOrders()" title="按发货状态筛选">
+          <option value="">全部发货</option>
+          <option value="unshipped">未发货</option>
+          <option value="partial">部分发货</option>
+          <option value="shipped">已发货</option>
+          <option value="returned">已退回</option>
+        </select>
+        <input id="orderSearch" placeholder="查询：内部单号 / 原始单号 / 分销商 / 物流" oninput="renderOrders()" style="width:230px">
         <span id="invBadge" class="inv-badge" title="库存快照：满足率提示的「昨天库存」基线">库存快照：未同步</span>
         <button class="btn" onclick="syncInventory()">⟳ 同步库存</button>
         <button class="btn" onclick="detectPushStatus()" title="按旺店通单号 / 销售出库单自动核对：已经在旺店通里的单标为已推送，不再出现在待推送里">⟳ 核对旺店通状态</button>
+        <button class="btn" id="btnQtyCheck" onclick="runQtyCheck()" title="按单号关联旺店通出库单，逐行比对订单件数和出库件数，揪出错记单位（箱记成件）的单">⇄ 件数核对</button>
         <button class="btn primary" onclick="openOrderModal()">＋ 新建订单</button>
       </div>
+      <div class="hint">标准订单工作区：<b>供销平台单号</b>是系统内部 FX 单号；<b>原始订单号</b>是旺店通 / 客户 Excel 里的单号，二者都保留。单击任意订单行，下方展开商品明细、收款和发货信息。</div>
       <div class="tbl">
         <table class="cols" data-ckey="order">
-          <colgroup><col style="width:170px"><col style="width:240px"><col style="width:150px"><col style="width:110px"><col style="width:70px"><col style="width:150px"><col style="width:190px"></colgroup>
+          <colgroup><col style="width:160px"><col style="width:185px"><col style="width:190px"><col style="width:105px"><col style="width:115px"><col style="width:108px"><col style="width:100px"><col style="width:60px"><col style="width:140px"><col style="width:150px"><col style="width:190px"></colgroup>
           <thead><tr>
-          <th data-col="tid">订单号</th><th data-col="dist">分销商</th><th data-col="status">状态</th><th data-col="amount" class="num">金额</th><th data-col="lines" class="num">明细</th><th data-col="date">下单时间</th><th data-col="ops">操作</th>
+          <th data-col="tid" title="供销平台内部单号（FX 开头），用于系统内追踪">供销平台单号</th>
+          <th data-col="orig" title="旺店通 / 客户 Excel 里的原始订单号，可能一单多个">原始订单号</th>
+          <th data-col="dist">分销商</th>
+          <th data-col="pay">收款</th>
+          <th data-col="ship">发货</th>
+          <th data-col="status">订单状态</th>
+          <th data-col="amount" class="num">金额</th>
+          <th data-col="lines" class="num">明细</th>
+          <th data-col="date">下单时间</th>
+          <th data-col="head" title="下单渠道 · 配送方式 · 是否刮码 · 发货仓库（下单时录的订单头）">订单头</th>
+          <th data-col="ops">操作</th>
         </tr></thead><tbody id="orderBody"></tbody></table>
         <div class="empty" id="orderEmpty" style="display:none">还没有订单</div>
       </div>
+    </div>
+
+    <!-- 应收账款：订单维度看每单收了多少、还差多少、凭证在不在 -->
+    <div class="card" id="panel-receivables" style="display:none">
+      <div class="head">
+        <h3>应收账款</h3>
+        <select id="arDist" style="width:180px" onchange="loadReceivables()"></select>
+        <select id="arStatus" style="width:130px" onchange="loadReceivables()">
+          <option value="">全部收款状态</option>
+          <option value="unpaid">未收到</option>
+          <option value="partial">部分收款</option>
+          <option value="received">已收到</option>
+          <option value="refunded">已退款</option>
+        </select>
+        <input id="arSearch" placeholder="单号 / 原始单号" oninput="renderReceivables()" style="width:200px">
+        <button class="btn" onclick="loadReceivables()">刷新</button>
+      </div>
+      <div class="hint" title="应收 = 订单总额；已收 = 已确认的收款（含凭证入账）；未收 = 应收 − 已收。凭证只做辅助识别，入账要人点「确认收款」。">客户打款后把<b>截图粘进来</b>（Ctrl+V 直接粘贴，或点凭证格子选图），系统自动识别金额 / 日期 / 付款方，核对无误再点「确认收款」计入这单。识别不准可以手改，一张单可以挂多张凭证（分次打款）。</div>
+
+      <div class="ar-metrics" id="arMetrics"></div>
+      <div class="ar-unclaimed" id="arUnclaimed" style="display:none"></div>
+
+      <div class="tbl">
+        <table class="cols" data-ckey="ar">
+          <colgroup><col style="width:150px"><col style="width:100px"><col style="width:170px"><col style="width:110px"><col style="width:110px"><col style="width:110px"><col style="width:100px"><col style="width:230px"><col style="width:170px"></colgroup>
+          <thead><tr>
+            <th data-col="no">订单号</th>
+            <th data-col="date">下单日期</th>
+            <th data-col="dist">分销商</th>
+            <th data-col="total" class="num" title="订单总额，即应收金额">应收</th>
+            <th data-col="paid" class="num" title="已确认的收款，含凭证入账">已收</th>
+            <th data-col="open" class="num" title="应收 − 已收">未收</th>
+            <th data-col="status">收款状态</th>
+            <th data-col="voucher" title="打款凭证：缩略图可点开大图；虚线格子可以直接粘图/选图">打款凭证</th>
+            <th data-col="ops">操作</th>
+          </tr></thead><tbody id="arBody"></tbody></table>
+        </div>
+      <div class="empty" id="arEmpty" style="display:none">没有符合条件的订单</div>
     </div>
 
     <!-- 订单状态处理：待审核 / 已审核 / 异常 三合一 -->
@@ -806,10 +1081,48 @@ toast{display:none}
 </div></div>
 
 <!-- 订单详情弹窗 -->
-<div class="backdrop" id="detailModal"><div class="modal">
-  <div class="mh"><h2 id="detailTitle">订单详情</h2><button class="btn" onclick="closeModal('detailModal')">✕</button></div>
+<div class="backdrop" id="detailModal"><div class="modal">  <div class="mh"><h2 id="detailTitle">订单详情</h2><button class="btn" onclick="closeModal('detailModal')">✕</button></div>
   <div class="mb" id="detailBody"></div>
-  <div class="mf"><button class="btn" onclick="closeModal('detailModal')">关闭</button></div>
+  <div class="mf"><button class="btn" onclick="closeModal('detailModal')">关闭</button><button class="btn primary" onclick="openFulfillmentModal(state.fulfillOrderId)">更新收款 / 发货</button></div>
+</div></div>
+
+<!-- 订单 ⇄ 出库件数核对弹窗 -->
+<div class="backdrop" id="qtyCheckModal"><div class="modal md">
+  <div class="mh"><h2>订单 ⇄ 出库件数核对</h2><button class="btn" onclick="closeModal('qtyCheckModal')">✕</button></div>
+  <div class="mb" id="qtyCheckBody"></div>
+  <div class="mf"><button class="btn" onclick="closeModal('qtyCheckModal')">关闭</button></div>
+</div></div>
+
+<!-- 收款 / 发货状态更新 -->
+<div class="backdrop" id="fulfillModal"><div class="modal">
+  <div class="mh"><h2 id="fulfillTitle">更新收款 / 发货</h2><button class="btn" onclick="closeModal('fulfillModal')">✕</button></div>
+  <div class="mb">
+    <div class="form-grid">
+      <div><label>收款状态</label><select id="fPayStatus">
+        <option value="unpaid">未收到</option><option value="partial">部分收款</option>
+        <option value="received">已收到</option><option value="refunded">已退款</option>
+        <option value="">未记录</option>
+      </select></div>
+      <div><label>已收金额（含税）</label><input id="fPaid" type="number" min="0" step="0.01" placeholder="标记已收到时自动按订单金额补齐"></div>
+      <div><label>收款日期</label><input id="fPayDate" type="date"></div>
+      <div><label>付款方（公司 / 个人）</label><input id="fPayCompany" placeholder="这单实际是谁付的钱"></div>
+      <div><label>发货状态</label><select id="fShipStatus">
+        <option value="unshipped">未发货</option><option value="partial">部分发货</option>
+        <option value="shipped">已发货</option><option value="returned">已退回</option>
+        <option value="">未记录</option>
+      </select></div>
+      <div><label>发货时间</label><input id="fShipDate" type="date"></div>
+      <div><label>物流公司</label><input id="fLogiCompany" placeholder="如 顺丰 / 京东物流"></div>
+      <div><label>物流单号</label><input id="fLogiNo" placeholder="有就填，方便查件"></div>
+      <div class="fo-span"><label>原始订单号（旺店通 / Excel）</label><input id="fOrigNo" placeholder="多个单号用英文逗号分隔；不要填内部 FX 单号"></div>
+    </div>
+    <div class="hint">收款和发货是执行状态，不会改变订单的审核状态；审核通过只代表可以推送 / 发货。</div>
+    <div class="err" id="fulfillErr"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="closeModal('fulfillModal')">取消</button>
+    <button class="btn primary" onclick="saveFulfillment()">保存状态</button>
+  </div>
 </div></div>
 
 <!-- 批量导入弹窗 -->
@@ -847,6 +1160,8 @@ const state = { distributors: [], products: [], orders: [], overview: null, tab:
   distEditId: null, prodEditId: null, orderEditId: null,
   // 分销商列表勾选：勾两行以上出现「合并所选」（同一客户多个付款账户的合并场景）
   distPick: new Set(),
+  // 分销商视图：dist=按分销商（默认） / entity=按付款抬头（交叉维度）
+  distView: "dist", payEntities: [],
   prices: [], statement: null, priceCache: {},
   // maintenance = 后端算好的待维护汇总（缺标价/缺分销价/成本待核对）
   // need = 当前筛选中的缺项代码，空串表示不筛选
@@ -866,8 +1181,15 @@ const state = { distributors: [], products: [], orders: [], overview: null, tab:
   entryOrders: [],
   // 订单状态处理页：全量订单（本地按状态切）+ 当前状态筛选 + 已勾选 id
   ostatus: [], ostFilter: "submitted", ostSel: new Set(),
+  // 订单页：当前展开的订单行 + 详情缓存（避免反复请求）
+  expandedOrderId: null, orderDetails: {},
+  fulfillOrderId: null,
   // 本会话是否已经自动核对过旺店通状态（每个会话只自动跑一次）
-  pushAutoChecked: false };
+  pushAutoChecked: false,
+  // 应收账款页：最近一次拉回来的数据 + 客户端关键字过滤
+  ar: null, arKw: "",
+  // 当前挂着「粘贴监听」的订单 id（订单详情弹窗打开时设置）
+  pvOrderId: null };
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -899,7 +1221,8 @@ async function loadAll(){
     state.maintenance = prod.maintenance || null;
     await loadOrders();
     renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
-    fillEntrySelects(); loadStockOverview(); loadWdtShops(); loadEntryOrders(); loadOstatus();
+    fillEntrySelects(); loadStockOverview(); loadWdtShops(); loadWdtWarehouses(); loadEntryOrders(); loadOstatus();
+    loadPayEntities();
     loadInventoryBadge(); loadTopCatOptions();
     $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
     // 顶部常驻提示：让用户随时知道「现在是在哪个品牌下操作」，含订单/价格/对账全站
@@ -914,13 +1237,15 @@ async function loadAll(){
 function switchTab(name){
   state.tab = name;
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
-  ["distributors","products","entry","orders","ostatus","prices","statements"].forEach(p => {
+  ["distributors","products","entry","orders","receivables","ostatus","prices","statements"].forEach(p => {
     $("panel-" + p).style.display = p === name ? "" : "none";
   });
-  const names = { distributors: "分销商", products: "商品", entry: "分销下单", orders: "分销订单", ostatus: "订单状态处理", prices: "经销商价格", statements: "对账单" };
+  const names = { distributors: "分销商", products: "商品", entry: "分销下单", orders: "分销订单",
+    receivables: "应收账款", ostatus: "订单状态处理", prices: "经销商价格", statements: "对账单" };
   $("crumbTab").textContent = names[name];
   if (name === "entry") { renderEntry(); loadEntryOrders(); }
   if (name === "orders") loadOrders();
+  if (name === "receivables") loadReceivables();
   if (name === "ostatus") loadOstatus();
   if (name === "prices") loadPrices();
   if (name === "statements") loadStatements();
@@ -932,7 +1257,9 @@ function fillEntrySelects(){
   const actives = state.distributors.filter(d => d.active);
   distSel.innerHTML = actives.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("")
     || `<option value="">（先到「分销商」页新建）</option>`;
-  const brands = [...new Set(state.products.filter(p => p.active && p.brand).map(p => p.brand))].sort();
+  // 下单页只展示热销商品：品牌/分类候选也只从「在售 + 热销」里取，避免选了品牌却空空如也
+  const hotProducts = state.products.filter(p => p.active && p.is_hot);
+  const brands = [...new Set(hotProducts.filter(p => p.brand).map(p => p.brand))].sort();
   // 顶栏已经选了品牌时，下单页的品牌下拉就跟着锁定，不给人「切到别的品牌」的机会
   if (state.brand) {
     $("entryBrand").innerHTML = `<option value="${esc(state.brand)}">${esc(state.brand)}（当前品牌）</option>`;
@@ -943,8 +1270,190 @@ function fillEntrySelects(){
     $("entryBrand").disabled = false;
     $("entryBrand").title = "";
   }
-  const cats = [...new Set(state.products.filter(p => p.active && p.category).map(p => p.category))].sort();
+  const cats = [...new Set(hotProducts.filter(p => p.category).map(p => p.category))].sort();
   $("entryCategory").innerHTML = `<option value="">全部分类</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
+  restoreEntryForm();
+  renderEntryReceiver();
+  renderQuickPicks();
+}
+
+/* ---------- 下单页订单头：表单记忆 + 常用客户（用户 2026-10-28 要求）----------
+   目标：常用客户一进页面就在眼前，点一下就选中；上次填的渠道/仓库/配送方式/刮码
+   下次自动回填，不用每次重填。记忆存在本机 localStorage，不占后端。 */
+const ENTRY_FORM_KEY = "entryForm_v1";
+
+function entryFormSaved(){
+  try { return JSON.parse(localStorage.getItem(ENTRY_FORM_KEY) || "{}") || {}; } catch (e) { return {}; }
+}
+function saveEntryForm(){
+  if (!$("entryDist")) return;
+  const data = {
+    // 仓库存编号（HHZ-Glico），显示名由旺店通仓库列表带出；店铺存编号，和 entryShop 共用记忆。
+    warehouse: ($("entryWarehouse").value || "").trim(),
+    delivery: entryDeliveryValue(),
+    scratch: $("entryScratch").checked ? 1 : 0,
+    distId: $("entryDist").value || "",
+    shipNote: ($("entryShipNote").value || "").trim(),
+  };
+  try { localStorage.setItem(ENTRY_FORM_KEY, JSON.stringify(data)); } catch (e) {}
+}
+
+function restoreEntryForm(){
+  const f = entryFormSaved();
+  // 仓库下拉可能比表单晚加载；loadWdtWarehouses 会再用同一个 localStorage 值回填。
+  if ($("entryWarehouse") && f.warehouse && [...$("entryWarehouse").options].some(o => o.value === f.warehouse)) {
+    $("entryWarehouse").value = f.warehouse;
+  }
+  if ($("entryShipNote")) $("entryShipNote").value = f.shipNote || "";
+  setEntryDelivery(f.delivery || "delivery", true);
+  if ($("entryScratch")) {
+    $("entryScratch").checked = !!f.scratch;
+    $("entryScratchWrap").classList.toggle("on", !!f.scratch);
+  }
+  // 上次选的客户：还在、还是启用状态才回填，避免指向一个已删/已停用的 id
+  const sel = $("entryDist");
+  if (f.distId && sel && [...sel.options].some(o => o.value === String(f.distId))) {
+    sel.value = String(f.distId);
+    loadDistPrices(f.distId).then(() => renderEntry()).catch(() => renderEntry());
+  }
+  // 下单时间默认当前，精确到分钟
+  if ($("entryOrderDate") && !$("entryOrderDate").value) $("entryOrderDate").value = nowLocalInput();
+  renderEntryReceiver();
+}
+
+/* 收货信息来自分销商档案：旺店通 trade_push 必填收货人/手机/省市区/地址。
+   下单页显式展示，缺项当场提醒，不要等推送失败才发现。 */
+function renderEntryReceiver(){
+  const box = $("entryReceiverText");
+  if (!box) return;
+  const id = $("entryDist") ? $("entryDist").value : "";
+  const d = (state.distributors || []).find(x => String(x.id) === String(id));
+  if (!d) { box.textContent = "选择经销商后自动带出"; return; }
+  const name = d.contact || d.name || "";
+  const phone = d.phone || "";
+  const addr = d.delivery_address || "";
+  const missing = [];
+  if (!name) missing.push("收货人");
+  if (!phone) missing.push("手机");
+  if (!addr) missing.push("地址");
+  const warn = missing.length
+    ? `<span class="eh-bad">缺 ${missing.join(" / ")}，推送旺店通会失败，请点「修改档案」补齐</span>`
+    : `<span style="color:#15803d">旺店通必填收货字段齐全</span>`;
+  box.innerHTML = `收货人 <b>${esc(name || "—")}</b> · 手机 <b>${esc(phone || "—")}</b>
+    · 地址 <b>${esc(addr || "—")}</b> ${warn}`;
+}
+
+function openEntryDistProfile(){
+  const id = $("entryDist") ? $("entryDist").value : "";
+  if (!id) { toast("请先选择下单经销商"); return; }
+  openDistModal(Number(id));
+}
+
+/* datetime-local 要的是 2026-10-28T18:30，不能用 toISOString（那是 UTC，会差 8 小时） */
+function nowLocalInput(){
+  const d = new Date();
+  const p = n => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function entryDeliveryValue(){
+  const on = document.querySelector("#entryDelivery button.on");
+  return on ? on.dataset.v : "delivery";
+}
+function setEntryDelivery(v, silent){
+  document.querySelectorAll("#entryDelivery button").forEach(b => {
+    b.classList.toggle("on", b.dataset.v === v);
+  });
+  const note = $("entryShipNote");
+  if (note) {
+    note.placeholder = v === "pickup"
+      ? "自提点 / 提货时间 / 随货资料…"
+      : "打包方式 / 随货资料 / 时效要求…";
+  }
+  if (!silent) saveEntryForm();
+}
+function onScratchChange(){
+  $("entryScratchWrap").classList.toggle("on", $("entryScratch").checked);
+  saveEntryForm();
+}
+
+/* 常用客户：按历史下单次数排（次数相同看最近下单时间），点一下就选中。
+   数据直接用已加载的全量订单，不额外打接口。 */
+function entryQuickList(){
+  const stat = new Map();
+  (state.orders || []).forEach(o => {
+    const id = o.distributor_id;
+    if (!id) return;
+    const cur = stat.get(id) || { id, name: o.distributor_name || "", count: 0, last: "" };
+    cur.count += 1;
+    const d = String(o.order_date || "");
+    if (d > cur.last) cur.last = d;
+    if (!cur.name) cur.name = o.distributor_name || "";
+    stat.set(id, cur);
+  });
+  const actives = new Set(state.distributors.filter(d => d.active).map(d => d.id));
+  return [...stat.values()]
+    .filter(x => actives.has(x.id))
+    .sort((a, b) => b.count - a.count || String(b.last).localeCompare(String(a.last)))
+    .slice(0, 8);
+}
+
+function renderQuickPicks(){
+  const box = $("entryQuickChips");
+  if (!box) return;
+  const list = entryQuickList();
+  const cur = $("entryDist") ? $("entryDist").value : "";
+  if (!list.length) {
+    box.innerHTML = `<span style="font-size:12px;color:#98a2b3">还没有历史订单 —— 下第一单之后，常下的客户会自动出现在这里</span>`;
+  } else {
+    box.innerHTML = list.map(x => `<button type="button" class="eh-chip${String(x.id) === String(cur) ? " on" : ""}"
+        onclick="pickQuickDist(${x.id})" title="共 ${x.count} 单，最近 ${esc(x.last)}">${esc(x.name)}
+        <span class="n">${x.count}</span></button>`).join("");
+  }
+  renderEntryLastHint();
+}
+
+function pickQuickDist(id){
+  const sel = $("entryDist");
+  if (!sel || String(sel.value) === String(id)) return;
+  sel.value = String(id);
+  sel.dispatchEvent(new Event("change", { bubbles: true }));
+}
+
+/* 选中客户后，把他上一单摆出来：一键复用商品和数量，价格仍按当前价格表重算 */
+function renderEntryLastHint(){
+  const box = $("entryLastHint");
+  if (!box) return;
+  const distId = $("entryDist") ? $("entryDist").value : "";
+  if (!distId) { box.innerHTML = ""; return; }
+  const list = (state.orders || []).filter(o => String(o.distributor_id) === String(distId));
+  if (!list.length) { box.innerHTML = `<span style="color:#98a2b3">这个客户还没有历史订单</span>`; return; }
+  list.sort((a, b) => String(b.order_date || "").localeCompare(String(a.order_date || "")));
+  const last = list[0];
+  box.innerHTML = `上次：<b>${esc(last.order_no)}</b> ${esc(last.order_date)} · ${money(last.total_amount)} · ${last.line_count} 行
+    <button class="btn mini" onclick="applyLastOrder(${last.id})"
+      title="把这个客户上一单的商品和数量重新填进表格；价格按当前价格表重算，不沿用旧价">再来一单</button>`;
+}
+
+async function applyLastOrder(orderId){
+  try {
+    const d = await api("/api/fx/orders/" + orderId);
+    const lines = d.lines || [];
+    if (!lines.length) { toast("这一单没有明细"); return; }
+    $("entryBody").querySelectorAll(".eq-qty, .eq-case, .eq-boxprice").forEach(i => { i.value = ""; });
+    const byId = new Map();
+    $("entryBody").querySelectorAll(".eq-qty").forEach(inp => byId.set(String(inp.dataset.id), inp));
+    let hit = 0; const miss = [];
+    lines.forEach(l => {
+      const inp = byId.get(String(l.product_id));
+      if (!inp) { miss.push(l.goods_name || l.goods_no || "?"); return; }
+      inp.value = String(Math.round(parseFloat(l.quantity) || 0));
+      inp.dispatchEvent(new Event("input", { bubbles: true }));
+      hit++;
+    });
+    entryRecalc();
+    toast(`已带出 ${hit} 行${miss.length ? `；${miss.length} 个商品当前不可下单（${miss.slice(0, 3).join("、")}）` : ""}`);
+  } catch (e) { toast("带出上次订单失败: " + e.message); }
 }
 
 async function loadStockOverview(){
@@ -983,6 +1492,35 @@ function onEntryShopChange(){
   if (v) localStorage.setItem("entryShop", v);
 }
 
+/* 发货仓库：只允许红盒子-格力高磐石仓（HHZ-Glico，排除次品仓）。
+   仓库编号必须来自旺店通档案；接口失败时用同一个编号兜底，提交时仍会校验。 */
+async function loadWdtWarehouses(){
+  let rows = [], defaultNo = "";
+  try {
+    const d = await api("/api/fx/wdt/warehouses");
+    rows = d.warehouses || []; defaultNo = d.default_warehouse_no || "";
+  } catch (e) { /* 网络失败不拦下单：下面用 HHZ-Glico 兜底 */ }
+  const glico = rows.filter(w =>
+    /格力高/.test(w.warehouse_name || "") && !/次品/.test(w.warehouse_name || ""));
+  const list = glico.length ? glico : [{
+    warehouse_no: "HHZ-Glico", warehouse_name: "红盒子-格力高磐石仓", warehouse_type: "",
+  }];
+  state.wdtWarehouses = list;
+  const sel = $("entryWarehouse");
+  if (!sel) return;
+  const saved = localStorage.getItem("entryWarehouse") || defaultNo;
+  const has = list.some(w => w.warehouse_no === saved);
+  sel.innerHTML = list.map(w =>
+    `<option value="${esc(w.warehouse_no)}">${esc(w.warehouse_name)}</option>`).join("");
+  sel.value = has ? saved : list[0].warehouse_no;
+  localStorage.setItem("entryWarehouse", sel.value);
+}
+
+function entryWarehouseLabel(){
+  const sel = $("entryWarehouse");
+  return sel && sel.selectedOptions[0] ? sel.selectedOptions[0].textContent.trim() : "";
+}
+
 // 与服务端 _validate_lines 同口径：专属价 > 一级价(>0) > 基础价
 function entryPriceOf(p){
   const map = state.priceCache[$("entryDist").value] || {};
@@ -997,7 +1535,11 @@ async function onEntryDistChange(){
   const distId = $("entryDist").value;
   if (distId) { try { await loadDistPrices(distId); } catch (e) { /* 服务端兜底 */ } }
   renderEntry();
+  renderEntryReceiver();
   loadEntryOrders();
+  // 选了哪个客户要记住（下次进来直接回填），常用客户里也要高亮它
+  saveEntryForm();
+  renderQuickPicks();
 }
 
 /* ---------- 下单页：该分销商的近期订单（点/双击看明细） ---------- */
@@ -1072,36 +1614,101 @@ function renderEntry(){
       ? `可下品牌：${allowed.join("、")}${distName ? "（" + distName + " 的授权品牌）" : ""}`
       : (distName ? `${distName} 还没勾授权品牌，请到「分销商」页勾选` : "");
   }
-  const rows = state.products.filter(p => p.active
+  const rows = state.products.filter(p => p.active && p.is_hot
     && (!kw || (p.sku + p.name + (p.barcode || "")).toLowerCase().includes(kw))
     && (!brand || p.brand === brand)
     && (!allowed.length || allowed.includes(p.brand))
     && (!cat || p.category === cat));
   $("entryEmpty").style.display = rows.length ? "none" : "";
-  if (!rows.length && allowed.length === 0 && $("entryDist").value) {
-    $("entryEmpty").textContent = "该分销商在当前品牌下没有可下单的货：到「分销商」页把授权品牌勾上。";
-  } else if (!rows.length) {
-    $("entryEmpty").textContent = "没有符合条件的商品：换个关键词，或到「商品」页检查商品是否启用。";
+  if (!rows.length) {
+    const hotCount = state.products.filter(p => p.active && p.is_hot).length;
+    if (!$("entryDist").value) {
+      $("entryEmpty").textContent = "请先在右上角选择分销商，商品和价格会按它的授权品牌与专属价自动带出。";
+    } else if (allowed.length === 0) {
+      $("entryEmpty").textContent = "该分销商在当前品牌下没有可下单的货：到「分销商」页把授权品牌勾上。";
+    } else if (!hotCount) {
+      $("entryEmpty").textContent = "当前没有热销商品：到「商品」页勾选商品，点「🔥 标记热销」后再回来下单。";
+    } else {
+      $("entryEmpty").textContent = "没有符合条件的热销商品：换个关键词，或到「商品」页检查商品是否已标记热销。";
+    }
   }
   $("entryBody").innerHTML = rows.map(p => {
     const pr = entryPriceOf(p);
     const sq = state.stockQty[p.spec_no];
     const stockText = state.stockDate ? (sq == null ? "—" : String(Math.round(sq * 100) / 100)) : "—";
     const low = state.stockDate && sq != null && sq <= 0;
-    return `<tr>
+    // 箱规：>0 才能换算件⇄箱，也才有箱价
+    const pack = p.pack_qty > 0 ? p.pack_qty : 0;
+    const boxPrice = pack && pr.v > 0 ? pr.v * pack : 0;
+    // 品牌折扣率 = 单价 ÷ 品牌标价（标价为空就不显示，免得算出个假的折数）
+    const lp = parseFloat(p.list_price) || 0;
+    return `<tr data-price="${pr.v}" data-listprice="${pr.v}" data-brandlist="${lp}">
     <td><b>${esc(p.sku)}</b></td>
     <td title="${esc(p.name)}">${esc(p.name)}</td>
     <td>${esc(p.spec) || "-"}</td>
     <td>${esc(p.brand) || "-"}</td>
     <td>${esc(p.category) || "-"}</td>
-    <td class="num">${pr.v > 0 ? pr.v.toFixed(2) : "—"}${pr.tag ? ` <span class="tag mini-tag" title="${pr.tag === "专属" ? "经销商专属价" : "一级分销价"}">${pr.tag}</span>` : ""}</td>
+    <td class="num eq-pricetd"><span class="eq-pricev">${pr.v > 0 ? pr.v.toFixed(2) : "—"}</span>${pr.tag ? ` <span class="tag mini-tag eq-pricetag" title="${pr.tag === "专属" ? "经销商专属价" : "一级分销价"}">${pr.tag}</span>` : ""}<span class="tag mini-tag eq-pricemod" style="display:none" title="这单按箱价反算的成交单价（箱价 ÷ 箱规），提交时按此价下单">改</span></td>
+    <td class="num disc-rate eq-disctd" title="${lp > 0 ? `品牌标价 ${lp.toFixed(2)}，单价 ${pr.v.toFixed(2)} ÷ 标价 = ${(pr.v / lp * 10).toFixed(2)} 折` : "这个商品没有品牌标价，算不出折扣率"}">${discText(pr.v, lp)}</td>
+    <td class="num"><input type="number" class="eq-boxprice" min="0" step="0.01" data-id="${p.id}" data-pack="${pack}" data-name="${esc(p.sku)}" oninput="entryQtyInput(this)" placeholder="${boxPrice > 0 ? boxPrice.toFixed(2) : "—"}" style="width:96px" ${pack && pr.v > 0 ? "" : "disabled"} title="${pack && pr.v > 0 ? `箱价 = 单价 ${pr.v.toFixed(2)} × 箱规 ${pack} = ${boxPrice.toFixed(2)}；直接填箱价会反算单价` : "没有箱规或没定价，算不出箱价"}"></td>
     <td class="num" style="${low ? "color:#e5484d;font-weight:600" : ""}">${stockText}</td>
-    <td>${p.pack_qty > 0 ? p.pack_qty + "/" + esc(p.pack_unit || "箱") : "-"}</td>
-    <td><input type="number" class="eq-qty" min="0" step="1" data-id="${p.id}" data-name="${esc(p.sku)}" oninput="entryRecalc()" placeholder="0" style="width:90px"></td>
+    <td>${pack ? pack + "/" + esc(p.pack_unit || "箱") : "-"}</td>
+    <td><input type="number" class="eq-qty" min="0" step="1" data-id="${p.id}" data-pack="${pack}" data-name="${esc(p.sku)}" oninput="entryQtyInput(this)" placeholder="0" style="width:90px" title="按件（基本单位）填"></td>
+    <td><input type="number" class="eq-case" min="0" step="0.001" data-id="${p.id}" data-pack="${pack}" data-name="${esc(p.sku)}" oninput="entryQtyInput(this)" placeholder="0" style="width:90px" ${pack ? "" : "disabled"} title="${pack ? "按箱填，件数自动 = 箱数 × " + pack : "这个商品没有箱规，只能按件下单"}"></td>
     <td class="num sub">—</td>
   </tr>`;
   }).join("");
-  applyColOrder(tableOf("entry"));
+  syncCols("entry-v2");   // 行重建了：先归位表头，再套记住的列顺序
+  entryRecalc();
+}
+
+/* 品牌折扣率文案：单价 ÷ 品牌标价，如 6.8 折。标价为 0 时不编造，直接给 — */
+function discText(price, listPrice){
+  const p = parseFloat(price) || 0, l = parseFloat(listPrice) || 0;
+  if (p <= 0 || l <= 0) return '<span style="color:#b6bfcc">—</span>';
+  return `<b>${(p / l * 10).toFixed(2).replace(/\.?0+$/, "")}</b> 折`;
+}
+
+/* 三个口子互相换算（用户 2026-10-28 定：不管用哪个口子写，都要自动换算出来）：
+     · 下单数量(件)  ←→  下单数量(箱)：件 = 箱 × 箱规
+     · 箱价           →   单价：单价 = 箱价 ÷ 箱规（改箱价就是改这单的成交价）
+   小计永远按「件数 × 单价」算；单价留空提交时服务端仍走 专属价 > 一级价 > 基础价。 */
+function entryQtyInput(el){
+  const tr = el.closest("tr");
+  if (!tr) return;
+  const pack = parseFloat(el.dataset.pack) || 0;
+  const v = parseFloat(el.value) || 0;
+  const qtyInp = tr.querySelector(".eq-qty");
+  const caseInp = tr.querySelector(".eq-case");
+  const boxInp = tr.querySelector(".eq-boxprice");
+  const priceTd = tr.querySelector(".eq-pricetd");
+  const discTd = tr.querySelector(".eq-disctd");
+
+  if (el.classList.contains("eq-boxprice")) {
+    // 按箱价填：单价 = 箱价 ÷ 箱规（改箱价就是改这单的成交价）
+    if (pack > 0) {
+      const list = parseFloat(tr.dataset.listprice) || 0;
+      const unit = v > 0 ? Math.round((v / pack) * 10000) / 10000 : list;
+      tr.dataset.price = String(unit);
+      const vEl = priceTd && priceTd.querySelector(".eq-pricev");
+      const modEl = priceTd && priceTd.querySelector(".eq-pricemod");
+      if (vEl) vEl.textContent = unit > 0 ? unit.toFixed(2) : "—";
+      // 只有真的偏离价格表才挂「改」，清空箱价就回到价格表原价
+      if (modEl) modEl.style.display = (v > 0 && Math.abs(unit - list) > 1e-9) ? "" : "none";
+      // 单价变了，折扣率跟着变
+      if (discTd) discTd.innerHTML = discText(unit, tr.dataset.brandlist);
+    }
+  } else if (pack > 0 && qtyInp && caseInp) {
+    if (el.classList.contains("eq-case")) {
+      // 按箱填：件 = 箱 × 箱规；件只能是整数，四舍五入到整件
+      const qty = v > 0 ? Math.round(v * pack) : 0;
+      qtyInp.value = qty > 0 ? String(qty) : "";
+    } else {
+      // 按件填：箱 = 件 ÷ 箱规，留 3 位小数够看清
+      const cs = v > 0 ? Math.round((v / pack) * 1000) / 1000 : 0;
+      caseInp.value = cs > 0 ? String(cs) : "";
+    }
+  }
   entryRecalc();
 }
 
@@ -1110,10 +1717,10 @@ function entryRecalc(){
   $("entryBody").querySelectorAll("tr").forEach(tr => {
     const inp = tr.querySelector(".eq-qty");
     if (!inp) return;
-    const p = state.products.find(x => x.id === parseInt(inp.dataset.id, 10));
     const q = parseFloat(inp.value) || 0;
-    const pr = p ? entryPriceOf(p) : { v: 0 };
-    const sub = Math.round(q * pr.v * 100) / 100;
+    // 单价以行上记的为准：没改过就是价格表给的，改过箱价就是反算出来的
+    const price = parseFloat(tr.dataset.price) || 0;
+    const sub = Math.round(q * price * 100) / 100;
     tr.querySelector(".sub").textContent = q > 0 ? "¥" + sub.toFixed(2) : "—";
     if (q > 0) { total += sub; n++; }
   });
@@ -1125,19 +1732,76 @@ function entryRecalc(){
 async function submitEntryOrder(){
   const distId = parseInt($("entryDist").value, 10);
   if (!distId) { toast("请先选择分销商"); return; }
-  const lines = [...$("entryBody").querySelectorAll(".eq-qty")]
-    .map(inp => ({ product_id: parseInt(inp.dataset.id, 10), quantity: parseFloat(inp.value) || 0 }))
-    .filter(l => l.quantity > 0);
-  if (!lines.length) { toast("请先填至少一行下单数量"); return; }
-  if (!confirm(`共 ${lines.length} 行，合计 ${$("entryTotal").textContent}。\n推送店铺：${$("entryShop").selectedOptions[0] ? $("entryShop").selectedOptions[0].textContent : "（系统默认）"}\n提交后自动推送旺店通，确认下单？`)) return;
+  const picked = [...$("entryBody").querySelectorAll(".eq-qty")]
+    .map(inp => {
+      const tr = inp.closest("tr");
+      return {
+        product_id: parseInt(inp.dataset.id, 10),
+        sku: tr.children[0].textContent.trim(),
+        quantity: parseFloat(inp.value) || 0,
+        price: parseFloat(tr.dataset.price) || 0,
+        list: parseFloat(tr.dataset.listprice) || 0,
+      };
+    })
+    .filter(r => r.quantity > 0);
+  if (!picked.length) { toast("请先填至少一行下单数量"); return; }
+  // 单价为 0 = 这个 SKU 没有专属价/一级价/基础价，服务端会按 0 元建单。
+  // 先拦一下让人确认，别白送一批货出去。
+  const noPrice = picked.filter(r => !(r.price > 0));
+  if (noPrice.length) {
+    const names = noPrice.slice(0, 5).map(r => r.sku).join("、")
+      + (noPrice.length > 5 ? ` 等 ${noPrice.length} 行` : "");
+    if (!confirm(`有 ${noPrice.length} 行商品查不到价格（${names}），提交后会按 0 元下单。\n`
+      + `建议先到「商品」页把这些 SKU 的一级分销价补上，再回来下单。\n\n仍要按 0 元下单吗？`)) return;
+  }
+  // 只有这单的单价被箱价改过才带 unit_price；没改就让服务端按
+  // 专属价 > 一级价 > 基础价 自己取，避免前端缓存过期把价格带歪
+  const lines = picked.map(r => {
+    const line = { product_id: r.product_id, quantity: r.quantity };
+    if (r.price > 0 && Math.abs(r.price - r.list) > 1e-9) line.unit_price = r.price;
+    return line;
+  });
+  // 下单渠道 = 推送店铺：选择旺店通店铺后，订单头的渠道就记店铺名；
+  // 仓库同时记中文名（给人看）和旺店通编号（推送 trade_push 用）。
+  const shopSel = $("entryShop");
+  const shopNo = (shopSel.value || "").trim();
+  const shopName = shopSel.selectedOptions[0] ? shopSel.selectedOptions[0].textContent.trim() : "";
+  const whNo = ($("entryWarehouse").value || "").trim();
+  const whName = entryWarehouseLabel();
+  if (!shopNo) { toast("请选择下单渠道 / 推送店铺"); return; }
+  if (!whNo) { toast("请选择发货仓库"); return; }
+  const head = {
+    order_channel: shopName,
+    ship_warehouse: whName,
+    ship_note: ($("entryShipNote").value || "").trim(),
+    delivery_type: entryDeliveryValue(),
+    scratch_code: $("entryScratch").checked ? 1 : 0,
+    order_date: ($("entryOrderDate").value || ""),
+    wdt_shop_no: shopNo,
+    wdt_warehouse_no: whNo,
+  };
+  const headLines = [
+    `客户：${$("entryDist").selectedOptions[0] ? $("entryDist").selectedOptions[0].textContent : distId}`,
+    `配送：${head.delivery_type === "pickup" ? "自提" : "送货"}`,
+    `渠道 / 店铺：${shopName}`,
+    `仓库：${whName}（${whNo}）`,
+    head.scratch_code ? "特殊情况：需要刮码" : "",
+    head.ship_note ? `发货要求：${head.ship_note}` : "",
+    `共 ${lines.length} 行，合计 ${$("entryTotal").textContent}`,
+    // 收货信息是旺店通必填项，确认时再亮一次
+    `收货：${$("entryReceiverText").textContent.trim()}`,
+  ].filter(Boolean).join("\n");
+  if (!confirm(`${headLines}\n\n提交后自动推送旺店通，确认下单？`)) return;
   const btn = $("btnEntrySubmit");
   btn.disabled = true; btn.textContent = "提交中…";
   try {
     const r = await api("/api/fx/orders", { method: "POST",
-      body: JSON.stringify({ distributor_id: distId, remark: $("entryRemark").value.trim(), lines, auto_push: true, wdt_shop_no: $("entryShop").value }) });
+      body: JSON.stringify(Object.assign({
+        distributor_id: distId, remark: $("entryRemark").value.trim(), lines, auto_push: true,
+      }, head)) });
     if (r.pushed) {
       toast(`下单成功：${r.order.order_no} 已推送旺店通${r.order.wdt_tid ? "（单号 " + r.order.wdt_tid + "）" : ""}`);
-      $("entryBody").querySelectorAll(".eq-qty").forEach(i => i.value = "");
+      $("entryBody").querySelectorAll(".eq-qty, .eq-case, .eq-boxprice").forEach(i => i.value = "");
       $("entryRemark").value = "";
       entryRecalc();
     } else {
@@ -1163,10 +1827,6 @@ function paymentAccountsOf(d){
   }));
 }
 function payAccName(acc){ return (acc && acc.account_name) || ""; }
-function maskBankAccount(value){
-  const s = String(value || "").replace(/\s+/g, "");
-  return s.length <= 8 ? s : s.slice(0, 4) + "…" + s.slice(-4);
-}
 function paySearchText(d){
   return paymentAccountsOf(d).map(a => [a.account_name, a.tax_no, a.bank_name, a.bank_branch, a.bank_account, a.account_holder, a.collection_note].join(" ")).join(" ");
 }
@@ -1180,16 +1840,15 @@ function renderDistributors(){
   body.innerHTML = rows.map(d => {
     const picked = state.distPick.has(d.id);
     const accounts = paymentAccountsOf(d);
-    const tax = d.tax_no || (accounts.find(a => a.tax_no) || {}).tax_no || "";
-    const first = accounts[0];
-    const payTitle = accounts.map(a => [a.account_name, a.tax_no ? "税号 " + a.tax_no : "", a.bank_name, a.bank_account, a.collection_note].filter(Boolean).join(" · ")).join("\n");
-    const payCell = first
-      ? `<div class="pay-cell" title="${esc(payTitle)}"><span class="pay-main">${esc(first.account_name)}</span>${accounts.length > 1 ? `<span class="pay-more">+${accounts.length - 1}</span>` : ""}</div>
-         ${first.bank_account ? `<div class="pay-sub">${esc(first.bank_name || "银行")} ${esc(maskBankAccount(first.bank_account))}</div>` : ""}`
+    // 付款账户列：全部抬头逐行列出（默认抬头打标），税号不在列表展示
+    const payCell = accounts.length
+      ? `<div class="pay-cell">` + accounts.map(a =>
+          `<div class="pay-line" title="${esc(a.account_name)}">${a.is_default ? `<span class="default-badge">默认</span>` : ""}<span style="overflow:hidden;text-overflow:ellipsis">${esc(a.account_name)}</span></div>`
+        ).join("") + `</div>`
       : `<span style="color:#c3cad6">-</span>`;
     return `<tr class="${picked ? "pick-on" : ""}" data-id="${d.id}">
     <td class="cell-pick"><input type="checkbox" ${picked ? "checked" : ""} onchange="distPick(${d.id}, this.checked)"></td>
-    <td><b>${esc(d.code)}</b></td><td title="${esc(tax)}">${esc(tax) || "-"}</td><td>${esc(d.name)}</td>
+    <td><b>${esc(d.code)}</b></td><td title="${esc(d.name)}">${esc(d.name)}</td>
     <td>${payCell}</td>
     <td>${(d.brands || []).length ? (d.brands).map(b => `<span class="tag mini-tag">${esc(b)}</span>`).join(" ") : "<span style=\"color:#c3cad6\">未授权</span>"}</td><td>${esc(d.contact) || "-"}</td>
     <td>${esc(d.phone) || "-"}</td>
@@ -1199,9 +1858,47 @@ function renderDistributors(){
       <button class="btn mini ${d.active ? "danger" : ""}" onclick="toggleDist(${d.id})">${d.active ? "停用" : "启用"}</button>
     </td></tr>`;
   }).join("");
-  applyColOrder(tableOf("dist"));
+  syncCols("dist");
   pinPickFirst(tableOf("dist"));
   syncDistMergeBtn();
+}
+
+/* ---------- 视图切换：分销商视角 ⇄ 付款抬头视角（交叉维度） ---------- */
+function renderDistCurrent(){
+  if (state.distView === "entity") renderPayEntities(); else renderDistributors();
+}
+function toggleDistView(){
+  state.distView = state.distView === "entity" ? "dist" : "entity";
+  $("distTblWrap").style.display = state.distView === "entity" ? "none" : "";
+  $("payEntityTblWrap").style.display = state.distView === "entity" ? "" : "none";
+  $("distMergeBtn").style.display = "none";
+  $("distViewBtn").textContent = state.distView === "entity" ? "⇄ 按分销商" : "⇄ 按付款抬头";
+  renderDistCurrent();
+}
+async function loadPayEntities(){
+  try {
+    const r = await api("/api/fx/pay-entities");
+    state.payEntities = r.entities || [];
+  } catch (e) { state.payEntities = []; }
+  if (state.distView === "entity") renderPayEntities();
+}
+function renderPayEntities(){
+  const kw = ($("distSearch").value || "").toLowerCase();
+  const rows = state.payEntities.filter(e => !kw
+    || (e.name + (e.distributors || []).map(d => d.code + d.name).join(" ")).toLowerCase().includes(kw));
+  $("payEntityEmpty").style.display = rows.length ? "none" : "";
+  $("payEntityBody").innerHTML = rows.map(e => {
+    const dists = (e.distributors || []).map(d =>
+      `<span class="tag mini-tag" title="${esc(d.name)}${d.is_default ? "（默认抬头）" : ""}" style="${d.active ? "" : "opacity:.45"}">${esc(d.code)} ${esc(d.name)}${d.is_default ? " ★" : ""}</span>`
+    ).join(" ");
+    const type = e.account_type === "personal" ? "对私" : "对公";
+    return `<tr>
+      <td><b>${esc(e.name)}</b>${e.distributor_count > 1 ? ` <span class="pay-more">×${e.distributor_count} 客户共用</span>` : ""}</td>
+      <td><span class="tag ${e.account_type === "personal" ? "off" : "on"}">${type}</span></td>
+      <td style="white-space:normal">${dists || "<span style=\"color:#c3cad6\">未关联</span>"}</td>
+      <td>${esc([...new Set((e.distributors || []).map(d => d.collection_note).filter(Boolean))].join("；")) || "-"}</td>
+    </tr>`;
+  }).join("");
 }
 
 /* 勾选列：applyColOrder 会把用户新存的列序里没有的「pick」排到末尾，这里钉回最前面 */
@@ -1604,7 +2301,6 @@ function renderProducts(){
     // 拿它当标价算折扣率会算出错的折数，不如不显示。
     const lp = parseFloat(p.list_price) || 0;
     const m = tierMargin(costOf(p), p.tier1_price, costLabelOf(p), lp, p.cost_status);
-    const tierNeed = p.need_tier1_price ? " need" : "";
     const packQty = p.pack_qty || 0;
     const t1 = parseFloat(p.tier1_price) || 0;
     const packUnit = esc(p.pack_unit || "箱");
@@ -1617,30 +2313,35 @@ function renderProducts(){
     const boxCell = (packQty > 0 && t1 > 0)
       ? `<span title="一级分销箱价 = 一级价 ${t1.toFixed(2)} × 箱规 ${packQty}${packUnit}">¥${(t1 * packQty).toFixed(2)}</span>`
       : '<span style="color:#b6bfcc" title="一级价定了之后这里自动算出整箱价">—</span>';
-    return `<tr class="${p.cost_status === "pending" ? "row-pending" : ""}">
+    const tierText = t1 > 0 ? t1.toFixed(2) : (p.need_tier1_price ? "未设" : "待定");
+    const tierClass = t1 > 0 ? "" : (p.need_tier1_price ? " need" : " na");
+    return `<tr class="${p.cost_status === "pending" ? "row-pending" : ""}"
+      data-id="${p.id}" data-tier="${t1 > 0 ? t1 : ""}" data-need-tier="${p.need_tier1_price ? 1 : 0}"
+      data-topcat="${esc(p.top_category || "")}" ondblclick="onProdRowDblClick(event,this)"
+      title="双击这一行可修改大类 / 一级分销价">
     <td><input type="checkbox" class="prod-ck" data-id="${p.id}" onchange="onProdCheck()"></td>
     <td><b>${esc(p.sku)}</b></td><td title="${esc(p.name)}">${esc(p.name)}</td>
     <td class="num">${listPriceCell(p)}</td>
     ${purchaseCell(p)}
-    <td class="tier-cell">
-      <input class="tier-in${m.low ? " low" : ""}${tierNeed}" type="number" min="0" step="0.01"
-             value="${p.tier1_price > 0 ? p.tier1_price : ""}" data-orig="${p.tier1_price > 0 ? p.tier1_price : ""}"
-             data-id="${p.id}" data-cost="${costOf(p)}" data-cost-label="${costLabelOf(p)}" data-list="${lp}" data-cost-status="${p.cost_status || ""}" data-pack="${packQty}" data-pack-unit="${packUnit}" placeholder="${p.need_tier1_price ? "未设" : "待定"}" title="${p.need_tier1_price ? "还没设一级分销价 —— 直接在这里填，填完点右上「保存改价」" : "一级分销价（含税），按箱/件设定，改完点右上「保存改价」"}"
-             oninput="onTierInput(this)">
-      <span class="tier-margin ${m.cls}" title="${m.tip}">${m.text}</span>${rateCell}
+    <td class="tier-cell" data-tier="${t1 > 0 ? t1 : ""}" data-cost="${costOf(p)}" data-cost-label="${esc(costLabelOf(p))}"
+        data-list="${lp}" data-cost-status="${esc(p.cost_status || "")}" data-pack="${packQty}" data-pack-unit="${packUnit}"
+        title="双击修改一级分销价">
+      <span class="tier-value${tierClass}">${tierText}</span>
+      <span class="tier-margin ${m.cls}" title="${esc(m.tip)}">${m.text}</span>${rateCell}
     </td>
     <td class="num tier-box-cell">${boxCell}</td>
     <td title="${esc(p.spec)}">${esc(p.spec) || "-"}</td>
     <td>${esc(p.brand) || "-"}</td>
-    <td class="topcat-cell"><input class="topcat-in" type="text" list="topcatOptions" data-id="${p.id}" data-orig="${esc(p.top_category || "")}"
-         value="${esc(p.top_category || "")}" placeholder="未分大类" title="大类：自己填的一层归类，只进这里，不会动「分类」"
-         oninput="onTopCatInput(this)"></td>
+    <td class="topcat-cell" data-topcat="${esc(p.top_category || "")}" title="双击修改大类">
+      <span class="topcat-value${p.top_category ? "" : " empty"}">${esc(p.top_category) || "—"}</span></td>
     <td>${esc(p.category) || "-"}</td><td>${esc(p.barcode) || "-"}</td><td>${esc(p.unit)}</td>
     <td>${esc(p.pack_spec) || "—"}</td>
     <td title="${esc(p.source) || ""}">${sourceLabel(p.source)}</td>
     <td>${p.cost_status === "pending"
       ? `<span class="tag warn" title="${esc(p.cost_note || "采购价存疑，待核对")}">待核对</span>`
-      : `<span class="tag ${p.active ? "on" : "off"}">${p.active ? "在售" : "停用"}</span>`}</td>
+      : `<span class="tag ${p.active ? "on" : "off"}">${p.active ? "在售" : "停用"}</span>`}${p.is_hot
+      ? ` <span class="tag hot" title="热销：分销下单页只展示热销商品${p.active ? "" : "；当前商品已停用，不会出现在下单页"}">热销</span>`
+      : ""}</td>
     <td class="ops">
       <button class="btn mini" onclick='openProdModal(${p.id})'>编辑</button>
       <button class="btn mini ${p.active ? "danger" : ""}" onclick="toggleProd(${p.id})">${p.active ? "停用" : "启用"}</button>
@@ -1650,7 +2351,107 @@ function renderProducts(){
   refreshTopCatDirty();
   // 重新渲染后勾选已清空，把「已选 N」工具条同步回隐藏，避免挂着旧数字
   onProdCheck();
-  applyColOrder(tableOf("prod"));  // 行重建了，把列的顺序/显隐重新套一遍
+  syncCols("prod");   // 行重建了：先归位表头，再套记住的列顺序/显隐
+}
+
+/* ---------- 商品表：默认固定展示，双击一行才进入修改模式 ---------- */
+/* 只开放「大类、一级分销价」两个原本内联可改的字段；品牌/分类/单位等
+   仍然走行尾「编辑」弹窗，避免表格里到处是输入框。 */
+function onProdRowDblClick(event, tr){
+  if (event.target.closest("button, a, input, select, textarea, label")) return;
+  const focus = event.target.closest(".topcat-cell") ? "topcat" : "tier";
+  startProductRowEdit(tr, focus);
+}
+
+function startProductRowEdit(tr, focus){
+  if (!tr || !tr.dataset.id) return;
+  const current = $("prodBody").querySelector("tr.row-edit");
+  if (current && current !== tr) { toast("先保存或取消当前正在修改的商品"); return; }
+  if (tr.classList.contains("row-edit")) {
+    const cur = focus === "topcat" ? tr.querySelector(".topcat-in") : tr.querySelector(".tier-in");
+    if (cur) { cur.focus(); cur.select?.(); }
+    return;
+  }
+  const tCell = tr.querySelector(".tier-cell");
+  const cCell = tr.querySelector(".topcat-cell");
+  const ops = tr.querySelector(".ops");
+  if (!tCell || !cCell || !ops) return;
+  const id = tr.dataset.id;
+  const tier = parseFloat(tr.dataset.tier) || 0;
+  const top = tr.dataset.topcat || "";
+  const need = tr.dataset.needTier === "1";
+  const cost = tCell.dataset.cost || "";
+  const costLabel = tCell.dataset.costLabel || "";
+  const list = tCell.dataset.list || "";
+  const costStatus = tCell.dataset.costStatus || "";
+  const pack = tCell.dataset.pack || "";
+  const packUnit = tCell.dataset.packUnit || "箱";
+  const m = tierMargin(cost, tier, costLabel, list, costStatus);
+  const listNum = parseFloat(list) || 0;
+  const rate = (listNum > 0 && tier > 0) ? tier / listNum * 10 : 0;
+  tCell.innerHTML = `<input class="tier-in${m.low ? " low" : ""}${need ? " need" : ""}" type="number" min="0" step="0.01"
+    value="${tier > 0 ? tier : ""}" data-orig="${tier > 0 ? tier : ""}" data-id="${id}" data-cost="${cost}"
+    data-cost-label="${esc(costLabel)}" data-list="${list}" data-cost-status="${esc(costStatus)}"
+    data-pack="${pack}" data-pack-unit="${esc(packUnit)}" placeholder="${need ? "未设" : "待定"}"
+    title="一级分销价（含税）；Enter 保存，Esc 取消" oninput="onTierInput(this)">
+    <span class="tier-margin ${m.cls}" title="${esc(m.tip)}">${m.text}</span><span class="tier-rate" style="${rate > 0 ? "" : "display:none"}">${rate > 0 ? rate.toFixed(1).replace(/\.0$/, "") + "折" : ""}</span>`;
+  cCell.innerHTML = `<input class="topcat-in" type="text" list="topcatOptions" data-id="${id}" data-orig="${esc(top)}"
+    value="${esc(top)}" placeholder="未分大类" title="大类；Enter 保存，Esc 取消" oninput="onTopCatInput(this)">`;
+  ops.innerHTML = `<button class="btn mini primary" type="button" onclick="saveProductRowEdit(this)">保存</button>
+    <button class="btn mini" type="button" onclick="cancelProductRowEdit(this)">取消</button>`;
+  tr.classList.add("row-edit");
+  const tIn = tCell.querySelector(".tier-in");
+  const cIn = cCell.querySelector(".topcat-in");
+  tIn.addEventListener("keydown", e => productRowKeydown(e, tIn));
+  cIn.addEventListener("keydown", e => productRowKeydown(e, cIn));
+  if (focus === "topcat") cIn.focus(); else { tIn.focus(); tIn.select(); }
+}
+
+function productRowKeydown(event, input){
+  // 中文输入法正在选词时，Enter/Esc 先交给输入法，不能提前保存或取消
+  if (event.isComposing || event.keyCode === 229) return;
+  if (event.key === "Enter") { event.preventDefault(); saveProductRowEdit(input); }
+  else if (event.key === "Escape") { event.preventDefault(); cancelProductRowEdit(input); }
+}
+
+async function saveProductRowEdit(el){
+  const tr = el.closest("tr");
+  if (!tr) return;
+  const ti = tr.querySelector(".tier-in");
+  const ci = tr.querySelector(".topcat-in");
+  const tierChanged = ti && ti.value !== (ti.dataset.orig || "");
+  const topChanged = ci && ci.value.trim() !== (ci.dataset.orig || "");
+  if (!tierChanged && !topChanged) { cancelProductRowEdit(el); return; }
+  const btn = tr.querySelector(".ops .btn.primary");
+  if (btn && btn.disabled) return;
+  if (btn) btn.disabled = true;
+  try {
+    if (tierChanged) {
+      await api("/api/fx/products/tier1-prices", { method: "PUT", body: JSON.stringify({
+        items: [{ product_id: Number(tr.dataset.id), tier1_price: ti.value === "" ? null : ti.value }]
+      }) });
+    }
+    if (topChanged) {
+      await api("/api/fx/products/top-categories", { method: "PUT", body: JSON.stringify({
+        items: [{ product_id: Number(tr.dataset.id), top_category: ci.value.trim() }]
+      }) });
+    }
+    toast("商品修改已保存");
+    state.priceCache = {};
+    await loadAll();
+    switchTab("products");
+  } catch (e) {
+    toast("保存失败: " + e.message);
+    if (btn) btn.disabled = false;
+  }
+}
+
+function cancelProductRowEdit(el){
+  const tr = el.closest("tr");
+  if (!tr || !tr.classList.contains("row-edit")) return;
+  const y = window.scrollY;
+  renderProducts();
+  window.scrollTo(0, y);
 }
 
 /* 来源列：库里存的是英文 key（wdt=旺店通同步 / manual=手工建 / import=导入），
@@ -1897,6 +2698,25 @@ async function saveTier1Prices(){
 /* ---------- 批量折扣定价 + 标价回填 ---------- */
 function checkedProdIds(){
   return [...$("prodBody").querySelectorAll(".prod-ck:checked")].map(c => Number(c.dataset.id));
+}
+/* 勾选商品批量标记/取消热销：只写 is_hot，不动在售状态、价格和分类。
+   默认排序由后端按 is_hot 优先返回，标记完刷新即可看到热销商品排在前面。 */
+async function markSelectedHot(isHot){
+  const ids = checkedProdIds();
+  if (!ids.length) { toast("先勾选要操作的商品"); return; }
+  const action = isHot ? "标记为热销" : "取消热销";
+  const extra = isHot
+    ? "\n标记后，分销下单页只会展示这些热销商品。"
+    : "\n取消后，分销下单页将不再展示这些商品。";
+  if (!confirm(`确定把勾选的 ${ids.length} 个商品${action}？${extra}`)) return;
+  try {
+    const r = await api("/api/fx/products/hot", { method: "PUT",
+      body: JSON.stringify({ product_ids: ids, is_hot: !!isHot }) });
+    const missing = (r.not_found || []).length;
+    toast(`已${action} ${r.updated} 个商品${missing ? `，${missing} 个商品已不存在` : ""}`);
+    await loadAll();
+    switchTab("products");
+  } catch (e) { toast(`${action}失败: ` + e.message); }
 }
 function onProdCheck(){
   const ids = checkedProdIds();
@@ -2185,13 +3005,53 @@ function pushTag(o, compact){
   return `<span style="color:#98a2b3">未推送</span>`;
 }
 
+/* 订单标准字段：原始单号、收款、发货。审核状态之外，钱和货各自独立。 */
+const PAY_LABELS = { "": "未记录", unpaid: "未收到", partial: "部分收款", received: "已收到", refunded: "已退款" };
+const SHIP_LABELS = { "": "未记录", unshipped: "未发货", partial: "部分发货", shipped: "已发货", returned: "已退回" };
+function payTag(o, compact){
+  const s = o.payment_status || "";
+  const label = o.payment_status_label || PAY_LABELS[s] || s || "未记录";
+  const bits = [];
+  if (Number(o.paid_amount) > 0) bits.push(`已收 ${money(o.paid_amount)}`);
+  if (o.payment_date) bits.push(o.payment_date);
+  if (o.pay_company) bits.push(o.pay_company);
+  return `<span class="tag pay-${s || "empty"}" title="${esc(bits.join(" · ") || "尚未标记收款")}">${esc(label)}</span>`;
+}
+function shipTag(o, compact){
+  const s = o.shipping_status || "";
+  const label = o.shipping_status_label || SHIP_LABELS[s] || s || "未记录";
+  const bits = [];
+  if (o.shipped_at) bits.push(`发货 ${o.shipped_at}`);
+  if (o.logistics_company) bits.push(o.logistics_company);
+  if (o.logistics_no) bits.push(o.logistics_no);
+  return `<span class="tag ship-${s || "empty"}" title="${esc(bits.join(" · ") || "尚未标记发货")}">${esc(label)}</span>`;
+}
+function orderOriginalNos(o){
+  const list = Array.isArray(o.original_order_nos) ? o.original_order_nos : [];
+  if (list.length) return list;
+  return String(o.original_order_no || "").replace(/[，；;]/g, ",").split(",").map(x => x.trim()).filter(Boolean);
+}
+function originalNosCell(o){
+  const nos = orderOriginalNos(o);
+  if (!nos.length) return `<span style="color:#b6bfcc">—</span>`;
+  return `<div class="orig-wrap">${nos.map(n => `<span class="orig-no" title="原始订单号 ${esc(n)}">${esc(n)}</span>`).join("")}</div>`;
+}
+function orderSearchText(o){
+  return [o.order_no, o.original_order_no, o.original_order_nos, o.distributor_name, o.order_date,
+    o.status_label, o.payment_status_label, o.shipping_status_label, o.pay_company,
+    o.logistics_company, o.logistics_no, money(o.total_amount)].flat().join(" ").toLowerCase();
+}
+
 async function loadOrders(){
   try {
     const params = new URLSearchParams();
     if ($("orderStatus").value) params.set("status", $("orderStatus").value);
     if (state.brand) params.set("brand", state.brand);   // 只显示授权了当前品牌的分销商的订单
+    params.set("limit", "0");                            // 全量：后端 limit<=0 = 不限量，查询在本地做
     const data = await api("/api/fx/orders" + (params.toString() ? "?" + params.toString() : ""));
     state.orders = data.orders;
+    state.orderDetails = {};
+    state.expandedOrderId = null;
   } catch (e) { state.orders = []; toast("订单加载失败: " + e.message); }
   renderOrders();
   /* 首次进订单页自动核对一次旺店通状态：历史团单原表就带出库单号，
@@ -2223,9 +3083,57 @@ function fillOrderSelects(){
     state.distributors.filter(d => d.active).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
 }
 
+/* 订单详情补录：店铺/仓库也必须从旺店通档案选，不能退回到自由文本。
+   老订单没有店铺/仓库编号时保留一个「沿用历史值」选项，保存时不覆盖历史文本。 */
+function wdtShopOptionsHtml(selectedNo, legacyName){
+  const list = state.wdtShops || [];
+  const has = list.some(s => s.shop_no === selectedNo);
+  let html = list.map(s =>
+    `<option value="${esc(s.shop_no)}"${s.shop_no === selectedNo ? " selected" : ""}>${esc(s.shop_name)}</option>`).join("");
+  if (selectedNo && !has) {
+    html += `<option value="${esc(selectedNo)}" selected>${esc(legacyName || selectedNo)}（店铺编号 ${esc(selectedNo)}）</option>`;
+  }
+  if (!selectedNo && legacyName) {
+    html = `<option value="" selected>（沿用历史渠道：${esc(legacyName)}）</option>` + html;
+  }
+  return html || `<option value="">（店铺列表未加载，保留历史渠道）</option>`;
+}
+
+function wdtWarehouseOptionsHtml(selectedNo, currentName){
+  const list = state.wdtWarehouses || [];
+  const has = list.some(w => w.warehouse_no === selectedNo);
+  let html = list.map(w =>
+    `<option value="${esc(w.warehouse_no)}" data-name="${esc(w.warehouse_name)}"${w.warehouse_no === selectedNo ? " selected" : ""}>${esc(w.warehouse_name)}（${esc(w.warehouse_no)}）</option>`).join("");
+  if (selectedNo && !has) {
+    html += `<option value="${esc(selectedNo)}" data-name="${esc(currentName || selectedNo)}" selected>${esc(currentName || selectedNo)}（${esc(selectedNo)}）</option>`;
+  }
+  if (!selectedNo && currentName) {
+    html = `<option value="" data-name="${esc(currentName)}" selected>（沿用历史仓库：${esc(currentName)}）</option>` + html;
+  }
+  return html || `<option value="">（仓库列表未加载，保留历史仓库）</option>`;
+}
+
+/* 订单头摘要：渠道 · 配送 · 刮码 · 仓库，一眼看出这单怎么发 */
+function orderHeadCell(o){
+  const bits = [];
+  if (o.order_channel) bits.push(`<span class="tag mini-tag">${esc(o.order_channel)}</span>`);
+  if (o.delivery_type) bits.push(`<span class="tag mini-tag${o.delivery_type === "pickup" ? " warn" : ""}">${o.delivery_type === "pickup" ? "自提" : "送货"}</span>`);
+  if (Number(o.scratch_code)) bits.push(`<span class="tag mini-tag warn" title="客户要求刮掉条码">刮码</span>`);
+  const sub = [o.ship_warehouse ? esc(o.ship_warehouse) : "", o.ship_note ? esc(o.ship_note) : ""].filter(Boolean).join(" · ");
+  return (bits.join("") || "") + (sub ? `<span class="cell-sub" title="${esc(sub)}">${sub}</span>` : "")
+    || '<span style="color:#b6bfcc">—</span>';
+}
+
 function renderOrders(){
   const distId = $("orderDist").value;
-  const rows = state.orders.filter(o => !distId || String(o.distributor_id) === distId);
+  const payFilter = $("orderPay") ? $("orderPay").value : "";
+  const shipFilter = $("orderShip") ? $("orderShip").value : "";
+  // 页内查询：关键字匹配内部单号 / 原始单号 / 分销商 / 金额 / 物流（全量数据已在本地，无需回服务端）
+  const kw = (($("orderSearch") && $("orderSearch").value) || "").trim().toLowerCase();
+  const rows = state.orders.filter(o => (!distId || String(o.distributor_id) === distId)
+    && (!payFilter || (o.payment_status || "") === payFilter)
+    && (!shipFilter || (o.shipping_status || "") === shipFilter)
+    && (!kw || orderSearchText(o).includes(kw)));
   $("orderEmpty").style.display = rows.length ? "none" : "";
   $("orderBody").innerHTML = rows.map(o => {
     const ops = [];
@@ -2236,16 +3144,112 @@ function renderOrders(){
       `<button class="btn mini" onclick="action(${o.id},'reject')">驳回</button>`,
       `<button class="btn mini danger" onclick="action(${o.id},'cancel')">取消</button>`);
     else if (canPushWdt(o)) ops.push(`<button class="btn mini primary" onclick="pushOrder(${o.id})">推送旺店通</button>`);
-    ops.splice(0, 0, `<button class="btn mini" onclick="viewOrder(${o.id})">查看</button>`);
-    const pushed = pushTag(o, true) + " ";
-    return `<tr data-id="${o.id}" data-status="${esc(o.status)}">
-      <td><b>${esc(o.order_no)}</b></td><td>${esc(o.distributor_name)}</td>
-      <td>${pushed}<span class="tag ${o.status}">${esc(o.status_label)}</span></td>
+    ops.splice(0, 0, `<button class="btn mini" onclick="viewOrder(${o.id})">详情</button>`);
+    const paidSub = Number(o.paid_amount) > 0 ? `<span class="cell-sub">${money(o.paid_amount)}</span>` : "";
+    const shipSub = o.logistics_no ? `<span class="cell-sub" title="${esc(o.logistics_no)}">${esc(o.logistics_company || "物流")} ${esc(o.logistics_no)}</span>` : "";
+    return `<tr class="order-row" data-id="${o.id}" data-status="${esc(o.status)}"
+        onclick="toggleOrderDetail(${o.id}, event)" title="单击展开订单明细、收款和发货信息">
+      <td><b>${esc(o.order_no)}</b></td>
+      <td class="orig-cell">${originalNosCell(o)}</td>
+      <td>${esc(o.distributor_name)}<span class="cell-sub">${esc(o.receiver_name || "")}${o.receiver_phone ? " · " + esc(o.receiver_phone) : ""}</span></td>
+      <td>${payTag(o, true)}${paidSub}</td>
+      <td>${shipTag(o, true)}${shipSub}</td>
+      <td><span class="tag ${o.status}">${esc(o.status_label)}</span><span class="cell-sub">${pushTag(o, true)}</span></td>
       <td class="num"><b>${money(o.total_amount)}</b></td>
       <td class="num">${o.line_count}</td><td>${esc(o.order_date)}</td>
-      <td class="ops">${ops.join("")}</td></tr>`;
+      <td class="oh-cell">${orderHeadCell(o)}</td>
+      <td class="ops" onclick="event.stopPropagation()">${ops.join("")}</td></tr>`;
   }).join("");
-  applyColOrder(tableOf("order"));
+  syncCols("order");
+}
+
+/* 单击订单行：在行下方展开，不再强迫用户跳到弹窗。 */
+async function toggleOrderDetail(id, ev){
+  if (ev && ev.target && ev.target.closest("button, a, input, select, label")) return;
+  const current = document.querySelector(`tr.order-detail-row[data-detail-id="${id}"]`);
+  if (current) {
+    current.remove();
+    if (state.expandedOrderId === id) state.expandedOrderId = null;
+    return;
+  }
+  document.querySelectorAll("tr.order-detail-row").forEach(tr => tr.remove());
+  const row = document.querySelector(`#orderBody tr.order-row[data-id="${id}"]`);
+  if (!row) return;
+  state.expandedOrderId = id;
+  const colspan = Math.max(1, document.querySelectorAll("#panel-orders thead th").length);
+  const loading = document.createElement("tr");
+  loading.className = "order-detail-row";
+  loading.dataset.detailId = id;
+  loading.innerHTML = `<td colspan="${colspan}" class="order-detail-cell"><div class="od-empty">正在加载订单明细…</div></td>`;
+  row.after(loading);
+  try {
+    const d = state.orderDetails[id] || await api("/api/fx/orders/" + id);
+    state.orderDetails[id] = d;
+    if (state.expandedOrderId !== id) return;
+    loading.remove();
+    const detail = document.createElement("tr");
+    detail.className = "order-detail-row";
+    detail.dataset.detailId = id;
+    detail.innerHTML = `<td colspan="${colspan}" class="order-detail-cell">${orderDetailPanel(d)}</td>`;
+    row.after(detail);
+  } catch (e) {
+    loading.remove();
+    toast("订单明细加载失败：" + e.message);
+  }
+}
+
+function orderDetailPanel(d){
+  const lines = d.lines || [];
+  const nos = orderOriginalNos(d);
+  const paid = Number(d.paid_amount) || 0;
+  const total = Number(d.total_amount) || 0;
+  const outstanding = Number(d.outstanding_amount != null ? d.outstanding_amount : Math.max(total - paid, 0));
+  const payBits = [d.payment_status_label || PAY_LABELS[d.payment_status || ""] || "未记录"];
+  if (paid > 0) payBits.push(`已收 ${money(paid)}`);
+  if (d.payment_date) payBits.push(d.payment_date);
+  const shipBits = [d.shipping_status_label || SHIP_LABELS[d.shipping_status || ""] || "未记录"];
+  if (d.shipped_at) shipBits.push(d.shipped_at);
+  const logistics = [d.logistics_company, d.logistics_no].filter(Boolean).join(" · ") || "—";
+  return `<div class="od-panel">
+    <div class="od-top">
+      <span class="od-internal">供销平台单号 <b>${esc(d.order_no)}</b></span>
+      <span class="od-internal">原始订单号 ${nos.length ? nos.map(n => `<span class="orig-no">${esc(n)}</span>`).join("") : "—"}</span>
+      <span class="od-spacer"></span>
+      ${payTag(d)} ${shipTag(d)} <span class="tag ${d.status}">${esc(d.status_label)}</span>
+    </div>
+    <div class="od-grid">
+      <div class="od-item"><span class="k">分销商</span><span class="v">${esc(d.distributor_name)}（${esc(d.distributor_code)}）</span></div>
+      <div class="od-item"><span class="k">收货人</span><span class="v">${esc(d.receiver_name || "—")}</span></div>
+      <div class="od-item"><span class="k">联系电话</span><span class="v">${esc(d.receiver_phone || "—")}</span></div>
+      <div class="od-item"><span class="k">收款</span><span class="v">${esc(payBits.join(" · "))}</span></div>
+      <div class="od-item"><span class="k">付款方</span><span class="v">${esc(d.pay_company || "—")}</span></div>
+      <div class="od-item"><span class="k">下单时间</span><span class="v">${esc(d.order_date || "—")}</span></div>
+      <div class="od-item"><span class="k">发货</span><span class="v">${esc(shipBits.join(" · "))}</span></div>
+      <div class="od-item"><span class="k">物流</span><span class="v">${esc(logistics)}</span></div>
+      ${d.signed_at ? `<div class="od-item"><span class="k">签收时间</span><span class="v">${esc(d.signed_at)}</span></div>` : ""}
+      <div class="od-item"><span class="k">推送旺店通</span><span class="v">${pushTag(d)} <span class="cell-sub">${esc(d.push_message || "")}</span></span></div>
+      <div class="od-item"><span class="k">来源</span><span class="v">${esc(d.source_channel || "—")}</span></div>
+      <div class="od-item span"><span class="k">收货地址</span><span class="v">${esc(d.receiver_address || "—")}</span></div>
+      <div class="od-item span"><span class="k">备注</span><span class="v">${esc(d.remark || "—")}</span></div>
+    </div>
+    <table class="od-lines"><thead><tr><th>商品</th><th>编号 / 规格</th><th class="num">数量</th><th class="num">单价</th><th class="num">小计</th></tr></thead>
+      <tbody>${lines.length ? lines.map(l => `<tr>
+        <td>${esc(l.goods_name)}</td>
+        <td>${esc(l.goods_no)}${l.spec_name ? `<span class="cell-sub">${esc(l.spec_name)}</span>` : ""}</td>
+        <td class="num">${Number(l.quantity).toLocaleString("zh-CN")}</td>
+        <td class="num">${money(l.unit_price)}</td>
+        <td class="num"><b>${money(l.subtotal)}</b></td></tr>`).join("")
+        : `<tr><td colspan="5" class="od-empty">这笔订单没有商品明细</td></tr>`}</tbody></table>
+    <div class="od-total">
+      <span>订单合计 <b>${money(total)}</b></span>
+      <span class="paid">已收 ${money(paid)}</span>
+      <span class="out">待收 ${money(outstanding)}</span>
+    </div>
+    <div class="od-actions">
+      <button class="btn mini primary" onclick="event.stopPropagation();openFulfillmentModal(${d.id})">更新收款 / 发货</button>
+      <button class="btn mini" onclick="event.stopPropagation();viewOrder(${d.id})">完整详情（含库存）</button>
+    </div>
+  </div>`;
 }
 
 /* ---------- 订单状态处理：待审核 / 已审核 / 推送异常 三合一 ---------- */
@@ -2318,7 +3322,7 @@ function renderOstatus(){
     all.checked = rows.length > 0 && picked === rows.length;
     all.indeterminate = picked > 0 && picked < rows.length;
   }
-  applyColOrder(tableOf("ostatus"));
+  syncCols("ostatus");
   ostRefreshSel();
 }
 
@@ -2456,6 +3460,15 @@ async function editOrder(id){
   try {
     const detail = await api("/api/fx/orders/" + id);
     state.orderEditId = id;
+    // 这个弹窗只改分销商和明细；订单头字段（渠道/仓库/配送/刮码/发货要求）
+    // 原样带着回传，不然 PUT 会把它们当成「传了空串」清掉。
+    state.orderEditHead = {
+      order_channel: detail.order_channel || "",
+      ship_warehouse: detail.ship_warehouse || "",
+      ship_note: detail.ship_note || "",
+      delivery_type: detail.delivery_type || "",
+      scratch_code: Number(detail.scratch_code) || 0,
+    };
     $("orderModalTitle").textContent = "编辑草稿 · " + detail.order_no;
     $("oDist").value = String(detail.distributor_id);
     $("oRemark").value = detail.remark || "";
@@ -2469,6 +3482,8 @@ async function editOrder(id){
 async function saveOrder(){
   const payload = { distributor_id: parseInt($("oDist").value, 10),
     remark: $("oRemark").value.trim(), lines: collectLines() };
+  // 编辑已有订单时，把订单头字段原样带上，避免被清空
+  if (state.orderEditId && state.orderEditHead) Object.assign(payload, state.orderEditHead);
   if (!payload.distributor_id) { showError("orderErr", "请选择分销商"); return; }
   try {
     if (state.orderEditId) await api("/api/fx/orders/" + state.orderEditId, { method: "PUT", body: JSON.stringify(payload) });
@@ -2518,10 +3533,16 @@ async function detectPushStatus(){
 async function viewOrder(id){
   try {
     const d = await api("/api/fx/orders/" + id);
-    // 满足率三态提示（库存不足/到仓待入库/满足库存）
-    let fulfill = null;
-    try { fulfill = await api("/api/fx/inventory/fulfillment?order_id=" + id); } catch (e) { fulfill = null; }
+    state.orderDetails[id] = d;
+    state.fulfillOrderId = id;
     $("detailTitle").textContent = "订单详情 · " + d.order_no;
+    // 已发货的订单不再做库存满足率判断：库存快照是「当前时点」的数，
+    // 拿它套已经出完货的历史单只会误报「库存不足」。
+    const shipped = d.shipping_status === "shipped" || !!d.shipped_at;
+    let fulfill = null;
+    if (!shipped) {
+      try { fulfill = await api("/api/fx/inventory/fulfillment?order_id=" + id); } catch (e) { fulfill = null; }
+    }
     const pushHtml = d.push_status === "sent"
       ? `已推送${d.pushed_at ? " · " + esc(d.pushed_at) : ""}${d.push_message ? ` <span style="color:#8a94a6">（${esc(d.push_message)}）</span>` : ""}`
       : d.push_status === "failed"
@@ -2533,21 +3554,53 @@ async function viewOrder(id){
       <div class="sec">
         <div class="sec-t">订单信息</div>
         <div class="dl">
+          <div class="row"><span class="k">供销平台单号</span><span class="v"><b>${esc(d.order_no)}</b></span></div>
+          <div class="row"><span class="k">原始订单号</span><span class="v">${orderOriginalNos(d).length ? orderOriginalNos(d).map(n => `<span class="orig-no">${esc(n)}</span>`).join(" ") : "—"}</span></div>
           <div class="row"><span class="k">分销商</span><span class="v">${esc(d.distributor_name)}（${esc(d.distributor_code)}）</span></div>
           <div class="row"><span class="k">状态</span><span class="v"><span class="tag ${d.status}">${esc(d.status_label)}</span></span></div>
+          <div class="row"><span class="k">收款</span><span class="v">${payTag(d)} ${Number(d.paid_amount) > 0 ? "已收 " + money(d.paid_amount) : ""} ${esc(d.payment_date || "")} ${esc(d.pay_company || "")}</span></div>
+          <div class="row"><span class="k">发货</span><span class="v">${shipTag(d)} ${esc(d.shipped_at || "")} ${esc(d.logistics_company || "")} ${esc(d.logistics_no || "")}</span></div>
           <div class="row"><span class="k">下单时间</span><span class="v">${esc(d.order_date)}</span></div>
-          <div class="row"><span class="k">旺店通单号</span><span class="v">${esc(d.wdt_tid) || "（未推送）"}</span></div>
-          <div class="row"><span class="k">推送店铺</span><span class="v">${esc(d.wdt_shop_no) || "（系统默认）"}</span></div>
+          <div class="row"><span class="k">下单渠道 / 推送店铺</span><span class="v">${esc(d.order_channel || d.wdt_shop_no) || "—"}${d.wdt_shop_no ? `<span class="sub">（${esc(d.wdt_shop_no)}）</span>` : ""}</span></div>
+          <div class="row"><span class="k">发货仓库</span><span class="v">${esc(d.ship_warehouse) || "—"}${d.wdt_warehouse_no ? `<span class="sub">（${esc(d.wdt_warehouse_no)}）</span>` : ""}</span></div>
+          <div class="row"><span class="k">配送方式</span><span class="v">${esc(d.delivery_type_label || "未指定")}</span></div>
+          <div class="row"><span class="k">特殊情况</span><span class="v">${Number(d.scratch_code) ? '<span class="tag warn">需刮码</span>' : "—"}</span></div>
+          <div class="row span"><span class="k">发货要求</span><span class="v">${esc(d.ship_note) || "—"}</span></div>
+          <div class="row"><span class="k">旺店通推送单号</span><span class="v">${esc(d.wdt_tid) || "（未推送）"}</span></div>
           <div class="row"><span class="k">推送状态</span><span class="v">${pushHtml}</span></div>
+          <div class="row span"><span class="k">收货信息</span><span class="v">${esc(d.receiver_name || "")} ${esc(d.receiver_phone || "")} ${esc(d.receiver_address || "")}</span></div>
           <div class="row span"><span class="k">备注</span><span class="v">${esc(d.remark) || "-"}</span></div>
         </div>
       </div>
       <div class="sec">
-        <div class="sec-t">商品明细 <span class="sub">共 ${d.lines.length} 项 · 实际可用 = 昨天库存 + 今日已入库</span></div>
-        ${renderFulfillment(fulfill)}
-        <table class="order-lines"><thead><tr><th>商品</th><th>编号</th><th class="num">数量</th>
-          <th class="num">单价</th><th class="num">小计</th><th class="num">实际可用</th>
-          <th class="num">满足率</th><th>库存状态</th></tr></thead>
+        <div class="sec-t">订单头补录 <span class="sub">下单时没填的在这里补，改完点「保存订单头」；只动订单头，不影响金额和库存</span></div>
+        <div class="oh-edit">
+          <label class="oh-f"><span class="oh-l">下单渠道 / 推送店铺</span>
+            <select id="dHeadShop">${wdtShopOptionsHtml(d.wdt_shop_no, d.order_channel)}</select></label>
+          <label class="oh-f"><span class="oh-l">发货仓库</span>
+            <select id="dHeadWarehouse">${wdtWarehouseOptionsHtml(d.wdt_warehouse_no, d.ship_warehouse)}</select></label>
+          <label class="oh-f"><span class="oh-l">配送方式</span>
+            <select id="dHeadDelivery">
+              <option value=""${!d.delivery_type ? " selected" : ""}>未指定</option>
+              <option value="delivery"${d.delivery_type === "delivery" ? " selected" : ""}>送货</option>
+              <option value="pickup"${d.delivery_type === "pickup" ? " selected" : ""}>自提</option>
+            </select></label>
+          <div class="oh-f"><span class="oh-l">特殊情况</span>
+            <span class="oh-box"><input type="checkbox" id="dHeadScratch"${Number(d.scratch_code) ? " checked" : ""}> 需要刮码</span></div>
+          <label class="oh-f oh-wide"><span class="oh-l">发货要求</span>
+            <input id="dHeadShipNote" value="${esc(d.ship_note || "")}" placeholder="打包方式 / 随货资料 / 时效要求…"></label>
+          <div class="oh-f oh-btn"><span class="oh-l">&nbsp;</span>
+            <button class="btn" onclick="saveOrderHead(${d.id})">保存订单头</button></div>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">商品明细 <span class="sub">共 ${d.lines.length} 项 · 数量按箱计，单价为元/箱（小字为件数换算）${shipped ? " · 已发货单不做库存判断" : " · 实际可用 = 昨天库存 + 今日已入库（件）"}</span></div>
+        ${shipped
+          ? `<div class="ff-banner" style="background:#f4f6fa;border:1px solid #dbe2ee;color:#64708a"><span style="font-size:18px">📦</span><span class="big">订单已发货</span><span>库存满足率仅对未发货订单计算（库存快照是当前时点，不代表发货时的库存）。</span></div>`
+          : renderFulfillment(fulfill)}
+        <table class="order-lines"><thead><tr><th>编号</th><th>商品</th><th class="num">数量(箱)</th>
+          <th class="num">单价(元/箱)</th><th class="num">小计</th>${shipped ? "" : `<th class="num">实际可用(件)</th>
+          <th class="num">满足率</th><th>库存状态</th>`}</tr></thead>
           <tbody>${(() => {
             const fl = (fulfill && fulfill.lines) || [];
             return d.lines.map((l, i) => {
@@ -2555,23 +3608,124 @@ async function viewOrder(id){
               if (f && l.spec_no && f.spec_no && f.spec_no !== l.spec_no) f = fl.find(x => x.spec_no === l.spec_no) || f;
               const c = f ? (f.state === "满足库存" ? "ok" : f.state === "到仓待入库" ? "arriving" : "short") : "";
               const q = Number(l.quantity);
-              return `<tr class="pline ${c}">
-                <td>${esc(l.goods_name)} ${l.spec_name ? "(" + esc(l.spec_name) + ")" : ""}</td>
-                <td>${esc(l.goods_no)}</td>
-                <td class="num">${Number.isFinite(q) ? q : esc(l.quantity)}</td>
-                <td class="num">${money(l.unit_price)}</td>
-                <td class="num"><b>${money(l.subtotal)}</b></td>
+              // 箱口径展示：箱数 = 件数 ÷ 箱规，箱价 = 件价 × 箱规（存储仍是件，换算无损）
+              const prod = state.products.find(p => p.spec_no === l.spec_no);
+              const pq = prod && Number(prod.pack_qty) > 0 ? Number(prod.pack_qty) : null;
+              const unit = pq ? esc(prod.pack_unit || "箱") : "件";
+              const qtyTxt = pq && Number.isFinite(q) ? (Math.round(q / pq * 1000) / 1000) : (Number.isFinite(q) ? q : esc(l.quantity));
+              const priceTxt = pq && Number.isFinite(q) ? money(l.unit_price * pq) : money(l.unit_price);
+              const subTxt = pq ? `${Number.isFinite(q) ? q : esc(l.quantity)} 件（${pq}件/${unit}）` : "件（商品档案未设箱规）";
+              const stockTds = shipped ? "" : `
                 <td class="num stock">${f ? esc(f.actual) : "—"}${f ? `<span class="sub">昨${esc(f.yesterday_stock)} + 今入${esc(f.today_stockin)}${Number(f.today_pending) > 0 ? " · 待入" + esc(f.today_pending) : ""}</span>` : ""}</td>
                 <td class="num rate ${c}">${f ? esc(f.fulfill_rate) + "%" : "—"}</td>
-                <td>${f ? `<span class="ff-tag ${c}">${esc(f.state)}</span>` : `<span class="muted">未同步</span>`}</td>
+                <td>${f ? `<span class="ff-tag ${c}">${esc(f.state)}</span>` : `<span class="muted">未同步</span>`}</td>`;
+              return `<tr class="pline ${c}">
+                <td>${esc(l.goods_no)}</td>
+                <td>${esc(l.goods_name)}${l.spec_name ? `<span class="sub" style="display:block">规格：${esc(l.spec_name)}</span>` : ""}</td>
+                <td class="num"><b>${qtyTxt}</b> ${unit}<span class="sub" style="display:block">${subTxt}</span></td>
+                <td class="num"><b>${priceTxt}</b>/ ${unit}</td>
+                <td class="num"><b>${money(l.subtotal)}</b></td>
+                ${stockTds}
               </tr>`;
             }).join("");
           })()}
           </tbody></table>
         <div class="line-total">订单合计：<b>${money(d.total_amount)}</b></div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">打款凭证 <span class="sub">客户打款的截图直接 <b>Ctrl+V</b> 粘到这里（或点虚线格子选图）；系统自动识别金额 / 日期 / 付款方，核对后点「确认收款」才计入这单</span></div>
+        <div id="pvBox" data-oid="${d.id}">加载中…</div>
       </div>`;
     openModal("detailModal");
+    state.pvOrderId = d.id;
+    renderOrderVouchers(d.id);
   } catch (e) { toast(e.message); }
+}
+
+/* 收款 / 发货状态更新：从行内详情或弹窗进入，保存后刷新同一行。 */
+async function openFulfillmentModal(id){
+  try {
+    const d = state.orderDetails[id] || await api("/api/fx/orders/" + id);
+    state.orderDetails[id] = d;
+    state.fulfillOrderId = id;
+    $("fulfillTitle").textContent = "更新收款 / 发货 · " + d.order_no;
+    $("fPayStatus").value = d.payment_status || "unpaid";
+    $("fPaid").value = Number(d.paid_amount) > 0 ? d.paid_amount : "";
+    $("fPayDate").value = (d.payment_date || "").slice(0, 10);
+    $("fPayCompany").value = d.pay_company || "";
+    $("fShipStatus").value = d.shipping_status || "unshipped";
+    $("fShipDate").value = (d.shipped_at || "").slice(0, 10);
+    $("fLogiCompany").value = d.logistics_company || "";
+    $("fLogiNo").value = d.logistics_no || "";
+    $("fOrigNo").value = d.original_order_no || orderOriginalNos(d).join(",");
+    showError("fulfillErr", "");
+    openModal("fulfillModal");
+  } catch (e) { toast("加载订单状态失败：" + e.message); }
+}
+
+async function saveFulfillment(){
+  const id = state.fulfillOrderId;
+  if (!id) return;
+  const payload = {
+    payment_status: $("fPayStatus").value,
+    payment_date: $("fPayDate").value || null,
+    pay_company: $("fPayCompany").value.trim(),
+    shipping_status: $("fShipStatus").value,
+    shipped_at: $("fShipDate").value || null,
+    logistics_company: $("fLogiCompany").value.trim(),
+    logistics_no: $("fLogiNo").value.trim(),
+    original_order_no: $("fOrigNo").value.trim(),
+  };
+  const paidText = $("fPaid").value.trim();
+  if (payload.payment_status === "unpaid") {
+    // 未收到时不允许把旧金额一起提交，否则会出现“未收到但已收 >0”的矛盾状态。
+    delete payload.paid_amount;
+  } else if (paidText !== "") {
+    payload.paid_amount = paidText;
+  }
+  try {
+    const r = await api(`/api/fx/orders/${id}/fulfillment`, { method: "PUT", body: JSON.stringify(payload) });
+    state.orderDetails[id] = r.order || state.orderDetails[id];
+    closeModal("fulfillModal");
+    toast("收款 / 发货状态已更新");
+    await loadOrders();
+    await toggleOrderDetail(id);
+  } catch (e) { showError("fulfillErr", e.message); }
+}
+
+/* 订单详情里补录订单头：走 fulfillment 接口（它支持这几个字段），只改传的字段 */
+async function saveOrderHead(id){
+  const shopSel = $("dHeadShop");
+  const shopNo = (shopSel.value || "").trim();
+  const shopName = shopSel.selectedOptions[0] ? shopSel.selectedOptions[0].textContent.trim() : "";
+  const whSel = $("dHeadWarehouse");
+  const whNo = (whSel.value || "").trim();
+  const whName = whSel.selectedOptions[0]
+    ? (whSel.selectedOptions[0].dataset.name || whSel.selectedOptions[0].textContent.trim()) : "";
+  const payload = {
+    ship_note: ($("dHeadShipNote").value || "").trim(),
+    delivery_type: $("dHeadDelivery").value,
+    scratch_code: $("dHeadScratch").checked ? 1 : 0,
+  };
+  // 选了真实店铺才覆盖渠道；老订单的「沿用历史渠道」选项不会把文本冲掉
+  if (shopNo) {
+    payload.wdt_shop_no = shopNo;
+    payload.order_channel = shopName;
+  }
+  // 仓库同理：有旺店通编号才写编号；历史文本仓保留原文，不强行改成 Glico
+  if (whNo) {
+    payload.wdt_warehouse_no = whNo;
+    payload.ship_warehouse = whName;
+  } else if (whName) {
+    payload.ship_warehouse = whName;
+  }
+  try {
+    const r = await api(`/api/fx/orders/${id}/fulfillment`, { method: "PUT", body: JSON.stringify(payload) });
+    state.orderDetails[id] = r.order || state.orderDetails[id];
+    toast("订单头已保存");
+    await loadOrders();
+    await viewOrder(id);
+  } catch (e) { toast("保存失败: " + e.message); }
 }
 
 /* 满足率三态提示：满足库存(绿) / 到仓待入库(橙) / 库存不足(红) */
@@ -2634,7 +3788,7 @@ async function loadPrices(){
       <td class="ops">${orig ? `<button class="btn mini" onclick="clearPrice(${p.id})">恢复品标价</button>` : ""}</td>
     </tr>`;
   }).join("");
-  applyColOrder(tableOf("price"));
+  syncCols("price");
 }
 
 function markDirtyRow(input){
@@ -2735,7 +3889,7 @@ function openImportModal(kind){
   const isDist = kind === "dist";
   $("importTitle").textContent = isDist ? "批量导入分销商" : "批量导入商品";
   $("importHint").innerHTML = isDist
-    ? `每行一个分销商，逗号分隔：<b>编码, 名称, 税号, 联系人, 电话, 备注, 收货地址</b><br>例如：<code>, 上海xx商贸, 91310115XXXXXXXXXX, 王经理, 13800000000, 月结30天, 上海市松江区XX路1号</code><br><b>编码留空会自动生成</b>（D001、D002…）；已存在的编码自动跳过，不会重复。收货地址可以不填。`
+    ? `每行一个分销商，逗号分隔：<b>编码, 名称, 税号, 联系人, 电话, 备注, 收货地址</b><br>例如：<code>, 上海xx商贸, 91310115XXXXXXXXXX, 王经理, 13800000000, 月结30天, 上海市松江区XX路1号</code><br><b>编码留空会自动生成</b>（H-01、H-02…）；已存在的编码自动跳过，不会重复。收货地址可以不填。`
     : `每行一个商品，逗号分隔：<b>SKU, 名称, 规格, 单位, 标价, 备注, 箱规, 一级分销价</b><br>例如：<code>GL001, 巧克力礼盒, 24×100g, 件, 168.00, , 24/箱, 188.00</code><br>箱规写「24/箱」或直接写数字 24；一级分销价留空 = 待定。已存在的 SKU 自动跳过，不会重复。`;
   $("importText").value = "";
   showError("importErr", "");
@@ -2791,17 +3945,31 @@ try {
   colOrderStore = JSON.parse(localStorage.getItem(COLO_KEY) || "{}") || {};
   colHideStore = JSON.parse(localStorage.getItem(COLH_KEY) || "{}") || {};
 } catch (e) { colwStore = {}; colOrderStore = {}; colHideStore = {}; }
-/* 2026-10-28：分销商表删掉「区域」列、新增「税号」列。老的顺序/隐藏记录里还留着 region，
-   这里就地清掉并把 taxno 插到「编码」后面，免得税号被挤到最后一列、区域变成幽灵列。 */
+/* 2026-10-28：分销商表删掉「区域」「税号」列。老的顺序/隐藏记录里还留着 region/taxno，
+   这里就地清掉，免得变成幽灵列。 */
 ["dist"].forEach(k => {
-  const clean = arr => (Array.isArray(arr) ? arr.filter(c => c !== "region") : arr);
+  const clean = arr => (Array.isArray(arr) ? arr.filter(c => c !== "region" && c !== "taxno") : arr);
   colOrderStore[k] = clean(colOrderStore[k]);
   colHideStore[k] = clean(colHideStore[k]);
-  if (Array.isArray(colOrderStore[k]) && colOrderStore[k].length && !colOrderStore[k].includes("taxno")) {
-    const at = colOrderStore[k].indexOf("code");
-    colOrderStore[k].splice(at < 0 ? 0 : at + 1, 0, "taxno");
-  }
 });
+/* 2026-10-28：订单表新增「原始订单号 / 收款 / 发货」。老用户的本机列顺序里没有
+   这三列，applyColOrder 会把它们排到最右边；这里一次性插回内部单号/分销商旁边，
+   用户之前调过的其它列顺序保持不变。 */
+(function upgradeOrderColumns(){
+  const saved = colOrderStore.order;
+  if (!Array.isArray(saved) || !saved.length) return;
+  const insertAfter = (key, after) => {
+    if (saved.includes(key)) return;
+    const i = saved.indexOf(after);
+    if (i >= 0) saved.splice(i + 1, 0, key);
+    else saved.push(key);
+  };
+  insertAfter("orig", "tid");
+  insertAfter("pay", "dist");
+  insertAfter("ship", "pay");
+  colOrderStore.order = saved;
+  try { localStorage.setItem(COLO_KEY, JSON.stringify(colOrderStore)); } catch (e) {}
+})();
 const saveColw = () => { try { localStorage.setItem(COLW_KEY, JSON.stringify(colwStore)); } catch (e) {} };
 const saveColOrder = () => { try { localStorage.setItem(COLO_KEY, JSON.stringify(colOrderStore)); } catch (e) {} };
 const saveColHide = () => { try { localStorage.setItem(COLH_KEY, JSON.stringify(colHideStore)); } catch (e) {} };
@@ -2824,6 +3992,11 @@ function hiddenSet(table){
 function applyColOrder(table){
   const ckey = ckeyOf(table); if (!ckey) return;
   const ths = thEls(table); if (!ths.length) return;
+  // 规范顺序 = HTML 里写死的列顺序。第一次重排时记下来，之后一直以它为准。
+  // 绝不能拿「表头当前顺序」当基准：表头被本函数重排过一次之后，再算出来的 perm 就是
+  // 恒等（原地不动），而 renderXxx() 重建出来的行是规范顺序 —— 表头在保存顺序、行在规范
+  // 顺序，整体错位一格（表现就是「大类」里显示商品名称、价格列全变「—」）。
+  if (!table.dataset.order0) table.dataset.order0 = ths.map(keyOf).join(",");
   const keys = ths.map(keyOf);
   let saved = colOrderStore[ckey];
   if (!Array.isArray(saved) || !saved.length) saved = (table.dataset.order0 || "").split(",").filter(Boolean);
@@ -2848,6 +4021,31 @@ function applyColOrder(table){
   applyColVis(table);
 }
 
+/* 渲染函数重建出来的行按 HTML 规范顺序排，但表头可能已经被重排过。
+   先让表头/colgroup 归位到规范顺序，再交给 applyColOrder 统一重排，
+   否则「表头在保存顺序、行在规范顺序」就会整体错位。渲染函数改完表格都走这个。 */
+function resetColOrder(table){
+  if (!table) return;
+  const ths = thEls(table); if (!ths.length) return;
+  if (!table.dataset.order0) table.dataset.order0 = ths.map(keyOf).join(",");
+  const canon = table.dataset.order0.split(",").filter(Boolean);
+  const cols = colEls(table), headRow = table.querySelector("thead tr"), cg = table.querySelector("colgroup");
+  const cur = ths.map((th, i) => ({ k: keyOf(th, i), th, col: cols[i] }));
+  const byKey = new Map(cur.map(o => [o.k, o]));
+  const seq = canon.map(k => byKey.get(k)).filter(Boolean);
+  cur.forEach(o => { if (!seq.includes(o)) seq.push(o); });   // 规范里没有的（理论上不会有）排末尾
+  if (seq.some((o, i) => o !== cur[i])) {
+    seq.forEach(o => { headRow.appendChild(o.th); if (cg && o.col) cg.appendChild(o.col); });
+  }
+}
+
+/* 行刚重建完的表格用这个：先把表头归位，再套用户记住的列顺序/显隐 */
+function syncCols(ckey){
+  const table = tableOf(ckey); if (!table) return;
+  resetColOrder(table);
+  applyColOrder(table);
+}
+
 /* 隐藏列：表头与数据格都藏掉，对应 col 宽度归零 */
 function applyColVis(table){
   const ths = thEls(table), cols = colEls(table), hide = hiddenSet(table);
@@ -2858,6 +4056,7 @@ function applyColVis(table){
     if (cols[i]) cols[i].style.width = off ? "0px" : (cols[i].dataset.w || cols[i].style.width || "");
   });
   table.querySelectorAll("tbody tr").forEach(tr => {
+    if (tr.classList.contains("order-detail-row")) return;
     [...tr.children].forEach((td, i) => {
       td.classList.toggle("col-off", hide.has(keyOf(ths[i], i)));
       td.style.display = "";
@@ -2999,6 +4198,7 @@ function renderColModal(){
     return `<div class="colset-row${on ? "" : " is-off"}">
       <input type="checkbox" ${on || locked ? "checked" : ""} ${locked ? 'disabled title="操作列必须始终显示"' : ""} onchange="toggleCol('${k}',this.checked)">
       <span class="nm${on ? "" : " off"}">${esc(colName(th, i))}</span>
+      ${locked ? '<span class="lock">固定</span>' : ""}
       <span class="mv">
         <button ${upOff ? "disabled" : ""} onclick="moveColStep('${k}',-1)" title="上移">↑</button>
         <button ${dnOff ? "disabled" : ""} onclick="moveColStep('${k}',1)" title="下移">↓</button>
@@ -3042,7 +4242,6 @@ function initColumnResize(){
     table.dataset.order0 = domKeys(table).join(",");  // 记下出厂顺序，「恢复默认」时用它
     applyColOrder(table);
     thEls(table).forEach(th => {
-      ${locked ? '<span class="lock">固定</span>' : ""}
       th.classList.add("col-drag");
       const grip = document.createElement("div");
       grip.className = "colgrip";
@@ -3080,19 +4279,16 @@ if (__tab === "orders" && __status) $("orderStatus").value = __status;
 
 loadAll();
 
-if (__tab && ["distributors", "products", "entry", "orders", "ostatus", "prices", "statements"].indexOf(__tab) >= 0) switchTab(__tab);
+if (__tab && ["distributors", "products", "entry", "orders", "receivables", "ostatus", "prices", "statements"].indexOf(__tab) >= 0) switchTab(__tab);
 
 /* ---------- 双击增强：表头排序 + 双击行直接进编辑 ----------
-   商品表里一级价、大类是内联输入框，双击那些格子不会弹窗（embed.js 里已排除）。 */
+   商品表默认只读：双击行由 renderProducts 里的 onProdRowDblClick 进入
+   「大类 / 一级价」行内修改模式，不再弹商品编辑窗。 */
 (function initFxTable(){
   if (!window.fxTable) return;
-  // 商品目录：双击表头排序，双击行打开商品编辑
+  // 商品目录：只给表头排序；行双击交给行内修改模式
   const prodTable = document.querySelector("#panel-products table");
   fxTable.sort(prodTable);
-  fxTable.rowEdit($("prodBody"), tr => {
-    const ck = tr.querySelector(".prod-ck");
-    if (ck && ck.dataset.id) openProdModal(Number(ck.dataset.id));
-  });
   // 分销商档案：双击行编辑
   fxTable.sort(document.querySelector("#panel-distributors table"));
   fxTable.rowEdit($("distBody"), tr => {
@@ -3109,6 +4305,398 @@ if (__tab && ["distributors", "products", "entry", "orders", "ostatus", "prices"
   fxTable.sort(document.querySelector("#panel-prices table"));
   fxTable.sort(document.querySelector("#panel-statements table"));
 })();
+
+/* ---------- 订单 ⇄ 出库件数核对 ----------
+   口径来自旺店通销售出库单反推：出库明细的 goods_count 是基本单位（件），
+   订单的 quantity 现在也统一成件，两边应当 1:1。差额 ÷ 箱规折成箱数给业务看。
+   除数量外还比：整单金额、以及「多张订单共用同一个旺店通单号」的重复单。 */
+const QTY_STATUS = {
+  mismatch:  { label: "数量/金额不符", color: "#e5484d" },
+  duplicate: { label: "重复单", color: "#8e5bd9" },
+  no_ship:   { label: "未找到出库单", color: "#b8860b" },
+  match:     { label: "一致", color: "#1a9a6c" },
+};
+async function runQtyCheck(){
+  const btn = $("btnQtyCheck");
+  btn.disabled = true; btn.textContent = "核对中…";
+  try {
+    const data = await api("/api/fx/reconcile-stockout");
+    renderQtyCheck(data);
+    openModal("qtyCheckModal");
+  } catch (e) { toast("核对失败：" + e.message); }
+  btn.disabled = false; btn.textContent = "⇄ 件数核对";
+}
+function renderQtyCheck(data){
+  const s = data.stats || {};
+  const head = `<div class="hint" style="margin-bottom:10px">共核对 <b>${s.checked || 0}</b> 张订单：` +
+    `<span style="color:#e5484d">数量/金额不符 ${s.mismatch || 0}</span> · ` +
+    `<span style="color:#8e5bd9">重复单 ${s.duplicate || 0}</span> · ` +
+    `<span style="color:#b8860b">未找到出库单 ${s.no_ship || 0}</span> · ` +
+    `<span style="color:#1a9a6c">一致 ${s.match || 0}</span>。` +
+    `件数均为基本单位（件），「≈箱」= 件数差 ÷ 箱规，负数=出得比订得多。</div>`;
+  const rows = (data.rows || []).map(r => {
+    const st = QTY_STATUS[r.status] || QTY_STATUS.match;
+    const shipTxt = r.status === "no_ship" ? "—" : (r.stockouts || []).join("、");
+    const amtDiff = r.amount_diff ? `<span style="color:#e5484d">${r.amount_diff}</span>` : "—";
+    let html = `<tr style="border-left:3px solid ${st.color}">
+      <td><b>${esc(r.order_no)}</b>${(r.duplicate_with && r.duplicate_with.length) ? `<span class="sub" style="display:block;color:#8e5bd9">与 ${r.duplicate_with.map(esc).join("、")} 共用旺店通单号</span>` : ""}</td>
+      <td>${esc(r.order_date)}</td>
+      <td><span class="tag" style="color:${st.color};border-color:${st.color}">${st.label}</span></td>
+      <td class="num">${r.total_order}</td>
+      <td class="num">${r.total_stockout}</td>
+      <td class="num">${amtDiff}</td>
+      <td title="出库单号">${esc(shipTxt)}${r.consign_time ? `<span class="sub" style="display:block">出库 ${esc(r.consign_time)}</span>` : ""}</td>
+    </tr>`;
+    // 不符的单把差异行展开，一眼看到差在哪
+    if (r.status === "mismatch") {
+      const bad = (r.lines || []).filter(l => parseFloat(l.diff) !== 0);
+      if (bad.length) {
+        html += `<tr><td colspan="7" style="padding:0 0 8px 26px;background:#fffafa">` +
+          bad.map(l => {
+            const pack = Number(l.pack_qty) > 0;
+            return `<div style="font-size:12px;margin-top:6px">` +
+              `<b>${esc(l.spec_no)}</b> ${esc((l.goods_name || "").slice(0, 24))}：` +
+              `订单 <b>${l.order_qty}</b> 件 vs 出库 <b>${l.stockout_qty}</b> 件，` +
+              `差 <span style="color:#e5484d;font-weight:700">${l.diff}</span> 件` +
+              (pack && l.diff_boxes ? `（≈ ${l.diff_boxes} 箱）` : "") +
+              `</div>`;
+          }).join("") + `</td></tr>`;
+      }
+    }
+    return html;
+  }).join("");
+  $("qtyCheckBody").innerHTML = head + `<table class="order-lines"><thead><tr>
+      <th>订单号</th><th>下单日期</th><th>结论</th><th class="num">订单件数</th><th class="num">出库件数</th><th class="num">金额差（元）</th><th>对应出库单</th>
+    </tr></thead><tbody>${rows.length ? rows : `<tr><td colspan="7" class="empty">还没有订单可核对</td></tr>`}</tbody></table>`;
+}
+
+/* ================= 客户打款凭证 + 应收账款（用户 2026-10-28 要求）=================
+   流程：粘图/选图 → 后端存图并 OCR → 回填金额/日期/付款方 → 人核对 → 确认收款计入订单。
+   一条铁律：识别只是辅助，不自动改钱；同一张凭证不能重复入账。 */
+const AR_STATUS = { unpaid: "未收到", partial: "部分收款", received: "已收到", refunded: "已退款" };
+
+async function uploadApi(path, formData){
+  const res = await fetch(path, { method: "POST", body: formData });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(data.detail || res.statusText);
+  return data;
+}
+
+function openLightbox(url){
+  closeLightbox();
+  const box = document.createElement("div");
+  box.className = "pv-lightbox"; box.id = "pvLightbox";
+  box.onclick = closeLightbox;
+  box.innerHTML = `<img src="${url}" alt="打款凭证">`;
+  document.body.appendChild(box);
+}
+function closeLightbox(){
+  const el = $("pvLightbox");
+  if (el) el.remove();
+}
+
+/* ---------- 上传 ---------- */
+function voucherFilePick(orderId){
+  const inp = document.createElement("input");
+  inp.type = "file"; inp.accept = "image/*";
+  inp.onchange = () => {
+    const f = inp.files && inp.files[0];
+    if (f) uploadVoucher(orderId, f);
+  };
+  inp.click();
+}
+
+async function uploadVoucher(orderId, file){
+  if (!orderId) { toast("先选一张订单"); return; }
+  if (!/^image\//.test(file.type)) { toast("只能传图片（png / jpg / webp）"); return; }
+  const box = $("pvBox");
+  if (box) box.insertAdjacentHTML("afterbegin",
+    `<div class="pv-item" id="pvUploading"><div class="pv-meta"><b>正在上传并识别…</b>
+       <div class="pv-text">图片越大识别越慢，一般 2~5 秒</div></div></div>`);
+  try {
+    const fd = new FormData();
+    fd.append("file", file, file.name || "打款凭证.png");
+    const r = await uploadApi(`/api/fx/orders/${orderId}/vouchers`, fd);
+    const v = r.voucher || {};
+    toast(v.ocr_status === "unavailable"
+      ? "图已存下，但本机没装 OCR 引擎，请手填金额"
+      : (v.amount ? `识别到 ¥${v.amount}${v.paid_at ? " · " + v.paid_at : ""}` : "图已存下，但没识别出金额，请手填"));
+    await renderOrderVouchers(orderId);
+    if (state.ar) loadReceivables();
+  } catch (e) {
+    toast("上传失败: " + e.message);
+    const up = $("pvUploading"); if (up) up.remove();
+  }
+}
+
+/* ---------- 订单详情里的凭证列表 ---------- */
+async function renderOrderVouchers(orderId){
+  const box = $("pvBox");
+  if (!box) return;
+  let items = [];
+  try { items = (await api(`/api/fx/orders/${orderId}/vouchers`)).items || []; }
+  catch (e) { box.innerHTML = `<div class="empty">凭证加载失败：${esc(e.message)}</div>`; return; }
+  const drop = `<div class="pv-item" style="align-items:center">
+      <div class="pv-drop" style="width:104px;height:104px;font-size:12px"
+           ondragover="event.preventDefault();this.classList.add('on')"
+           ondragleave="this.classList.remove('on')"
+           ondrop="pvDropFile(event, ${orderId})"
+           onclick="voucherFilePick(${orderId})">＋<br>粘图 / 选图<br><span style="font-size:10px">Ctrl+V</span></div>
+      <div class="pv-meta"><b style="font-size:13px">把客户打款的截图粘到这里</b>
+        <div class="pv-text" style="max-height:none">支持微信 / 支付宝转账截图、银行回单照片。
+          上传后自动识别<b>金额、打款时间、付款方</b>；识别不准可以直接改，改完点「确认收款」。
+          一张单可以挂多张凭证（分次打款）。</div></div>
+    </div>`;
+  box.innerHTML = drop + (items.length ? items.map(v => pvItemHtml(v)).join("")
+    : `<div class="empty" style="padding:10px 0">这单还没有打款凭证</div>`);
+}
+
+function pvItemHtml(v){
+  const st = Number(v.applied)
+    ? `<span class="pv-tag ok">已入账</span>`
+    : v.ocr_status === "done" ? `<span class="pv-tag">待确认</span>`
+    : v.ocr_status === "unavailable" ? `<span class="pv-tag warn">未装 OCR，手填金额</span>`
+    : v.ocr_status === "failed" ? `<span class="pv-tag bad">识别失败，手填金额</span>`
+    : `<span class="pv-tag warn">识别中</span>`;
+  const dis = Number(v.applied) ? " disabled" : "";
+  return `<div class="pv-item">
+    <img src="${v.url}" alt="打款凭证" title="点开看大图" onclick="openLightbox('${v.url}')">
+    <div class="pv-meta">
+      <div class="pv-head">${st}<span>${esc(v.created_at)}</span>
+        <span style="color:#b6bfcc">${esc(v.filename)}</span>
+        ${v.pay_method ? `<span class="pv-tag">${esc(v.pay_method)}</span>` : ""}</div>
+      <div class="pv-fields">
+        <label>金额<input id="pvAmt_${v.id}" value="${v.amount || ""}" placeholder="识别不出就手填"${dis}></label>
+        <label>打款时间<input id="pvAt_${v.id}" value="${esc(v.paid_at)}" placeholder="2026-10-27 14:23"${dis}></label>
+        <label>付款方<input id="pvPayer_${v.id}" value="${esc(v.payer)}" placeholder="谁打的钱"${dis}></label>
+        <label>方式<input id="pvMethod_${v.id}" value="${esc(v.pay_method)}" placeholder="微信 / 支付宝 / 银行"${dis}></label>
+      </div>
+      <div class="pv-ops">
+        <button class="btn mini" onclick="saveVoucherFields(${v.id}, ${v.order_id || 0})"${dis}>保存修改</button>
+        <button class="btn mini primary" onclick="applyVoucher(${v.id}, ${v.order_id || 0})"${dis}>确认收款</button>
+        <button class="btn mini" onclick="unapplyVoucher(${v.id}, ${v.order_id || 0})"${Number(v.applied) ? "" : " disabled"}>撤销入账</button>
+        <button class="btn mini" onclick="reparseVoucher(${v.id}, ${v.order_id || 0})"${dis}>重新识别</button>
+        <button class="btn mini danger" onclick="deleteVoucher(${v.id}, ${v.order_id || 0})"${dis}>删除</button>
+      </div>
+      ${v.ocr_text ? `<div class="pv-text" title="OCR 原文，可用来核对">${esc(v.ocr_text).slice(0, 500)}</div>` : ""}
+    </div>
+  </div>`;
+}
+
+function pvDropFile(ev, orderId){
+  ev.preventDefault();
+  ev.currentTarget.classList.remove("on");
+  const f = ev.dataTransfer && ev.dataTransfer.files && ev.dataTransfer.files[0];
+  if (f) uploadVoucher(orderId, f);
+}
+
+/* 全局粘贴：只处理「剪贴板里是图片」的情况，文本框里的文字粘贴不受影响 */
+document.addEventListener("paste", (ev) => {
+  const items = (ev.clipboardData && ev.clipboardData.items) || [];
+  const img = [...items].find(x => x.type && x.type.startsWith("image/"));
+  if (!img) return;
+  const target = state.pvTarget || state.pvOrderId;
+  if (!target) return;
+  const file = img.getAsFile();
+  if (!file) return;
+  ev.preventDefault();
+  uploadVoucher(target, file);
+});
+
+/* ---------- 凭证操作 ---------- */
+async function saveVoucherFields(vid, orderId){
+  const body = {
+    amount: ($("pvAmt_" + vid).value || "").trim(),
+    paid_at: ($("pvAt_" + vid).value || "").trim(),
+    payer: ($("pvPayer_" + vid).value || "").trim(),
+    pay_method: ($("pvMethod_" + vid).value || "").trim(),
+  };
+  try {
+    await api("/api/fx/vouchers/" + vid, { method: "PUT", body: JSON.stringify(body) });
+    toast("凭证信息已保存");
+    if (orderId) await renderOrderVouchers(orderId);
+    if (state.ar) loadReceivables();
+  } catch (e) { toast("保存失败: " + e.message); }
+}
+
+async function applyVoucher(vid, orderId){
+  const amt = ($("pvAmt_" + vid).value || "").trim();
+  if (!amt) { toast("先填金额（识别不出来就手填）"); return; }
+  const detail = state.orderDetails[orderId] || {};
+  const paid = Number(detail.paid_amount || 0), total = Number(detail.total_amount || 0);
+  const left = Math.max(0, total - paid);
+  const tip = `把这笔 ¥${amt} 计入 ${detail.order_no || "该订单"} 的收款？\n`
+    + (total ? `订单应收 ¥${total.toFixed(2)}，已收 ¥${paid.toFixed(2)}，未收 ¥${left.toFixed(2)}\n` : "")
+    + (Number(amt) > left + 0.005 ? "⚠ 这笔金额超过未收金额，确认没问题再继续。\n" : "");
+  if (!confirm(tip + "\n确认收款？")) return;
+  try {
+    const r = await api(`/api/fx/vouchers/${vid}/apply`, { method: "POST", body: JSON.stringify({ amount: amt, mode: "add" }) });
+    toast(`已收款 ¥${r.order.paid_amount}（${AR_STATUS[r.order.payment_status] || r.order.payment_status}）`);
+    await loadOrders(); renderOrders();
+    if (orderId) {
+      state.orderDetails[orderId] = null;
+      await viewOrder(orderId);
+    }
+    if (state.ar) loadReceivables();
+  } catch (e) { toast("入账失败: " + e.message); }
+}
+
+async function unapplyVoucher(vid, orderId){
+  if (!confirm("撤销这笔入账？订单已收金额会扣回去，凭证本身保留。")) return;
+  try {
+    await api(`/api/fx/vouchers/${vid}/unapply`, { method: "POST" });
+    toast("已撤销入账");
+    await loadOrders(); renderOrders();
+    if (orderId) { state.orderDetails[orderId] = null; await viewOrder(orderId); }
+    if (state.ar) loadReceivables();
+  } catch (e) { toast("撤销失败: " + e.message); }
+}
+
+async function reparseVoucher(vid, orderId){
+  try {
+    const r = await api(`/api/fx/vouchers/${vid}/reparse`, { method: "POST" });
+    const v = r.voucher || {};
+    toast(v.amount ? `重新识别到 ¥${v.amount}` : "重新识别完成，但没认出金额");
+    if (orderId) await renderOrderVouchers(orderId);
+  } catch (e) { toast("识别失败: " + e.message); }
+}
+
+async function deleteVoucher(vid, orderId){
+  if (!confirm("删除这张凭证？图片文件也会一起删掉，不能恢复。")) return;
+  try {
+    await api("/api/fx/vouchers/" + vid, { method: "DELETE" });
+    toast("已删除");
+    if (orderId) await renderOrderVouchers(orderId);
+    if (state.ar) loadReceivables();
+  } catch (e) { toast("删除失败: " + e.message); }
+}
+
+/* ---------- 应收账款页 ---------- */
+function fillArDistSelect(){
+  const sel = $("arDist");
+  if (!sel) return;
+  const want = state.distributors.length;
+  if (!want || sel.options.length > want) return;   // 已经填过就不重复重建（会丢当前选择）
+  const cur = sel.value;
+  sel.innerHTML = `<option value="">全部分销商</option>` +
+    state.distributors.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
+  sel.value = cur;
+}
+
+async function loadReceivables(){
+  fillArDistSelect();
+  const sel = $("arDist");
+  const q = new URLSearchParams();
+  if (sel && sel.value) q.set("distributor_id", sel.value);
+  const st = $("arStatus"); if (st && st.value) q.set("status", st.value);
+  try {
+    state.ar = await api("/api/fx/receivables?" + q.toString());
+    fillArDistSelect();
+    renderReceivables();
+  } catch (e) { toast("应收账款加载失败: " + e.message); }
+}
+
+function renderReceivables(){
+  if (!state.ar) return;
+  const kw = ($("arSearch") && $("arSearch").value || "").trim().toLowerCase();
+  const items = (state.ar.items || []).filter(x => !kw
+    || (x.order_no || "").toLowerCase().includes(kw));
+  renderArMetrics(state.ar.totals || {}, state.ar.stats || {});
+
+  const un = state.ar.unclaimed || [];
+  const unBox = $("arUnclaimed");
+  if (unBox) {
+    if (un.length) {
+      unBox.style.display = "";
+      unBox.innerHTML = `<b>⚠ ${un.length} 张凭证还没挂订单</b>
+        <span>（钱到了但没认领：先收钱后发货的常见情况）点凭证缩略图指定订单</span>`
+        + un.slice(0, 6).map(v => `<span class="pv-thumb pending" title="${esc(v.filename)} · 点一下指定订单"
+            onclick="claimVoucher(${v.id}, ${v.distributor_id})"><img src="${v.url}">
+            <span class="pv-badge">${v.amount ? "¥" + v.amount : "待认领"}</span></span>`).join("")
+        + `<span style="color:#8a5a00">认领后就能在订单详情里看到这张凭证并确认收款</span>`;
+    } else {
+      unBox.style.display = "none";
+    }
+  }
+
+  $("arEmpty").style.display = items.length ? "none" : "";
+  $("arBody").innerHTML = items.map(it => {
+    const open = Number(it.open_amount || 0);
+    const openCls = open > 0 ? "color:#e5484d;font-weight:700" : "color:#8a94a6";
+    const stCls = it.payment_status === "received" ? "ok" : it.payment_status === "partial" ? "warn" : "";
+    const thumbs = (it.vouchers || []).map(v =>
+      `<span class="pv-thumb${v.applied ? "" : " pending"}" title="${esc(v.filename)} · ${v.applied ? "已入账" : "未入账"}${v.amount ? " · ¥" + v.amount : ""}"
+        onclick="event.stopPropagation();openLightbox('${v.url}')"><img src="${v.url}">
+        <span class="pv-badge">${v.applied ? "已入账" : (v.amount ? "¥" + v.amount : "待确认")}</span></span>`).join("");
+    const more = (it.voucher_count || 0) > (it.vouchers || []).length
+      ? `<span style="font-size:11px;color:#8a94a6">+${it.voucher_count - it.vouchers.length}</span>` : "";
+    return `<tr data-id="${it.id}">
+      <td><b>${esc(it.order_no)}</b></td>
+      <td>${esc(it.order_date)}</td>
+      <td>${esc(it.distributor_name)}</td>
+      <td class="num">${money(it.total_amount)}</td>
+      <td class="num">${Number(it.paid_amount) > 0 ? money(it.paid_amount) : "—"}</td>
+      <td class="num" style="${openCls}">${open > 0 ? money(it.open_amount) : "已结清"}</td>
+      <td><span class="tag ${it.payment_status === "received" ? "approved" : it.payment_status === "partial" ? "submitted" : "draft"}">${AR_STATUS[it.payment_status] || it.payment_status}</span>
+        ${it.payment_date ? `<span class="cell-sub">${esc(it.payment_date)}</span>` : ""}</td>
+      <td><div class="ar-vcell">${thumbs}${more}
+        <div class="pv-drop" title="点这里选图，或先点一下再 Ctrl+V 粘贴"
+             ondragover="event.preventDefault();this.classList.add('on')"
+             ondragleave="this.classList.remove('on')"
+             ondrop="pvDropFile(event, ${it.id})"
+             onclick="event.stopPropagation();pvTarget(${it.id})">＋<br>粘图</div></div></td>
+      <td class="ops" onclick="event.stopPropagation()">
+        <button class="btn mini" onclick="pvTarget(${it.id});viewOrder(${it.id})">详情 / 凭证</button>
+        <button class="btn mini" onclick="pvTarget(${it.id});voucherFilePick(${it.id})">上传凭证</button>
+      </td></tr>`;
+  }).join("");
+  syncCols("ar");
+}
+
+/* 认领：把「没挂订单的凭证」指定到某张订单上（钱到了但还没认单的场景） */
+async function claimVoucher(vid, distId){
+  const input = prompt("这张凭证要挂到哪张订单？\n输入订单号（FX 开头，可只输后几位）或订单 id：", "");
+  if (!input) return;
+  const kw = input.trim().toUpperCase();
+  const pool = (state.orders || []).filter(o => !distId || String(o.distributor_id) === String(distId));
+  let order = pool.find(o => (o.order_no || "").toUpperCase() === kw)
+    || pool.find(o => String(o.id) === kw)
+    || pool.find(o => (o.order_no || "").toUpperCase().includes(kw));
+  if (!order) { toast(`这个分销商名下找不到订单「${input}」`); return; }
+  const left = Number(order.total_amount || 0) - Number(order.paid_amount || 0);
+  if (!confirm(`把凭证挂到 ${order.order_no}（${order.distributor_name || ""}）？\n`
+    + `该单应收 ¥${Number(order.total_amount || 0).toFixed(2)}，已收 ¥${Number(order.paid_amount || 0).toFixed(2)}，未收 ¥${left.toFixed(2)}\n\n`
+    + `挂上之后还要在订单详情里点「确认收款」才会真正入账。`)) return;
+  try {
+    await api("/api/fx/vouchers/" + vid, { method: "PUT", body: JSON.stringify({ order_id: order.id }) });
+    toast(`已挂到 ${order.order_no}`);
+    await loadReceivables();
+    await viewOrder(order.id);
+  } catch (e) { toast("认领失败: " + e.message); }
+}
+
+/* 指定「粘贴目标」：点一下某行的粘图格，随后 Ctrl+V 就落到这单 */
+function pvTarget(orderId){
+  state.pvTarget = orderId;
+  document.querySelectorAll("#arBody .pv-drop").forEach(el => el.classList.remove("on"));
+  const row = document.querySelector(`#arBody tr[data-id="${orderId}"] .pv-drop`);
+  if (row) row.classList.add("on");
+  toast("已选中该订单，现在 Ctrl+V 粘贴打款截图");
+}
+
+function renderArMetrics(t, stats){
+  const box = $("arMetrics");
+  if (!box) return;
+  const money2 = (v) => "¥" + Number(v || 0).toLocaleString("zh-CN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  const open = Number(t.outstanding || 0);
+  box.innerHTML = `
+    <div class="ar-metric"><div class="k">应收合计</div><div class="v">${money2(t.receivable)}</div></div>
+    <div class="ar-metric ok"><div class="k">已收合计</div><div class="v">${money2(t.received)}</div></div>
+    <div class="ar-metric ${open > 0 ? "danger" : ""}"><div class="k">未收合计</div><div class="v">${money2(t.outstanding)}</div></div>
+    <div class="ar-metric"><div class="k">订单数</div><div class="v">${t.order_count || 0}</div></div>
+    <div class="ar-metric ${(t.without_voucher || 0) > 0 ? "warn" : ""}"><div class="k">缺凭证订单</div>
+      <div class="v">${t.without_voucher || 0}</div></div>`;
+}
 </script>
 </body>
 </html>

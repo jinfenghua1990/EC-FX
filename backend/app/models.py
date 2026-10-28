@@ -97,14 +97,96 @@ class FxDistributor(Base):
     # 空 = 还没录授权品牌：顶部选了具体品牌时它不出现（只在「全部品牌」下可见），
     # 绝不默认成「全品牌通吃」，免得给它看到别的品牌的货。
     brands: Mapped[str] = mapped_column(String(500), default="")
-    # pay_accounts：付款账户（付款方公司/个人名），逗号分隔存。
-    # 一个客户可能从多个账户付款（自己付/关联公司代付/个人卡付），都记在这里；
-    # 合并分销商时，被并入那几行的名称和付款账户也会汇进来。
+    # pay_accounts：旧版付款账户快照（付款方公司/个人名，逗号分隔）。
+    # 2026-10-28 起付款账户明细改存 fx_distributor_pay_accounts；这一列只保留兼容，
+    # 每次保存/合并会同步账户名，旧代码/旧导入模板仍可读。
     pay_accounts: Mapped[str] = mapped_column(String(800), default="")
     # region（区域）已停用：2026-10-28 起页面不再显示也不再录入，旧数据保留在库里不删
     region: Mapped[str] = mapped_column(String(120), default="")
     note: Mapped[str] = mapped_column(String(1000), default="")
     active: Mapped[int] = mapped_column(Integer, default=1, index=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # 付款账户明细：一个客户可以挂多个付款抬头（多对多，见 fx_distributor_pay_links）。
+    pay_links: Mapped[list["FxDistributorPayLink"]] = relationship(
+        back_populates="distributor",
+        cascade="all, delete-orphan",
+        order_by="FxDistributorPayLink.sort_order",
+    )
+
+
+class FxPayEntity(Base):
+    """付款抬头主档（全平台唯一，一份资料多方共用）。
+
+    2026-10-28 重构：以前每个分销商名下各存一份「湖南正祥医药有限公司」，
+    同一抬头重复三四条、税号银行信息各改各的。现在抬头独立成主数据：
+    - 同名抬头全库只一条，谁都可以关联使用（多维度交叉：抬头 ↔ 多个分销商）；
+    - 在任何一个客户里补全税号/开户行，其他关联客户立刻同步；
+    - 旧表 fx_distributor_pay_accounts 保留作历史快照，不再写入。
+    """
+    __tablename__ = "fx_pay_entities"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # 付款方名称（公司全称或个人姓名），全局唯一——去重合并的锚点
+    name: Mapped[str] = mapped_column(String(160), unique=True, index=True)
+    # 该付款主体自己的税号，和客户主档税号可以不同
+    tax_no: Mapped[str] = mapped_column(String(80), default="")
+    bank_name: Mapped[str] = mapped_column(String(160), default="")
+    bank_branch: Mapped[str] = mapped_column(String(160), default="")
+    bank_account: Mapped[str] = mapped_column(String(80), default="")
+    # 银行账户户名 / 收款人；客户收款时可用来核对「谁收、谁付」
+    account_holder: Mapped[str] = mapped_column(String(160), default="")
+    # company = 对公，personal = 对私
+    account_type: Mapped[str] = mapped_column(String(20), default="company")
+    note: Mapped[str] = mapped_column(String(500), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class FxDistributorPayLink(Base):
+    """分销商 ↔ 付款抬头 关联（多对多交叉）。
+
+    同一付款抬头（如关联公司代付）可以挂在多个分销商名下；每个分销商
+    各自维护默认抬头和收款备注，抬头本身的税号/银行资料只在主档存一份。
+    """
+    __tablename__ = "fx_distributor_pay_links"
+    __table_args__ = (
+        UniqueConstraint("distributor_id", "entity_id", name="uq_fx_pay_link"),
+    )
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    distributor_id: Mapped[int] = mapped_column(
+        ForeignKey("fx_distributors.id", ondelete="CASCADE"), index=True
+    )
+    entity_id: Mapped[int] = mapped_column(
+        ForeignKey("fx_pay_entities.id", ondelete="RESTRICT"), index=True
+    )
+    is_default: Mapped[int] = mapped_column(Integer, default=0)
+    # 客户收款备注/用途：如「货款」「预付款」「关联公司代付」，只做说明，不存金额
+    collection_note: Mapped[str] = mapped_column(String(500), default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+
+    distributor: Mapped["FxDistributor"] = relationship(back_populates="pay_links")
+    entity: Mapped["FxPayEntity"] = relationship(lazy="joined")
+
+
+class FxBrand(Base):
+    """品牌主数据：顶部品牌切换、商品品牌、分销商授权品牌共用同一份清单。"""
+    __tablename__ = "fx_brands"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    # 品牌全名（产品档案里的原值，如「格力高/Glico」）
+    name: Mapped[str] = mapped_column(String(100), unique=True, index=True)
+    # 顶栏和卡片上显示的短名；空 = 自动取 name 第一个「/」前的部分
+    short_name: Mapped[str] = mapped_column(String(60), default="")
+    code: Mapped[str] = mapped_column(String(60), default="")
+    # 品牌 LOGO 文件名（brand-logos/ 目录）或完整 URL；空 = 用品牌首字徽标
+    logo: Mapped[str] = mapped_column(String(255), default="")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0)
+    active: Mapped[int] = mapped_column(Integer, default=1, index=True)
+    note: Mapped[str] = mapped_column(String(500), default="")
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
@@ -156,6 +238,8 @@ class FxProduct(Base):
     cost_note: Mapped[str] = mapped_column(String(300), default="")
     note: Mapped[str] = mapped_column(String(500), default="")
     active: Mapped[int] = mapped_column(Integer, default=1, index=True)
+    # 热销标记：1 = 下单页展示，0 = 不在下单页展示。与 active 独立，停用后即使标记也不下单。
+    is_hot: Mapped[int] = mapped_column(Integer, default=0, index=True)
     # --- 旺店通商品档案字段（由「从旺店通同步商品」回填，手工建品时留空）---
     spec_no: Mapped[str] = mapped_column(String(160), default="", index=True)
     goods_no: Mapped[str] = mapped_column(String(80), default="", index=True)
@@ -357,10 +441,44 @@ class FxOrder(Base):
     order_date: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, index=True)
     total_amount: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
     remark: Mapped[str] = mapped_column(String(1000), default="")
+    # 这单是谁付的钱：一个订单只有一个付款公司（用户 2026-10-28 定）。
+    # 分销商档案上的「付款账户」是「这个客户名下有哪些公司」的集合，两者不是一个概念。
+    pay_company: Mapped[str] = mapped_column(String(160), default="")
+    # 内部 FX 单号之外，旺店通 / 客户 Excel 里的原始订单号；一单可能拆成多个单号，逗号分隔。
+    # 与 wdt_tid 分开：wdt_tid 是推送旺店通用的单号，历史团单里它就是原始出库单号；
+    # 新单推送后 wdt_tid 可能等于内部单号，不能拿它冒充原始订单号。
+    original_order_no: Mapped[str] = mapped_column(String(255), default="")
+    # 来源：手工 / 旺店通 / 团单Excel；只做标识和排查，不参与金额计算
+    source_channel: Mapped[str] = mapped_column(String(32), default="")
+    # 下单页录的订单头信息（用户 2026-10-28 要求订单维度一次录全，别再靠备注口口相传）。
+    # order_channel 是**业务渠道**（线下/团购/直播…），由下单人填；
+    # 上面的 source_channel 是**系统来源**（手工/旺店通/团单Excel），由程序写，两者别混。
+    order_channel: Mapped[str] = mapped_column(String(32), default="")
+    ship_warehouse: Mapped[str] = mapped_column(String(80), default="")
+    # 给仓库的额外要求：打包方式、随货资料、时效等，自由文本
+    ship_note: Mapped[str] = mapped_column(String(500), default="")
+    # 配送方式："" 未指定 / pickup 自提 / delivery 送货。自提不产生物流单号。
+    delivery_type: Mapped[str] = mapped_column(String(16), default="")
+    # 刮码：0 不刮（默认）/ 1 需要刮掉条码。客户防窜货、防追溯的常规要求。
+    scratch_code: Mapped[int] = mapped_column(Integer, default=0)
     # 预留：未来推送旺店通时的原始单号 tid
     wdt_tid: Mapped[str] = mapped_column(String(120), default="")
     # 推送目标店铺：下单时选定（如 hhz-xxqd=红盒子-格力高-分销渠道）；空 = 用系统默认配置
     wdt_shop_no: Mapped[str] = mapped_column(String(40), default="")
+    # 推送目标仓库编号（如 HHZ-Glico=红盒子-格力高磐石仓）；空 = 回退 .env WDT_WAREHOUSE_NO。
+    # ship_warehouse 存中文名给人看，本字段才是旺店通 trade_push.php 的 warehouse_no。
+    wdt_warehouse_no: Mapped[str] = mapped_column(String(40), default="")
+    # 收款状态：unpaid 未收到 / partial 部分收款 / received 已收到 / refunded 已退款
+    payment_status: Mapped[str] = mapped_column(String(16), default="unpaid", index=True)
+    paid_amount: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
+    payment_date: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    # 发货状态：unshipped 未发货 / partial 部分发货 / shipped 已发货 / returned 已退回
+    shipping_status: Mapped[str] = mapped_column(String(16), default="unshipped", index=True)
+    shipped_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    logistics_company: Mapped[str] = mapped_column(String(100), default="")
+    logistics_no: Mapped[str] = mapped_column(String(120), default="")
+    # 客户签收时间（源表「签收时间」有就展示，没有留空）
+    signed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     # 推送旺店通的记录："" 未推送 / sent 已推送 / failed 失败，message 存最后一次结果
     push_status: Mapped[str] = mapped_column(String(16), default="")
     push_message: Mapped[str] = mapped_column(String(500), default="")
@@ -400,5 +518,50 @@ class FxPrice(Base):
     product_id: Mapped[int] = mapped_column(ForeignKey("fx_products.id"), index=True)
     price: Mapped[Decimal] = mapped_column(MONEY, default=Decimal("0"))
     note: Mapped[str] = mapped_column(String(200), default="")
+    created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class FxPaymentVoucher(Base):
+    """客户打款凭证（截图 / 回单照片）。
+
+    用户 2026-10-28 要求：客户付款后把打款凭证粘到系统里，自动识别金额和日期，
+    落到「应收账款」里，每个订单都能挂自己的凭证。
+
+    设计口径：
+    - 图片原文件存磁盘（data/local/vouchers/YYYY-MM/），库里只存相对路径，
+      避免把二进制塞进 SQLite 把库撑大；
+    - `order_id` 允许为空：先收到钱、还没认领到具体订单时先挂到分销商名下，
+      之后再认领（认领只改 order_id，不重新 OCR）；
+    - OCR 只做「辅助填数」：识别结果存进来给人核对，绝不自动改订单金额，
+      必须由人点「确认收款」才写 paid_amount（见 services/vouchers.py:apply_voucher）；
+    - `applied` 标记这张凭证是否已计入某张订单的收款，防止同一张图重复入账。
+    """
+
+    __tablename__ = "fx_payment_vouchers"
+    id: Mapped[int] = mapped_column(primary_key=True)
+    order_id: Mapped[int | None] = mapped_column(
+        ForeignKey("fx_orders.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    distributor_id: Mapped[int] = mapped_column(ForeignKey("fx_distributors.id"), index=True)
+    # 原始文件名（只作展示），磁盘上的名字是 uuid，避免中文/重名冲突
+    filename: Mapped[str] = mapped_column(String(255), default="")
+    # 相对 VOUCHER_ROOT 的路径，如 2026-10/3f2a....jpg
+    stored_path: Mapped[str] = mapped_column(String(255), default="")
+    mime: Mapped[str] = mapped_column(String(80), default="")
+    size: Mapped[int] = mapped_column(Integer, default=0)
+    sha256: Mapped[str] = mapped_column(String(64), default="", index=True)
+    # OCR 状态：pending 待识别 / done 成功 / failed 失败 / unavailable 本机没有 OCR 引擎
+    ocr_status: Mapped[str] = mapped_column(String(16), default="pending", index=True)
+    ocr_engine: Mapped[str] = mapped_column(String(32), default="")
+    ocr_text: Mapped[str] = mapped_column(Text, default="")
+    # 识别出来的打款信息（人可改，改完再确认收款）
+    amount: Mapped[Decimal | None] = mapped_column(MONEY, nullable=True)
+    paid_at: Mapped[str] = mapped_column(String(20), default="")   # YYYY-MM-DD HH:MM
+    payer: Mapped[str] = mapped_column(String(160), default="")     # 付款方 / 付款人
+    pay_method: Mapped[str] = mapped_column(String(32), default="")  # 微信 / 支付宝 / 银行转账…
+    note: Mapped[str] = mapped_column(String(255), default="")       # 摘要 / 备注
+    # 0 = 只存凭证没入账，1 = 已计入订单收款
+    applied: Mapped[int] = mapped_column(Integer, default=0, index=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow)
     updated_at: Mapped[datetime] = mapped_column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

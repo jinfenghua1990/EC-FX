@@ -34,7 +34,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 from typing import Any
 
-from sqlalchemy import delete, or_, select
+from sqlalchemy import delete, exists, func, or_, select
 from sqlalchemy.orm import Session
 
 from ..models import FxProduct, FxPurchaseItem, FxPurchaseOrder, FxPurchasePrice
@@ -834,8 +834,18 @@ def list_purchase_orders(
     keyword: str = "",
     abnormal: int = -1,
     limit: int = 200,
+    brand: str = "",
 ) -> list[dict]:
-    """采购单列表（供页面查询；后续关联商品/分销订单也从这里接）。"""
+    """采购单列表（供页面查询；后续关联商品/分销订单也从这里接）。
+
+    品牌筛选（brand）
+    -----------------
+    品牌只落在明细 `fx_purchase_items.brand_name` 上，单据头没有品牌字段，
+    所以只能筛「明细里含该品牌货品的采购单」（EXISTS 子查询）。
+    命中之后，列表的数量/金额、明细弹窗的内容都收窄到该品牌 —— 否则一张
+    混品牌采购单会把别的品牌的金额算进来，页面上怎么加都对不上。
+    """
+    brand = (brand or "").strip()
     stmt = select(FxPurchaseOrder).order_by(FxPurchaseOrder.check_time.desc(), FxPurchaseOrder.id.desc())
     if month:
         start = datetime.strptime(f"{month}-01", "%Y-%m-%d")
@@ -848,15 +858,49 @@ def list_purchase_orders(
                 FxPurchaseOrder.purchase_no.like(like),
                 FxPurchaseOrder.provider_name.like(like),
                 FxPurchaseOrder.warehouse_name.like(like),
+                # 单号/供应商之外，也要能按「品牌、货品名、商家编码」搜到单
+                exists(
+                    select(1)
+                    .select_from(FxPurchaseItem)
+                    .where(
+                        FxPurchaseItem.order_id == FxPurchaseOrder.id,
+                        or_(
+                            FxPurchaseItem.brand_name.like(like),
+                            FxPurchaseItem.goods_name.like(like),
+                            FxPurchaseItem.spec_no.like(like),
+                        ),
+                    )
+                ),
             )
         )
     if abnormal in (0, 1):
         stmt = stmt.where(FxPurchaseOrder.abnormal == abnormal)
+    if brand:
+        stmt = stmt.where(
+            exists(
+                select(1)
+                .select_from(FxPurchaseItem)
+                .where(
+                    FxPurchaseItem.order_id == FxPurchaseOrder.id,
+                    FxPurchaseItem.brand_name == brand,
+                )
+            )
+        )
     rows = db.scalars(stmt.limit(max(1, min(int(limit), 1000)))).all()
 
     result: list[dict] = []
     for row in rows:
         items = db.scalars(select(FxPurchaseItem).where(FxPurchaseItem.order_id == row.id)).all()
+        # 选了品牌：数量/金额/明细都只算这个品牌，和页面上的品牌视图保持一致
+        scoped = [i for i in items if i.brand_name == brand] if brand else items
+        if brand:
+            goods_count = sum((i.num for i in scoped), Decimal("0"))
+            goods_amount = sum((i.amount for i in scoped), Decimal("0"))
+            tax_amount = sum((i.tax_amount for i in scoped), Decimal("0"))
+        else:
+            goods_count = row.goods_count
+            goods_amount = row.goods_amount
+            tax_amount = row.tax_goods_amount
         result.append(
             {
                 "id": row.id,
@@ -867,13 +911,16 @@ def list_purchase_orders(
                 "status": row.status,
                 "status_label": purchase_status_label(row.status),
                 "check_time": row.check_time.strftime("%Y-%m-%d %H:%M") if row.check_time else "",
-                "goods_count": str(row.goods_count),
-                "goods_amount": str(row.goods_amount),
-                "tax_goods_amount": str(row.tax_goods_amount),
+                "goods_count": str(goods_count),
+                "goods_amount": str(goods_amount),
+                "tax_goods_amount": str(tax_amount),
                 "remark": row.remark,
                 "abnormal": bool(row.abnormal),
                 "abnormal_reason": row.abnormal_reason,
-                "item_count": len(items),
+                "item_count": len(scoped),
+                "brand_scoped": bool(brand),
+                # 这张单涉及哪些品牌（选品牌时只看得到该品牌，列表多一列品牌维度）
+                "brands": sorted({i.brand_name for i in scoped if i.brand_name}),
                 "items": [
                     {
                         "spec_no": item.spec_no,
@@ -889,21 +936,84 @@ def list_purchase_orders(
                         "last_price": str(item.last_price),
                         "lowest_price": str(item.lowest_price),
                     }
-                    for item in items
+                    for item in scoped
                 ],
             }
         )
     return result
 
 
-def purchase_order_summary(db: Session) -> dict[str, Any]:
-    rows = db.scalars(select(FxPurchaseOrder)).all()
+def purchase_order_summary(db: Session, brand: str = "") -> dict[str, Any]:
+    """顶部统计卡片。
+
+    选了品牌就整套跟着品牌走：单数/异常数按「含该品牌货品的采购单」算；
+    金额换成该品牌明细的含税合计（goods_amount 是不含税口径，
+    跨品牌相加对不上，混品牌单还会把别的品牌的货算进来）。
+    """
+    brand = (brand or "").strip()
+    stmt = select(FxPurchaseOrder)
+    if brand:
+        stmt = stmt.where(
+            exists(
+                select(1)
+                .select_from(FxPurchaseItem)
+                .where(
+                    FxPurchaseItem.order_id == FxPurchaseOrder.id,
+                    FxPurchaseItem.brand_name == brand,
+                )
+            )
+        )
+    rows = db.scalars(stmt).all()
     total_amount = sum((_d(r.goods_amount) for r in rows), Decimal("0"))
+    total_tax = sum((_d(r.tax_goods_amount) for r in rows), Decimal("0"))
     abnormal = sum(1 for r in rows if r.abnormal)
     latest = max((r.check_time for r in rows if r.check_time), default=None)
-    return {
+    summary: dict[str, Any] = {
         "orders": len(rows),
         "abnormal_orders": abnormal,
         "goods_amount": str(total_amount.quantize(Decimal("0.01"))),
+        "tax_goods_amount": str(total_tax.quantize(Decimal("0.01"))),
         "latest_check_time": latest.strftime("%Y-%m-%d %H:%M") if latest else "",
+        "brand": brand,
     }
+    if brand and rows:
+        agg = db.execute(
+            select(
+                func.coalesce(func.sum(FxPurchaseItem.amount), 0),
+                func.coalesce(func.sum(FxPurchaseItem.tax_amount), 0),
+                func.coalesce(func.sum(FxPurchaseItem.num), 0),
+            )
+            .where(FxPurchaseItem.order_id.in_([r.id for r in rows]))
+            .where(FxPurchaseItem.brand_name == brand)
+        ).one()
+        summary["brand_goods_amount"] = str(_d(agg[0]).quantize(Decimal("0.01")))
+        summary["brand_tax_amount"] = str(_d(agg[1]).quantize(Decimal("0.01")))
+        summary["brand_goods_count"] = str(_d(agg[2]))
+    return summary
+
+
+def purchase_brands(db: Session) -> list[dict[str, Any]]:
+    """采购明细里真实出现过的品牌，给页面的品牌下拉用。
+
+    用明细的品牌而不是商品档案的品牌：采购单里才会出现「磐石-瑞士莲（京东专供）」
+    这类供货口径，跟档案里的品牌名不一定完全一致，下拉必须跟数据对得上。
+    """
+    rows = db.execute(
+        select(FxPurchaseItem.brand_name, func.count(FxPurchaseItem.id))
+        .where(FxPurchaseItem.brand_name != "")
+        .group_by(FxPurchaseItem.brand_name)
+        .order_by(func.count(FxPurchaseItem.id).desc(), FxPurchaseItem.brand_name.asc())
+    ).all()
+    return [{"name": name, "items": count} for name, count in rows]
+
+
+def purchase_months(db: Session) -> list[str]:
+    """有采购单的月份（YYYY-MM，倒序），给月份下拉用。
+
+    只查 check_time 一列，不碰明细 —— 页面原来靠「再拉 1000 张单+全部明细」
+    去凑月份，切一次品牌就多跑一次重查询，这里顺手替掉。
+    """
+    rows = db.scalars(
+        select(FxPurchaseOrder.check_time).where(FxPurchaseOrder.check_time.isnot(None))
+    ).all()
+    return sorted({r.strftime("%Y-%m") for r in rows}, reverse=True)

@@ -107,22 +107,51 @@ class WangdianClient:
             page_no += 1
         return rows
 
+    def warehouses(self, page_size: int = 100) -> list[dict[str, Any]]:
+        """拉取旺店通仓库档案（warehouse_query.php，只读）。
+
+        下单页只允许选红盒子-格力高磐石仓，但仓库编号必须以旺店通档案为准，
+        不能在代码里写死显示名；拉取失败时页面保留一个安全的 Glico 兜底。
+        """
+        rows: list[dict[str, Any]] = []
+        page_no = 0
+        while True:
+            payload = self._request(
+                "warehouse_query.php",
+                {"page_no": page_no, "page_size": page_size},
+            )
+            page_rows = payload.get("warehouses") or []
+            rows.extend(page_rows)
+            if not page_rows or len(page_rows) < page_size:
+                break
+            page_no += 1
+        return rows
+
     def sales_trade_push(self, trade: dict[str, Any]) -> dict[str, Any]:
         """推送/更新销售单（分销订单 → 旺店通）。
 
-        旺店通 openapi2 sales_trade_push.php：shop_no + tid + trade（JSON 串）。
-        tid 相同则更新原单，因此重推分销订单不会造成重复。
+        旺店通 openapi2 `trade_push.php` 的正式报文：
+        `shop_no` + `trade_list`（JSON 数组，单条包含 `order_list`）。
+        同一 `tid` 会更新原单，因此重推分销订单不会造成重复。
+
+        方法名保留 `sales_trade_push` 是为了兼容既有调用和测试；实际接口已按
+        官方文档更正，不再使用不存在的 `sales_trade_push.php` / `trade` 单对象。
         """
         if not trade.get("shop_no"):
             raise RuntimeError("旺店通销售单推送缺少 shop_no，请配置 WDT_SHOP_NO")
-        if not trade.get("tid"):
-            raise RuntimeError("销售单推送缺少 tid（原始单号）")
+        trade_list = trade.get("trade_list")
+        if not trade_list:
+            # 兼容旧调用方：如果直接传一条 trade（含 tid），包成 trade_list
+            if trade.get("tid"):
+                trade_list = [{k: v for k, v in trade.items() if k != "shop_no"}]
+            else:
+                raise RuntimeError("销售单推送缺少 trade_list / tid")
         return self._request(
-            "sales_trade_push.php",
+            "trade_push.php",
             {
                 "shop_no": _s(trade.get("shop_no")),
-                "tid": _s(trade.get("tid")),
-                "trade": json.dumps(trade, ensure_ascii=False, default=str),
+                "switch": "0",  # 非严格模式：先保证能建单，必填字段仍全部显式传
+                "trade_list": json.dumps(trade_list, ensure_ascii=False, default=str),
             },
         )
 

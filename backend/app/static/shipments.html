@@ -195,7 +195,7 @@ async function load(){
     $('rows').innerHTML=d.rows.map(r=>{
       const e=r.effective||{},rw=r.raw||{};
       const post=(Number(e.post_cost||0)+Number(e.package_cost||0));
-      return `<tr>
+      return `<tr data-no="${esc(r.stockout_no)}">
       <td style="font-family:ui-monospace,monospace;font-size:12px">${esc(r.stockout_no)}</td>
       <td>${esc(r.shop_name)}</td><td>${esc(pname(r.platform_id))}</td>
       <td style="color:var(--muted)">${esc((r.consign_time||'').replace('T',' ').slice(0,16))}</td>
@@ -260,6 +260,11 @@ $('fMonth').value=defMonth();
 $('fMonth').addEventListener('change',()=>{page=1;loadFacets();loadOverview();load()});
 ['fShop','fPlatform','fStatus','fRefund','fAdj'].forEach(id=>$(id).addEventListener('change',()=>{page=1;load()}));
 $('fSearch').addEventListener('keydown',e=>{if(e.key==='Enter'){page=1;load()}});
+/* 双击表头排序；双击任意行打开出库单详情（点“详情”链接时交给 onclick，避免重复弹） */
+if(window.fxTable){
+  fxTable.sort(document.querySelector('#rows').closest('table'));
+  fxTable.rowEdit($('rows'),(tr,e)=>{if(e.target.closest('.link'))return;if(tr.dataset.no)detail(tr.dataset.no)});
+}
 loadOverview();loadFacets();load();checkWdt();
 </script>
 </body>

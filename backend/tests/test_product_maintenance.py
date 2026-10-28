@@ -148,6 +148,20 @@ def test_summary_counts():
     assert s["clean"] is False
 
 
+def test_summary_ignores_inactive_products():
+    """停用商品不再参与顶部横幅统计；牌价明细仍保留。"""
+    rows = [
+        _product(sku="A", active=False),
+        _product(sku="B", list_price=Decimal("5.83"), tier1_price=Decimal("4.95")),
+    ]
+    s = maintenance_summary(rows)
+    assert s["total_products"] == 2
+    assert s["active_products"] == 1
+    assert s["no_list_price"] == 0
+    assert s["no_tier1_price"] == 0
+    assert s["clean"] is True
+
+
 def test_summary_clean_when_all_maintained():
     rows = [_product(sku="A", list_price=Decimal("5.83"), tier1_price=Decimal("4.95"))]
     s = maintenance_summary(rows)

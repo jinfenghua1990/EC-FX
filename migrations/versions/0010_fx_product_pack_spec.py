@@ -26,9 +26,16 @@ _TABLE = "fx_products"
 
 
 def upgrade() -> None:
+    # 0007 里 create_all 会按当前模型把 fx_products 整张表建出来，箱规两列已经在里面；
+    # 老库（先有表、后升级）才需要补列。两种路径都要能跑通，所以先看有没有。
+    from sqlalchemy import inspect
+
+    existing = {c["name"] for c in inspect(op.get_bind()).get_columns(_TABLE)}
     with op.batch_alter_table(_TABLE) as batch:
-        batch.add_column(sa.Column("pack_qty", sa.Integer(), nullable=False, server_default="0"))
-        batch.add_column(sa.Column("pack_unit", sa.String(length=20), nullable=False, server_default="箱"))
+        if "pack_qty" not in existing:
+            batch.add_column(sa.Column("pack_qty", sa.Integer(), nullable=False, server_default="0"))
+        if "pack_unit" not in existing:
+            batch.add_column(sa.Column("pack_unit", sa.String(length=20), nullable=False, server_default="箱"))
 
 
 def downgrade() -> None:

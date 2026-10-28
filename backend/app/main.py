@@ -29,13 +29,16 @@ from .services.adjustments import (
 )
 from .services.distribution import (
     FX_ORDER_STATUSES, STATUS_LABELS, batch_push_orders, batch_transition_orders,
-    create_and_push_order, create_distributor, create_order, create_product,
-    delete_price, fx_overview, import_distributors, import_products,
+    create_and_push_order, create_brand, create_distributor, create_order, create_product,
+    delete_brand, delete_price, detect_push_status, fx_overview, import_distributors, import_products,
+    reconcile_orders_stockout,
     list_distributors, list_orders, list_prices, list_products, list_statements,
-    list_brands, list_top_categories, merge_distributors, set_top_categories,
+    list_brands, list_pay_entities, list_top_categories, merge_distributors, set_top_categories,
     order_detail, push_order_to_wangdian, set_price, set_tier1_prices, statement_excel_bytes,
-    transition_order, toggle_distributor, toggle_product, update_distributor,
-    update_order, update_product,
+    set_hot_products,
+    sync_brands_from_products, toggle_brand, transition_order, toggle_distributor,
+    toggle_product, update_brand, update_distributor, update_order, update_order_fulfillment,
+    update_product,
 )
 from .services.wdt_products import sync_products_from_wdt
 from .services.product_cost import import_list_prices, set_cost_status
@@ -56,6 +59,7 @@ from .services.inventory import (
     stock_overview,
     sync_stock_snapshot,
 )
+from .services import vouchers as voucher_svc
 
 app = FastAPI(title=settings.app_name, version=settings.app_version)
 STATIC_DIR = Path(__file__).parent / "static"
@@ -73,8 +77,22 @@ class AdjustmentPayload(BaseModel):
     active: bool = True
 
 
+class FxDistributorPaymentAccountPayload(BaseModel):
+    """一个付款账户的完整明细。金额不在这里存，财务金额仍由订单/对账单派生。"""
+    account_name: str = ""
+    tax_no: str = ""
+    bank_name: str = ""
+    bank_branch: str = ""
+    bank_account: str = ""
+    account_holder: str = ""
+    account_type: str = "company"
+    collection_note: str = ""
+    is_default: bool = False
+    note: str = ""
+
+
 class FxDistributorPayload(BaseModel):
-    # 编码允许缺省：不填 / 填空都由后端自动生成（D001、D002…），前端不再强制手填
+    # 编码允许缺省：不填 / 填空都由后端自动生成（H-01、H-02…），前端不再强制手填
     code: str = ""
     name: str
     contact: str = ""
@@ -85,8 +103,20 @@ class FxDistributorPayload(BaseModel):
     tax_no: str = ""
     # 授权分销的品牌（可多个）。空数组 = 没录授权，选了具体品牌时这个分销商不出现
     brands: list[str] = Field(default_factory=list)
-    # 付款账户（可多个）：同一个客户从不同公司/个人账户付款时都记这里，对账用
+    # 旧版付款账户名数组（兼容旧前端/批量导入）；新前端用下面的 payment_accounts
     pay_accounts: list[str] = Field(default_factory=list)
+    # 付款账户明细：税号、开户行、账号、户名/收款人、客户收款备注
+    payment_accounts: list[FxDistributorPaymentAccountPayload] = Field(default_factory=list)
+    note: str = ""
+
+
+class FxBrandPayload(BaseModel):
+    name: str = ""
+    short_name: str = ""
+    code: str = ""
+    logo: str = ""
+    sort_order: int = 0
+    active: bool = True
     note: str = ""
 
 
@@ -106,6 +136,8 @@ class FxProductPayload(BaseModel):
     category: str = ""
     # 大类：与分类独立的一层，用户自己维护
     top_category: str = ""
+    # 热销：不传 = 本次不改（编辑弹窗不会冲掉批量标记）；新建默认不热销
+    is_hot: bool | None = None
 
 
 class FxTier1PriceItem(BaseModel):
@@ -125,6 +157,13 @@ class FxTopCategoryItem(BaseModel):
 
 class FxTopCategoriesPayload(BaseModel):
     items: list[FxTopCategoryItem] = []
+
+
+class FxHotProductsPayload(BaseModel):
+    """批量标记热销：只改 is_hot，保留在售状态和全部商品资料。"""
+
+    product_ids: list[int] = []
+    is_hot: bool = True
 
 
 class FxBatchDiscountPayload(BaseModel):
@@ -148,12 +187,63 @@ class FxOrderPayload(BaseModel):
     auto_push: bool = False
     # 推送目标店铺号（如 hhz-xxqd）；留空回退 .env 的 WDT_SHOP_NO
     wdt_shop_no: str = ""
+    # 推送目标仓库编号（如 HHZ-Glico=红盒子-格力高磐石仓）；留空回退 .env
+    wdt_warehouse_no: str = ""
+    # 订单头信息（用户 2026-10-28 要求下单时一次录全，别再靠备注口口相传）
+    order_channel: str = ""      # 业务渠道：与推送店铺合并后存店铺名
+    ship_warehouse: str = ""     # 发货仓库中文名（给人看）
+    ship_note: str = ""          # 发货要求（自由文本）
+    delivery_type: str = ""      # pickup 自提 / delivery 送货 / "" 未指定
+    scratch_code: int = 0        # 1 = 需要刮码
+    order_date: str = ""         # 下单时间，留空用当前时间
 
 
 class FxOrderBatchPayload(BaseModel):
     """批量订单处理：ids 是要处理的订单 id，action 只对 batch-action 生效。"""
     ids: list[int] = Field(default_factory=list)
     action: str = ""
+
+
+class FxOrderFulfillmentPayload(BaseModel):
+    """订单收款 / 发货等执行状态。只传要改的字段，未传的不动。"""
+    original_order_no: str | None = None
+    source_channel: str | None = None
+    # 订单头信息：下单页录漏了可在订单页补
+    order_channel: str | None = None
+    wdt_shop_no: str | None = None
+    wdt_warehouse_no: str | None = None
+    ship_warehouse: str | None = None
+    ship_note: str | None = None
+    delivery_type: str | None = None
+    scratch_code: int | None = None
+    payment_status: str | None = None
+    paid_amount: Decimal | None = None
+    payment_date: str | None = None
+    pay_company: str | None = None
+    shipping_status: str | None = None
+    shipped_at: str | None = None
+    logistics_company: str | None = None
+    logistics_no: str | None = None
+    signed_at: str | None = None
+
+
+class FxVoucherApplyPayload(BaseModel):
+    """把凭证金额计入订单收款。amount 不传就用凭证上识别/手填的金额。
+
+    mode=add 累加到已收（分次打款的常规情况）；mode=set 直接覆盖已收。
+    """
+    amount: str | None = None
+    mode: str = "add"
+
+
+class FxVoucherUpdatePayload(BaseModel):
+    """人工修正识别结果；只传要改的字段。"""
+    amount: str | None = None
+    paid_at: str | None = None
+    payer: str | None = None
+    pay_method: str | None = None
+    note: str | None = None
+    order_id: int | None = None
 
 
 class FxPricePayload(BaseModel):
@@ -678,10 +768,16 @@ def fx_distributors(include_inactive: int = 1, brand: str = "", db: Session = De
     return {"distributors": list_distributors(db, include_inactive=bool(include_inactive), brand=brand)}
 
 
+@app.get("/api/fx/pay-entities")
+def fx_pay_entities(keyword: str = "", db: Session = Depends(get_db)):
+    """付款抬头主档 × 分销商 交叉视图：一个抬头被哪些客户用来付款。"""
+    return {"entities": list_pay_entities(db, keyword=keyword)}
+
+
 @app.post("/api/fx/distributors")
 def fx_distributor_create(payload: FxDistributorPayload, db: Session = Depends(get_db)):
     try:
-        return {"ok": True, "distributor": create_distributor(db, payload.model_dump())}
+        return {"ok": True, "distributor": create_distributor(db, payload.model_dump(exclude_unset=True))}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -689,7 +785,7 @@ def fx_distributor_create(payload: FxDistributorPayload, db: Session = Depends(g
 @app.put("/api/fx/distributors/{distributor_id}")
 def fx_distributor_update(distributor_id: int, payload: FxDistributorPayload, db: Session = Depends(get_db)):
     try:
-        return {"ok": True, "distributor": update_distributor(db, distributor_id, payload.model_dump())}
+        return {"ok": True, "distributor": update_distributor(db, distributor_id, payload.model_dump(exclude_unset=True))}
     except ValueError as exc:
         raise HTTPException(404 if "不存在" in str(exc) else 400, str(exc)) from exc
 
@@ -719,22 +815,67 @@ def fx_distributor_merge(payload: FxDistributorMergePayload, db: Session = Depen
 
 
 @app.get("/api/fx/products")
-def fx_products(include_inactive: int = 1, brand: str = "", db: Session = Depends(get_db)):
+def fx_products(
+    include_inactive: int = 1, brand: str = "", hot_only: int = 0, db: Session = Depends(get_db)
+):
     """商品列表 + 待维护汇总。
 
     maintenance 是给页面顶部「强制提醒横幅」用的：缺牌价 / 缺一级分销价 /
     成本待核对各多少个，点击横幅上的数字直接筛出对应商品。
     """
     return {
-        "products": list_products(db, include_inactive=bool(include_inactive), brand=brand),
+        "products": list_products(
+            db,
+            include_inactive=bool(include_inactive),
+            brand=brand,
+            hot_only=bool(hot_only),
+        ),
         "maintenance": summary_from_db(db, brand=brand, include_inactive=bool(include_inactive)),
     }
 
 
 @app.get("/api/fx/brands")
-def fx_brands(db: Session = Depends(get_db)):
-    """顶部「品牌维度」切换器的数据源：品牌名 + 在售商品数。"""
-    return {"brands": list_brands(db)}
+def fx_brands(include_inactive: int = 0, db: Session = Depends(get_db)):
+    """品牌清单：顶栏切换用启用品牌；品牌管理页传 include_inactive=1 看全量。"""
+    return {"brands": list_brands(db, include_inactive=bool(include_inactive))}
+
+
+@app.post("/api/fx/brands/sync-products")
+def fx_brand_sync_products(db: Session = Depends(get_db)):
+    """把商品档案里出现、但还没建档的品牌补进品牌管理。"""
+    return {"ok": True, **sync_brands_from_products(db)}
+
+
+@app.post("/api/fx/brands")
+def fx_brand_create(payload: FxBrandPayload, db: Session = Depends(get_db)):
+    try:
+        return {"ok": True, "brand": create_brand(db, payload.model_dump())}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.put("/api/fx/brands/{brand_id}")
+def fx_brand_update(brand_id: int, payload: FxBrandPayload, db: Session = Depends(get_db)):
+    try:
+        return {"ok": True, "brand": update_brand(db, brand_id, payload.model_dump())}
+    except ValueError as exc:
+        raise HTTPException(404 if "不存在" in str(exc) else 400, str(exc)) from exc
+
+
+@app.post("/api/fx/brands/{brand_id}/toggle")
+def fx_brand_toggle(brand_id: int, db: Session = Depends(get_db)):
+    try:
+        return {"ok": True, "brand": toggle_brand(db, brand_id)}
+    except ValueError as exc:
+        raise HTTPException(404 if "不存在" in str(exc) else 400, str(exc)) from exc
+
+
+@app.delete("/api/fx/brands/{brand_id}")
+def fx_brand_delete(brand_id: int, db: Session = Depends(get_db)):
+    try:
+        return {"ok": True, **delete_brand(db, brand_id)}
+    except ValueError as exc:
+        raise HTTPException(404 if "不存在" in str(exc) else 409, str(exc)) from exc
 
 
 @app.post("/api/fx/products")
@@ -864,6 +1005,17 @@ def fx_product_cost_warehouse(
     """
     try:
         return {"ok": True, **set_cost_warehouse(db, sku=sku, brand=brand, warehouse=warehouse)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.put("/api/fx/products/hot")
+def fx_product_set_hot(payload: FxHotProductsPayload, db: Session = Depends(get_db)):
+    """批量标记 / 取消热销。注意必须声明在 /api/fx/products/{product_id} 之前。"""
+    if not payload.product_ids:
+        raise HTTPException(400, "没有勾选商品")
+    try:
+        return {"ok": True, **set_hot_products(db, payload.product_ids, payload.is_hot)}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -1050,6 +1202,38 @@ def fx_wdt_shops():
     return {"ok": True, "shops": shops, "default_shop_no": settings.wdt_shop_no}
 
 
+@app.get("/api/fx/wdt/warehouses")
+def fx_wdt_warehouses():
+    """旺店通仓库列表（warehouse_query.php 只读），给下单页选发货仓库。
+
+    当前分销业务只从红盒子-格力高磐石仓（HHZ-Glico）发货，前端会把选项
+    收窄到这一个；接口仍返回全部启用仓，避免写死档案导致仓库改名后失效。
+    """
+    client = WangdianClient()
+    if not client.configured:
+        return {"ok": False, "warehouses": [], "message": "旺店通密钥未配置"}
+    try:
+        rows = client.warehouses()
+    except Exception as exc:  # 网络失败不阻断下单，前端用 HHZ-Glico 兜底
+        return {"ok": False, "warehouses": [], "message": str(exc)[:200]}
+    warehouses = [
+        {
+            "warehouse_no": str(r.get("warehouse_no") or ""),
+            "warehouse_name": str(r.get("name") or r.get("warehouse_name") or ""),
+            "warehouse_type": str(r.get("warehouse_type") or ""),
+        }
+        for r in rows
+        if str(r.get("is_disabled") or "0") != "1"
+        and str(r.get("warehouse_no") or "").strip()
+    ]
+    warehouses.sort(key=lambda w: w["warehouse_name"])
+    return {
+        "ok": True,
+        "warehouses": warehouses,
+        "default_warehouse_no": settings.wdt_warehouse_no or "HHZ-Glico",
+    }
+
+
 @app.post("/api/fx/inventory/sync")
 def fx_inventory_sync(
     snap_date: str = "",
@@ -1149,8 +1333,39 @@ def fx_order_batch_push(payload: FxOrderBatchPayload, db: Session = Depends(get_
     return {"ok": True, **batch_push_orders(db, payload.ids)}
 
 
+@app.post("/api/fx/orders/detect-push")
+def fx_order_detect_push(payload: FxOrderBatchPayload | None = None, db: Session = Depends(get_db)):
+    """自动核对订单在旺店通里的真实状态（历史团单不该再出现在待推送里）。
+
+    不传 ids 就全量核对；传了只核对这些单。
+    """
+    ids = payload.ids if payload and payload.ids else None
+    return {"ok": True, **detect_push_status(db, ids)}
+
+
+@app.get("/api/fx/reconcile-stockout")
+def fx_reconcile_stockout(db: Session = Depends(get_db)):
+    """订单 ⇄ 出库件数核对：按单号关联，逐行比订单件数和旺店通出库件数。"""
+    return {"ok": True, **reconcile_orders_stockout(db)}
+
+
 @app.post("/api/fx/orders")
 def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
+    # 下单时间允许前端指定（补录 / 隔天录单）；格式非法就报错，不静默改成当前时间
+    order_date = None
+    if (payload.order_date or "").strip():
+        try:
+            order_date = datetime.fromisoformat(payload.order_date.strip())
+        except ValueError as exc:
+            raise HTTPException(400, f"下单时间格式不对: {payload.order_date}") from exc
+    head = dict(
+        order_channel=payload.order_channel,
+        ship_warehouse=payload.ship_warehouse,
+        ship_note=payload.ship_note,
+        delivery_type=payload.delivery_type,
+        scratch_code=payload.scratch_code,
+        order_date=order_date,
+    )
     try:
         if payload.auto_push:
             # 下单页一键流程：创建 → 自动审核 → 推送旺店通（失败不回滚，返回报错供重推）
@@ -1160,6 +1375,8 @@ def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
                 lines=[line.model_dump() for line in payload.lines],
                 remark=payload.remark,
                 wdt_shop_no=payload.wdt_shop_no,
+                wdt_warehouse_no=payload.wdt_warehouse_no,
+                **head,
             )
             return {"ok": True, **result}
         row = create_order(
@@ -1168,6 +1385,8 @@ def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
             lines=[line.model_dump() for line in payload.lines],
             remark=payload.remark,
             wdt_shop_no=payload.wdt_shop_no,
+            wdt_warehouse_no=payload.wdt_warehouse_no,
+            **head,
         )
         return {"ok": True, "order": row, "pushed": False, "push_error": ""}
     except ValueError as exc:
@@ -1176,6 +1395,12 @@ def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
 
 @app.put("/api/fx/orders/{order_id}")
 def fx_order_update(order_id: int, payload: FxOrderPayload, db: Session = Depends(get_db)):
+    order_date = None
+    if (payload.order_date or "").strip():
+        try:
+            order_date = datetime.fromisoformat(payload.order_date.strip())
+        except ValueError as exc:
+            raise HTTPException(400, f"下单时间格式不对: {payload.order_date}") from exc
     try:
         row = update_order(
             db,
@@ -1183,10 +1408,141 @@ def fx_order_update(order_id: int, payload: FxOrderPayload, db: Session = Depend
             distributor_id=payload.distributor_id,
             lines=[line.model_dump() for line in payload.lines],
             remark=payload.remark,
+            wdt_shop_no=payload.wdt_shop_no,
+            wdt_warehouse_no=payload.wdt_warehouse_no,
+            order_channel=payload.order_channel,
+            ship_warehouse=payload.ship_warehouse,
+            ship_note=payload.ship_note,
+            delivery_type=payload.delivery_type,
+            scratch_code=payload.scratch_code,
+            order_date=order_date,
         )
         return {"ok": True, "order": row}
     except ValueError as exc:
         raise HTTPException(404 if "不存在" in str(exc) else 400, str(exc)) from exc
+
+
+# 注意：本路由必须定义在下方 {action} 通配路由之前，否则 fulfillment 会被它先匹配走
+@app.put("/api/fx/orders/{order_id}/fulfillment")
+def fx_order_fulfillment(order_id: int, payload: FxOrderFulfillmentPayload,
+                         db: Session = Depends(get_db)):
+    """更新收款 / 发货 / 原始单号；只改传进来的字段。"""
+    try:
+        return {"ok": True, "order": update_order_fulfillment(
+            db, order_id, payload.model_dump(exclude_unset=True)
+        )}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+# ---------------- 客户打款凭证（用户 2026-10-28 要求）----------------
+# 粘一张打款截图 → 自动识别金额/日期/付款方 → 人确认后计入订单收款 → 应收账款里能看到
+
+@app.get("/api/fx/orders/{order_id}/vouchers")
+def fx_order_vouchers(order_id: int, db: Session = Depends(get_db)):
+    try:
+        return {"items": voucher_svc.list_vouchers(db, order_id)}
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+
+
+@app.post("/api/fx/orders/{order_id}/vouchers")
+async def fx_order_voucher_upload(order_id: int, file: UploadFile = File(...),
+                                  db: Session = Depends(get_db)):
+    """上传/粘贴凭证。识别失败也照样存图，返回 ocr_status 让前端提示手填。"""
+    content = await file.read()
+    try:
+        return {"ok": True, "voucher": voucher_svc.add_voucher(
+            db, content=content, filename=file.filename or "voucher.png",
+            mime=file.content_type or "", order_id=order_id,
+        )}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/vouchers")
+async def fx_voucher_upload_unclaimed(file: UploadFile = File(...),
+                                     distributor_id: int = Query(0),
+                                     db: Session = Depends(get_db)):
+    """先收钱后认单：凭证先挂分销商，之后再指定订单。"""
+    content = await file.read()
+    try:
+        return {"ok": True, "voucher": voucher_svc.add_voucher(
+            db, content=content, filename=file.filename or "voucher.png",
+            mime=file.content_type or "", distributor_id=distributor_id or None,
+        )}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/fx/vouchers/{voucher_id}/file")
+def fx_voucher_file(voucher_id: int, db: Session = Depends(get_db)):
+    from .models import FxPaymentVoucher
+    row = db.get(FxPaymentVoucher, int(voucher_id))
+    if not row:
+        raise HTTPException(404, "凭证不存在")
+    try:
+        path = voucher_svc.file_path(row.stored_path)
+    except ValueError as exc:
+        raise HTTPException(404, str(exc)) from exc
+    return FileResponse(path, media_type=row.mime or "image/png",
+                        filename=row.filename or f"voucher-{voucher_id}")
+
+
+@app.put("/api/fx/vouchers/{voucher_id}")
+def fx_voucher_update(voucher_id: int, payload: FxVoucherUpdatePayload,
+                      db: Session = Depends(get_db)):
+    try:
+        return {"ok": True, "voucher": voucher_svc.update_voucher(
+            db, voucher_id, payload.model_dump(exclude_unset=True))}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.delete("/api/fx/vouchers/{voucher_id}")
+def fx_voucher_delete(voucher_id: int, db: Session = Depends(get_db)):
+    try:
+        return voucher_svc.delete_voucher(db, voucher_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/vouchers/{voucher_id}/reparse")
+def fx_voucher_reparse(voucher_id: int, db: Session = Depends(get_db)):
+    try:
+        return {"ok": True, "voucher": voucher_svc.reparse(db, voucher_id)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/vouchers/{voucher_id}/apply")
+def fx_voucher_apply(voucher_id: int, payload: FxVoucherApplyPayload,
+                     db: Session = Depends(get_db)):
+    try:
+        return voucher_svc.apply_voucher(db, voucher_id, amount=payload.amount,
+                                        mode=payload.mode or "add")
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/vouchers/{voucher_id}/unapply")
+def fx_voucher_unapply(voucher_id: int, db: Session = Depends(get_db)):
+    try:
+        return voucher_svc.unapply_voucher(db, voucher_id)
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.get("/api/fx/receivables")
+def fx_receivables(distributor_id: int = Query(0), status: str = Query(""),
+                   keyword: str = Query(""), limit: int = Query(500),
+                   db: Session = Depends(get_db)):
+    """应收账款：订单维度，带凭证缩略图与未收金额。"""
+    data = voucher_svc.receivables(db, distributor_id=distributor_id or None,
+                                   status=status, keyword=keyword, limit=limit)
+    data["unclaimed"] = voucher_svc.unclaimed_vouchers(db)
+    data["stats"] = voucher_svc.voucher_stats(db)
+    return data
 
 
 # 注意：本路由必须定义在下方 {action} 通配路由之前，否则 push-wdt 会被它先匹配走
@@ -1308,6 +1664,12 @@ def purchase_page():
 def distribution_page():
     # 红盒子供销平台：分销管理主模块
     return FileResponse(STATIC_DIR / "distribution.html")
+
+
+@app.get("/brand-management")
+def brand_management_page():
+    # 品牌主数据独立管理页（新增/改名/排序/停用启用）
+    return FileResponse(STATIC_DIR / "brand-management.html")
 
 
 @app.get("/")

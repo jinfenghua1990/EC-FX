@@ -2,7 +2,7 @@
 
 用户 2026-10-28 要求：
 1. 新建分销商想把税号当识别码用 —— 加「税号」字段，选填；
-2. 编码不用手填了 —— 留空自动生成 D001、D002…，且不跳号、不撞已有编码；
+2. 编码不用手填了 —— 留空自动生成 H-01、H-02…，且不跳号、不撞已有编码；
 3. 「区域」页面上删掉（数据是历史值，保留在库里，只是不再录入、不再更新）。
 
 这里锁死三条底线：
@@ -33,8 +33,8 @@ def db():
 def test_code_auto_generated_when_blank(db):
     a = dist.create_distributor(db, {"code": "", "name": "上海甲商贸", "tax_no": "91310115AAAA"})
     b = dist.create_distributor(db, {"code": "   ", "name": "上海乙商贸"})
-    assert a["code"] == "D001"
-    assert b["code"] == "D002"
+    assert a["code"] == "H-01"
+    assert b["code"] == "H-02"
     assert a["tax_no"] == "91310115AAAA"
     assert b["tax_no"] == ""
 
@@ -43,11 +43,11 @@ def test_explicit_code_still_respected_and_no_skip(db):
     """手工编码照旧；自动编号会跳过已占用的号，不会撞车也不会跳空号。"""
     dist.create_distributor(db, {"code": "FX001", "name": "老分销商"})
     auto = dist.create_distributor(db, {"name": "新分销商"})
-    assert auto["code"] == "D001"          # 手工编码不占 D 号段，编号从 D001 起
+    assert auto["code"] == "H-01"          # 手工编码不占 H 号段，编号从 H-01 起
 
-    dist.create_distributor(db, {"code": "D002", "name": "手工占了 D002"})
+    dist.create_distributor(db, {"code": "H-02", "name": "手工占了 H-02"})
     auto2 = dist.create_distributor(db, {"name": "再来一个"})
-    assert auto2["code"] == "D003"         # D001/D002 都占用，顺延到下一个空号
+    assert auto2["code"] == "H-03"         # H-01/H-02 都占用，顺延到下一个空号
 
 
 def test_duplicate_code_still_rejected(db):
@@ -91,5 +91,5 @@ def test_import_uses_tax_no_and_auto_code(db):
     ])
     assert res["created"] == 3
     codes = sorted(db.scalars(select(FxDistributor.code)).all())
-    assert codes == ["D001", "D002", "D003"]
+    assert codes == ["H-01", "H-02", "H-03"]
     assert sorted(db.scalars(select(FxDistributor.tax_no)).all()) == ["T1", "T1", "T2"]

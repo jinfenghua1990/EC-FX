@@ -14,6 +14,7 @@
 from __future__ import annotations
 
 import io
+import re
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
@@ -21,7 +22,18 @@ from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
-from ..models import FxDistributor, FxOrder, FxOrderLine, FxPrice, FxProduct
+from ..models import (
+    FxBrand,
+    FxDistributor,
+    FxDistributorPayLink,
+    FxOrder,
+    FxOrderLine,
+    FxPayEntity,
+    FxPrice,
+    FxProduct,
+    StockoutItem,
+    StockoutOrder,
+)
 from .product_maintenance import log_price_change, maintenance_of
 from .wangdian import WangdianClient
 
@@ -43,6 +55,67 @@ STATUS_LABELS = {
     "approved": "已审核",
     "cancelled": "已取消",
 }
+
+# 旺店通推送状态。"" = 真的还没推（新建单）；
+# "sent" = 已经在旺店通（系统推的，或原表本来就带出库单号）；
+# "history" = 历史导入单，原表没有旺店通单号——既不冒充已推送，也不再混进待推送。
+PUSH_STATUS_LABELS = {
+    "": "未推送",
+    "sent": "已推送旺店通",
+    "failed": "推送失败",
+    "history": "历史单（原表无单号）",
+}
+
+# 订单除了审核状态，还必须能看清钱和货：收款、发货各自独立。
+PAYMENT_STATUS_LABELS = {
+    "": "未记录",
+    "unpaid": "未收到",
+    "partial": "部分收款",
+    "received": "已收到",
+    "refunded": "已退款",
+}
+SHIPPING_STATUS_LABELS = {
+    "": "未记录",
+    "unshipped": "未发货",
+    "partial": "部分发货",
+    "shipped": "已发货",
+    "returned": "已退回",
+}
+PAYMENT_STATUSES = tuple(PAYMENT_STATUS_LABELS)
+SHIPPING_STATUSES = tuple(SHIPPING_STATUS_LABELS)
+# 配送方式：自提没有物流单号，送货必须有。下单页必选，避免发货环节来回问。
+DELIVERY_TYPE_LABELS = {
+    "": "未指定",
+    "pickup": "自提",
+    "delivery": "送货",
+}
+DELIVERY_TYPES = tuple(k for k in DELIVERY_TYPE_LABELS if k)
+# 当前分销业务只从红盒子-格力高磐石仓发货（次品仓 HHZ-Glico-C 不参与）。
+# 下单页会从旺店通仓库档案实时选，但推送必须有编号；这里作为老订单/接口漏传时的兜底。
+DEFAULT_WDT_WAREHOUSE_NO = "HHZ-Glico"
+
+
+def _dt_text(value: datetime | None, date_only: bool = False) -> str:
+    if not value:
+        return ""
+    return value.strftime("%Y-%m-%d" if date_only else "%Y-%m-%d %H:%M")
+
+
+def _parse_dt(value, field: str) -> datetime | None:
+    """页面/源表传来的日期：支持空值、ISO、YYYY-MM-DD、YYYY/MM/DD。"""
+    if value in (None, ""):
+        return None
+    if isinstance(value, datetime):
+        return value
+    text = str(value).strip().replace("T", " ").replace("/", "-")
+    if not text:
+        return None
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%d"):
+        try:
+            return datetime.strptime(text, fmt)
+        except ValueError:
+            continue
+    raise ValueError(f"{field}格式不正确，应为 YYYY-MM-DD 或 YYYY-MM-DD HH:MM")
 
 
 def _money(value: Decimal) -> Decimal:
@@ -175,7 +248,11 @@ def distributor_in_brand(row: FxDistributor, brand: str) -> bool:
 
 
 def list_distributors(db: Session, include_inactive: bool = True, brand: str = "") -> list[dict]:
-    stmt = select(FxDistributor).order_by(FxDistributor.id.desc())
+    stmt = (
+        select(FxDistributor)
+        .options(selectinload(FxDistributor.pay_links))
+        .order_by(FxDistributor.id.desc())
+    )
     if not include_inactive:
         stmt = stmt.where(FxDistributor.active == 1)
     brand = (brand or "").strip()
@@ -195,6 +272,7 @@ def list_distributors(db: Session, include_inactive: bool = True, brand: str = "
 
 
 def _distributor_view(row: FxDistributor) -> dict:
+    accounts = _payment_accounts_view(row)
     return {
         "id": row.id,
         "code": row.code,
@@ -202,12 +280,15 @@ def _distributor_view(row: FxDistributor) -> dict:
         "contact": row.contact,
         "phone": row.phone,
         "email": row.email,
-        "delivery_address": row.delivery_address or "",
         "tax_no": row.tax_no or "",
         "brands": brand_list_of(row),
-        "pay_accounts": _text_to_list(getattr(row, "pay_accounts", "") or ""),
+        # pay_accounts 保留「账户名数组」旧口径，旧页面/旧导入继续可用；
+        # payment_accounts 是完整明细，新编辑弹窗和品牌/对账页使用这一份。
+        "pay_accounts": [a["account_name"] for a in accounts],
+        "payment_accounts": accounts,
         "region": row.region,
         "note": row.note,
+        "delivery_address": row.delivery_address or "",
         "active": bool(row.active),
         "created_at": row.created_at.strftime("%Y-%m-%d %H:%M") if row.created_at else "",
     }
@@ -235,13 +316,189 @@ def _brands_to_text(value) -> str:
     return ",".join(out)
 
 
+def _clip_text(value, limit: int) -> str:
+    return str(value or "").strip()[:limit]
+
+
+# 抬头主档字段：保存时「非空新值」会写回主档（同名抬头一份资料，改一处全同步）
+PAY_ENTITY_FIELDS = ("tax_no", "bank_name", "bank_branch", "bank_account", "account_holder", "account_type", "note")
+
+
+def _pay_account_view(link: FxDistributorPayLink) -> dict:
+    """关联行 → 页面用的账户明细（抬头主档资料 + 本客户自己的默认/收款备注）。"""
+    ent = link.entity
+    return {
+        "id": link.id,
+        "entity_id": ent.id if ent else None,
+        "account_name": (ent.name if ent else "") or "",
+        "tax_no": ent.tax_no or "" if ent else "",
+        "bank_name": ent.bank_name or "" if ent else "",
+        "bank_branch": ent.bank_branch or "" if ent else "",
+        "bank_account": ent.bank_account or "" if ent else "",
+        "account_holder": ent.account_holder or "" if ent else "",
+        "account_type": (ent.account_type or "company") if ent else "company",
+        "note": ent.note or "" if ent else "",
+        "collection_note": link.collection_note or "",
+        "is_default": bool(link.is_default),
+    }
+
+
+def _pay_account_snapshot(link_or_dict) -> dict:
+    """把明细行转成可重新落库的普通 dict（合并时先抓快照，再删源客户）。"""
+    data = dict(link_or_dict if isinstance(link_or_dict, dict) else _pay_account_view(link_or_dict))
+    data.pop("id", None)
+    data.pop("entity_id", None)
+    return data
+
+
+def _empty_pay_account(name: str, tax_no: str = "") -> dict:
+    return {
+        "id": None,
+        "entity_id": None,
+        "account_name": _clip_text(name, 160),
+        "tax_no": _clip_text(tax_no, 80),
+        "bank_name": "",
+        "bank_branch": "",
+        "bank_account": "",
+        "account_holder": "",
+        "account_type": "company",
+        "collection_note": "",
+        "is_default": False,
+        "note": "",
+    }
+
+
+def _normalize_payment_accounts(items) -> list[dict]:
+    """统一付款账户录入：支持明细数组、旧字符串数组、逗号串。
+
+    - 每条必须有付款方名称；只有银行信息没有名称的行会被忽略；
+    - 同一「付款方 + 银行账号」去重，但允许同一公司开多个银行账号；
+    - 最多一个默认账户；没有指定时默认第一条，和弹窗的默认选中保持一致。
+    """
+    if isinstance(items, str):
+        items = _text_to_list(items)
+    elif isinstance(items, dict):
+        items = [items]
+    if not items:
+        return []
+    out: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+    for item in items:
+        if isinstance(item, str):
+            item = {"account_name": item}
+        if not isinstance(item, dict):
+            continue
+        name = _clip_text(item.get("account_name") or item.get("name"), 160)
+        if not name:
+            continue
+        bank_account = _clip_text(item.get("bank_account"), 80)
+        key = (name, bank_account)
+        if key in seen:
+            continue
+        seen.add(key)
+        default_raw = item.get("is_default", False)
+        is_default = default_raw in (True, 1, "1", "true", "True", "on")
+        account_type = str(item.get("account_type") or "company").strip().lower()
+        if account_type in ("personal", "private", "对私", "个人"):
+            account_type = "personal"
+        else:
+            account_type = "company"
+        out.append({
+            "account_name": name,
+            "tax_no": _clip_text(item.get("tax_no"), 80),
+            "bank_name": _clip_text(item.get("bank_name"), 160),
+            "bank_branch": _clip_text(item.get("bank_branch"), 160),
+            "bank_account": bank_account,
+            "account_holder": _clip_text(item.get("account_holder"), 160),
+            "account_type": account_type,
+            "collection_note": _clip_text(item.get("collection_note"), 500),
+            "is_default": is_default,
+            "note": _clip_text(item.get("note"), 500),
+        })
+    if out:
+        defaults = [a for a in out if a["is_default"]]
+        for account in defaults[1:]:
+            account["is_default"] = False
+        if not defaults:
+            out[0]["is_default"] = True
+    return out
+
+
+def _payment_details_from_payload(data: dict) -> list[dict] | None:
+    """从请求里取付款账户明细；返回 None 表示本次不修改账户。"""
+    if "payment_accounts" in data:
+        detailed = data.get("payment_accounts")
+        if detailed:
+            return _normalize_payment_accounts(detailed)
+        # 新字段显式为空时，兼容旧前端仍传 pay_accounts 的情况
+        if data.get("pay_accounts"):
+            return _normalize_payment_accounts(data.get("pay_accounts"))
+        return []
+    if "pay_accounts" in data:
+        return _normalize_payment_accounts(data.get("pay_accounts"))
+    return None
+
+
+def _payment_accounts_view(row: FxDistributor) -> list[dict]:
+    accounts = [_pay_account_view(l) for l in (row.pay_links or [])]
+    if accounts:
+        return accounts
+    # 兼容迁移前/旧导入只写逗号串的数据：先展示成「只有名称」的明细
+    return [_empty_pay_account(name) for name in _text_to_list(row.pay_accounts or "")]
+
+
+def _get_or_create_entity(db: Session, detail: dict) -> FxPayEntity:
+    """按名称取/建抬头主档；已有抬头用非空新值补全（一份资料，改一处全同步）。"""
+    name = _clip_text(detail.get("account_name"), 160)
+    ent = db.scalar(select(FxPayEntity).where(FxPayEntity.name == name))
+    if ent is None:
+        ent = FxPayEntity(name=name)
+        db.add(ent)
+        db.flush()
+    for f in PAY_ENTITY_FIELDS:
+        val = _clip_text(detail.get(f), 500 if f in ("note",) else 160)
+        if f == "tax_no":
+            val = _clip_text(detail.get(f), 80)
+        elif f == "bank_account":
+            val = _clip_text(detail.get(f), 80)
+        elif f == "account_type":
+            val = detail.get(f) or "company"
+        if val and val != "company":
+            setattr(ent, f, val)
+        elif f == "account_type":
+            ent.account_type = ent.account_type or "company"
+    db.flush()
+    return ent
+
+
+def _replace_payment_accounts(db: Session, row: FxDistributor, details: list[dict]) -> None:
+    """整组替换客户的付款抬头关联：同名抬头共用主档，只重建关联行。"""
+    row.pay_links.clear()
+    db.flush()
+    seen: set[str] = set()
+    for i, detail in enumerate(details):
+        name = _clip_text(detail.get("account_name"), 160)
+        if not name or name in seen:
+            continue
+        seen.add(name)
+        ent = _get_or_create_entity(db, detail)
+        row.pay_links.append(FxDistributorPayLink(
+            distributor_id=row.id,
+            entity_id=ent.id,
+            is_default=1 if detail.get("is_default") else 0,
+            collection_note=_clip_text(detail.get("collection_note"), 500),
+            sort_order=i,
+        ))
+    row.pay_accounts = ",".join(_clip_text(d.get("account_name"), 160) for d in details if d.get("account_name"))[:800]
+
+
 def _next_distributor_code(db: Session) -> str:
-    """编码留空时自动生成：从 D001 起找第一个没人用的号（编号保持连续，不跳号）。"""
+    """编码留空时自动生成：从 H-01 起找第一个没人用的号（编号保持连续，不跳号）。"""
     used = set(db.scalars(select(FxDistributor.code)).all())
     n = 1
-    while f"D{n:03d}" in used:
+    while f"H-{n:02d}" in used:
         n += 1
-    return f"D{n:03d}"
+    return f"H-{n:02d}"
 
 
 def create_distributor(db: Session, data: dict) -> dict:
@@ -254,6 +511,7 @@ def create_distributor(db: Session, data: dict) -> dict:
     exists = db.scalar(select(FxDistributor).where(FxDistributor.code == code))
     if exists:
         raise ValueError(f"分销商编码已存在: {code}")
+    accounts = _payment_details_from_payload(data) or []
     row = FxDistributor(
         code=code,
         name=name,
@@ -263,10 +521,10 @@ def create_distributor(db: Session, data: dict) -> dict:
         delivery_address=(data.get("delivery_address") or "").strip(),
         tax_no=(data.get("tax_no") or "").strip(),
         brands=_brands_to_text(data.get("brands")),
-        pay_accounts=_brands_to_text(data.get("pay_accounts")),
         note=(data.get("note") or "").strip(),
         active=1,
     )
+    _replace_payment_accounts(db, row, accounts)
     db.add(row)
     db.commit()
     return _distributor_view(row)
@@ -287,8 +545,9 @@ def update_distributor(db: Session, distributor_id: int, data: dict) -> dict:
             setattr(row, field, str(data[field]).strip())
     if "brands" in data and data["brands"] is not None:
         row.brands = _brands_to_text(data["brands"])
-    if "pay_accounts" in data and data["pay_accounts"] is not None:
-        row.pay_accounts = _brands_to_text(data["pay_accounts"])
+    details = _payment_details_from_payload(data)
+    if details is not None:
+        _replace_payment_accounts(db, row, details)
     if "name" in data and not (data.get("name") or "").strip():
         raise ValueError("分销商名称不能为空")
     db.commit()
@@ -322,7 +581,28 @@ def merge_distributors(db: Session, target_id: int, source_ids: list[int]) -> di
         raise ValueError("有要并入的客户不存在")
 
     moved_orders = moved_prices = dropped_prices = 0
-    accounts: list[str] = _text_to_list(target.pay_accounts or "")
+    # 先按「账户名 + 银行账号」把明细合并去重；同公司多账号保留多条。
+    accounts: list[dict] = []
+    seen: set[tuple[str, str]] = set()
+
+    def add_account(item: dict) -> None:
+        name = _clip_text(item.get("account_name"), 160)
+        if not name:
+            return
+        key = (name, _clip_text(item.get("bank_account"), 80))
+        if key in seen:
+            return
+        seen.add(key)
+        item = dict(item)
+        item.pop("id", None)
+        if not any(a.get("is_default") for a in accounts):
+            item["is_default"] = True
+        else:
+            item["is_default"] = False
+        accounts.append(item)
+
+    for existing in _payment_accounts_view(target):
+        add_account(existing)
     for src in sources:
         # 1) 订单全部改挂到目标
         r = db.execute(
@@ -341,18 +621,19 @@ def merge_distributors(db: Session, target_id: int, source_ids: list[int]) -> di
             else:
                 sp.distributor_id = target.id
                 moved_prices += 1
-        # 3) 名称+付款账户并入目标账户列表
-        for acc in [src.name, *( _text_to_list(src.pay_accounts or "") )]:
-            if acc and acc not in accounts:
-                accounts.append(acc)
-    target.pay_accounts = ",".join(accounts)
+        # 3) 名称 + 付款账户明细并入目标；源客户名也留一条只含名称的账户，绝不丢对账线索。
+        add_account(_empty_pay_account(src.name, src.tax_no))
+        for acc in _payment_accounts_view(src):
+            add_account(acc)
+    _replace_payment_accounts(db, target, accounts)
     # 收货地址：源客户有、目标没有的收货点也并进来（同一客户多个收货点不能丢）
     addrs = [a for a in dict.fromkeys([target.delivery_address] + [s.delivery_address for s in sources]) if a]
     target.delivery_address = "；".join(addrs)
     merged_names = "、".join(s.name for s in sources)
     target.note = (f"{target.note or ''}｜合并入档：{merged_names}（{datetime.utcnow():%Y-%m-%d}）").strip("｜")
-    # 4) 删除被并行（订单/专属价已转移）
-    db.execute(delete(FxDistributor).where(FxDistributor.id.in_(ids)))
+    # 4) 删除被并行（订单/专属价已转移；付款账户已先快照并入目标）
+    for src in sources:
+        db.delete(src)
     db.commit()
     return {
         "distributor": _distributor_view(target),
@@ -363,32 +644,304 @@ def merge_distributors(db: Session, target_id: int, source_ids: list[int]) -> di
     }
 
 
+# ---------------------------------------------------------------- 付款抬头（交叉维度）
+def list_pay_entities(db: Session, keyword: str = "") -> list[dict]:
+    """付款抬头主档 + 每个抬头被哪些分销商使用（多维度交叉视图）。
+
+    同一抬头挂在多个分销商名下时（如关联公司代付），这里能一眼看出
+    「这笔钱到底是谁付的、替谁付的」，列表按关联客户数倒序。
+    """
+    kw = (keyword or "").strip().lower()
+    links = db.scalars(
+        select(FxDistributorPayLink).options(selectinload(FxDistributorPayLink.entity))
+    ).all()
+    dists = {d.id: d for d in db.scalars(select(FxDistributor)).all()}
+    grouped: dict[int, dict] = {}
+    for link in links:
+        ent = link.entity
+        if ent is None:
+            continue
+        bucket = grouped.setdefault(ent.id, {
+            "id": ent.id,
+            "name": ent.name,
+            "tax_no": ent.tax_no or "",
+            "account_type": ent.account_type or "company",
+            "bank_name": ent.bank_name or "",
+            "bank_account": ent.bank_account or "",
+            "distributors": [],
+        })
+        d = dists.get(link.distributor_id)
+        if d is not None:
+            bucket["distributors"].append({
+                "id": d.id,
+                "code": d.code,
+                "name": d.name,
+                "active": bool(d.active),
+                "is_default": bool(link.is_default),
+                "collection_note": link.collection_note or "",
+            })
+    out = list(grouped.values())
+    for e in out:
+        e["distributor_count"] = len(e["distributors"])
+        # 客户侧顺序：编码倒序排（和列表页一致），默认抬头排前面
+        e["distributors"].sort(key=lambda x: (not x["is_default"], x["code"] or ""), reverse=False)
+        e["distributors"].sort(key=lambda x: x["code"] or "")
+    if kw:
+        out = [e for e in out if kw in e["name"].lower()
+               or any(kw in d["name"].lower() or kw in (d["code"] or "").lower() for d in e["distributors"])]
+    out.sort(key=lambda e: (-e["distributor_count"], e["name"]))
+    return out
+
+
 # ---------------------------------------------------------------- 商品
-def list_products(db: Session, include_inactive: bool = True, brand: str = "") -> list[dict]:
-    stmt = select(FxProduct).order_by(FxProduct.id.desc())
+def list_products(
+    db: Session, include_inactive: bool = True, brand: str = "", hot_only: bool = False
+) -> list[dict]:
+    # 默认排序：热销商品优先，其余仍按 id 倒序（新商品在前）。
+    # hot_only 给下单页/外部调用使用，商品档案页拿全量后由前端筛选。
+    stmt = select(FxProduct).order_by(FxProduct.is_hot.desc(), FxProduct.id.desc())
     if not include_inactive:
         stmt = stmt.where(FxProduct.active == 1)
     if brand:
         stmt = stmt.where(FxProduct.brand == brand)
+    if hot_only:
+        stmt = stmt.where(FxProduct.is_hot == 1)
     return [_product_view(r) for r in db.scalars(stmt).all()]
 
 
-def list_brands(db: Session) -> list[dict]:
-    """按商品档案的品牌聚合，供顶部「品牌维度」切换器使用。
+def _short_brand_name(name: str) -> str:
+    text = (name or "").strip()
+    return text.split("/", 1)[0].strip() or text
 
-    - 只统计在售商品：停用的历史商品不该在切换器里占一个入口。
-    - 空品牌不进列表：旺店通档案里没填品牌的商品只在「全部品牌」下出现。
-    - 按商品数倒序，同数量时按品牌名排，保证每次刷新顺序稳定。
-    """
-    rows = db.execute(
+
+def _brand_counts(db: Session) -> tuple[dict[str, int], dict[str, int]]:
+    """返回 (在售商品数, 授权分销商数)，按品牌全名索引。"""
+    product_rows = db.execute(
         select(FxProduct.brand, func.count(FxProduct.id).label("cnt"))
         .where(FxProduct.active == 1)
         .where(FxProduct.brand.is_not(None))
         .where(FxProduct.brand != "")
         .group_by(FxProduct.brand)
-        .order_by(func.count(FxProduct.id).desc(), FxProduct.brand)
     ).all()
-    return [{"brand": brand, "count": cnt} for brand, cnt in rows]
+    product_counts = {name: int(cnt or 0) for name, cnt in product_rows}
+    distributor_counts: dict[str, int] = {}
+    for row in db.scalars(select(FxDistributor)).all():
+        for name in brand_list_of(row):
+            distributor_counts[name] = distributor_counts.get(name, 0) + 1
+    return product_counts, distributor_counts
+
+
+def _brand_view(row: FxBrand, product_counts: dict[str, int], distributor_counts: dict[str, int]) -> dict:
+    name = row.name or ""
+    return {
+        "id": row.id,
+        "brand": name,
+        "name": name,
+        "short_name": (row.short_name or "").strip() or _short_brand_name(name),
+        "code": row.code or "",
+        "logo": row.logo or "",
+        "sort_order": int(row.sort_order or 0),
+        "active": bool(row.active),
+        "managed": True,
+        "count": product_counts.get(name, 0),
+        "product_count": product_counts.get(name, 0),
+        "distributor_count": distributor_counts.get(name, 0),
+        "note": row.note or "",
+    }
+
+
+def list_brands(db: Session, include_inactive: bool = False) -> list[dict]:
+    """品牌主数据 + 商品聚合，供顶栏切换、分销商授权和品牌管理共用。
+
+    已建档品牌按 sort_order / 商品数排序；商品里出现但还没建档的品牌以
+    managed=False 的虚拟行返回，页面可一键「纳入管理」，不会因为漏建档就消失。
+    """
+    product_counts, distributor_counts = _brand_counts(db)
+    masters = db.scalars(select(FxBrand).order_by(FxBrand.sort_order, FxBrand.name)).all()
+    seen = {row.name for row in masters}
+    out: list[dict] = []
+    for row in masters:
+        if not include_inactive and not row.active:
+            continue
+        out.append(_brand_view(row, product_counts, distributor_counts))
+
+    for name, count in product_counts.items():
+        if name in seen:
+            continue
+        short = _short_brand_name(name)
+        out.append({
+            "id": None,
+            "brand": name,
+            "name": name,
+            "short_name": short,
+            "code": "",
+            "logo": "",
+            "sort_order": 9999,
+            "active": True,
+            "managed": False,
+            "count": count,
+            "product_count": count,
+            "distributor_count": distributor_counts.get(name, 0),
+            "note": "",
+        })
+    for name in distributor_counts:
+        if name in seen or any(item["name"] == name for item in out):
+            continue
+        out.append({
+            "id": None,
+            "brand": name,
+            "name": name,
+            "short_name": _short_brand_name(name),
+            "code": "",
+            "logo": "",
+            "sort_order": 9998,
+            "active": True,
+            "managed": False,
+            "count": 0,
+            "product_count": 0,
+            "distributor_count": distributor_counts[name],
+            "note": "",
+        })
+
+    out.sort(key=lambda item: (
+        0 if item["active"] else 1,
+        int(item["sort_order"] or 0),
+        -int(item["count"] or 0),
+        item["name"],
+    ))
+    return out
+
+
+def _brand_duplicate(db: Session, name: str, exclude_id: int | None = None) -> bool:
+    stmt = select(FxBrand).where(FxBrand.name == name)
+    if exclude_id is not None:
+        stmt = stmt.where(FxBrand.id != exclude_id)
+    return db.scalar(stmt) is not None
+
+
+def _brand_payload_fields(data: dict) -> dict:
+    name = _clip_text(data.get("name") or data.get("brand"), 100)
+    if not name:
+        raise ValueError("品牌名称必填")
+    short = _clip_text(data.get("short_name"), 60) or _short_brand_name(name)
+    try:
+        sort_order = int(data.get("sort_order") or 0)
+    except (TypeError, ValueError):
+        sort_order = 0
+    return {
+        "name": name,
+        "short_name": short,
+        "code": _clip_text(data.get("code"), 60),
+        "logo": _clip_text(data.get("logo"), 255),
+        "sort_order": sort_order,
+        "active": 1 if data.get("active", True) in (True, 1, "1", "true", "True", "on") else 0,
+        "note": _clip_text(data.get("note"), 500),
+    }
+
+
+def create_brand(db: Session, data: dict) -> dict:
+    fields = _brand_payload_fields(data)
+    if _brand_duplicate(db, fields["name"]):
+        raise ValueError(f"品牌已存在: {fields['name']}")
+    row = FxBrand(**fields)
+    db.add(row)
+    db.commit()
+    product_counts, distributor_counts = _brand_counts(db)
+    return _brand_view(row, product_counts, distributor_counts)
+
+
+def update_brand(db: Session, brand_id: int, data: dict) -> dict:
+    row = db.get(FxBrand, brand_id)
+    if not row:
+        raise ValueError("品牌不存在")
+    fields = _brand_payload_fields(data)
+    old_name = row.name
+    new_name = fields["name"]
+    if new_name != old_name and _brand_duplicate(db, new_name, exclude_id=row.id):
+        raise ValueError(f"品牌已存在: {new_name}")
+
+    # 改名必须级联：商品档案和分销商授权都按品牌全名存储，不能留下两个旧名字。
+    if new_name != old_name:
+        db.execute(update(FxProduct).where(FxProduct.brand == old_name).values(brand=new_name))
+        for dist in db.scalars(select(FxDistributor)).all():
+            names = brand_list_of(dist)
+            if old_name in names:
+                replaced: list[str] = []
+                for name in names:
+                    value = new_name if name == old_name else name
+                    if value not in replaced:
+                        replaced.append(value)
+                dist.brands = ",".join(replaced)
+
+    row.name = fields["name"]
+    row.short_name = fields["short_name"]
+    row.code = fields["code"]
+    row.logo = fields["logo"]
+    row.sort_order = fields["sort_order"]
+    row.active = fields["active"]
+    row.note = fields["note"]
+    db.commit()
+    product_counts, distributor_counts = _brand_counts(db)
+    return _brand_view(row, product_counts, distributor_counts)
+
+
+def toggle_brand(db: Session, brand_id: int) -> dict:
+    row = db.get(FxBrand, brand_id)
+    if not row:
+        raise ValueError("品牌不存在")
+    row.active = 0 if row.active else 1
+    db.commit()
+    product_counts, distributor_counts = _brand_counts(db)
+    return _brand_view(row, product_counts, distributor_counts)
+
+
+def delete_brand(db: Session, brand_id: int) -> dict:
+    """删除没有关联数据的品牌。
+
+    商品品牌和分销商授权都是按名称存储的，没有数据库外键；如果直接删主数据，
+    会留下指向不存在品牌的孤儿字符串。所以有引用时拒绝删除，引导用户先改关联
+    数据，或者只停用（历史数据保留）。
+    """
+    row = db.get(FxBrand, brand_id)
+    if not row:
+        raise ValueError("品牌不存在")
+    name = row.name
+    product_count = db.scalar(
+        select(func.count()).select_from(FxProduct).where(FxProduct.brand == name)
+    ) or 0
+    distributor_count = 0
+    for dist in db.scalars(select(FxDistributor)).all():
+        if name in brand_list_of(dist):
+            distributor_count += 1
+    if product_count or distributor_count:
+        raise ValueError(
+            f"品牌「{name}」仍被 {product_count} 个商品（含停用）、{distributor_count} 个分销商使用，"
+            "不能直接删除；请先修改商品品牌或解除分销商授权，或者改为停用。"
+        )
+    db.delete(row)
+    db.commit()
+    return {"deleted": True, "id": brand_id, "name": name}
+
+
+def sync_brands_from_products(db: Session) -> dict:
+    """把商品里出现、但品牌主数据还没有的品牌补建出来（不覆盖已有品牌配置）。"""
+    product_rows = db.execute(
+        select(FxProduct.brand)
+        .where(FxProduct.brand.is_not(None))
+        .where(FxProduct.brand != "")
+        .group_by(FxProduct.brand)
+    ).scalars().all()
+    existing = {row.name for row in db.scalars(select(FxBrand)).all()}
+    created: list[str] = []
+    for name in product_rows:
+        name = (name or "").strip()
+        if not name or name in existing:
+            continue
+        db.add(FxBrand(name=name, short_name=_short_brand_name(name)))
+        existing.add(name)
+        created.append(name)
+    db.commit()
+    return {"created": len(created), "names": created}
 
 
 def _product_view(row: FxProduct) -> dict:
@@ -443,6 +996,8 @@ def _product_view(row: FxProduct) -> dict:
         **maintenance_of(row),
         "note": row.note,
         "active": bool(row.active),
+        # 热销：1 = 分销下单页展示；与 active 独立，停用后仍可保留标记但不会下单
+        "is_hot": bool(row.is_hot),
         # 旺店通商品档案字段
         "spec_no": row.spec_no or "",
         "goods_no": row.goods_no or "",
@@ -485,6 +1040,7 @@ def create_product(db: Session, data: dict) -> dict:
         category=(data.get("category") or "").strip(),
         top_category=(data.get("top_category") or "").strip(),
         active=1,
+        is_hot=1 if data.get("is_hot") else 0,
     )
     db.add(row)
     db.commit()
@@ -519,6 +1075,8 @@ def update_product(db: Session, product_id: int, data: dict) -> dict:
     for field in ("name", "spec", "unit", "note", "brand", "category", "top_category"):
         if field in data and data[field] is not None:
             setattr(row, field, str(data[field]).strip())
+    if data.get("is_hot") is not None:
+        row.is_hot = 1 if data["is_hot"] else 0
     if "pack_qty" in data and data["pack_qty"] is not None:
         row.pack_qty = _pack_qty(data["pack_qty"])
     if "pack_unit" in data and data["pack_unit"] is not None:
@@ -535,6 +1093,37 @@ def toggle_product(db: Session, product_id: int) -> dict:
     row.active = 0 if row.active else 1
     db.commit()
     return _product_view(row)
+
+
+def set_hot_products(db: Session, product_ids: list[int], is_hot: bool = True) -> dict:
+    """批量标记 / 取消热销。
+
+    只写 is_hot，不动在售状态、价格和分类。勾选里混有已删除的 id 时，
+    能更新的照常更新，返回 not_found 让页面提示，而不是整批失败。
+    """
+    ids: list[int] = []
+    for pid in product_ids:
+        try:
+            value = int(pid)
+        except (TypeError, ValueError):
+            continue
+        if value > 0 and value not in ids:
+            ids.append(value)
+    if not ids:
+        raise ValueError("没有勾选商品")
+    rows = db.scalars(select(FxProduct).where(FxProduct.id.in_(ids))).all()
+    if not rows:
+        raise ValueError("勾选的商品不存在")
+    flag = 1 if is_hot else 0
+    for row in rows:
+        row.is_hot = flag
+    db.commit()
+    found = {row.id for row in rows}
+    return {
+        "updated": len(rows),
+        "is_hot": bool(flag),
+        "not_found": [pid for pid in ids if pid not in found],
+    }
 
 
 def set_tier1_prices(db: Session, items: list[dict]) -> dict:
@@ -605,7 +1194,7 @@ def _next_order_no(db: Session) -> str:
     """订单号自动生成：FX + 日期 + 当天最大序号+1（如 FX20261027-0001）。
 
     同时作为推送旺店通的 tid（原始单号），两边单号一致便于互查；
-    重推同单走 sales_trade_push 的 tid 更新语义，不会重复建单。
+    重推同单走 trade_push 的 tid 更新语义，不会重复建单。
     取最大序号而非条数，避免删单后序号回绕撞唯一约束。
     """
     prefix = datetime.now().strftime("FX%Y%m%d")
@@ -681,20 +1270,54 @@ def _validate_lines(db: Session, lines: list[dict], distributor_id: int | None =
 
 
 def _order_view(row: FxOrder, with_lines: bool = True, pmap: dict | None = None) -> dict:
+    total = _money(row.total_amount)
+    paid = _money(row.paid_amount or Decimal("0"))
+    original_no = (row.original_order_no or "").strip()
+    # 兼容 0024 迁移前/尚未回填的历史单：wdt_tid 不是内部单号时就是原始单号。
+    if not original_no and row.wdt_tid and row.wdt_tid != row.order_no:
+        original_no = row.wdt_tid.strip()
+    original_nos = [x.strip() for x in original_no.replace("，", ",").replace("；", ",").replace(";", ",").split(",") if x.strip()]
+    distributor = row.distributor
     data = {
         "id": row.id,
         "order_no": row.order_no,
+        "original_order_no": original_no,
+        "original_order_nos": original_nos,
+        "source_channel": row.source_channel or "",
         "distributor_id": row.distributor_id,
-        "distributor_name": row.distributor.name if row.distributor else "",
-        "distributor_code": row.distributor.code if row.distributor else "",
+        "distributor_name": distributor.name if distributor else "",
+        "distributor_code": distributor.code if distributor else "",
+        "receiver_name": (distributor.contact or distributor.name) if distributor else "",
+        "receiver_phone": distributor.phone if distributor else "",
+        "receiver_address": distributor.delivery_address if distributor else "",
         "status": row.status,
         "status_label": STATUS_LABELS.get(row.status, row.status),
-        "order_date": row.order_date.strftime("%Y-%m-%d %H:%M") if row.order_date else "",
-        "total_amount": str(_money(row.total_amount)),
+        "order_date": _dt_text(row.order_date),
+        "total_amount": str(total),
         "remark": row.remark or "",
         "wdt_tid": row.wdt_tid or "",
         "wdt_shop_no": row.wdt_shop_no or "",
+        "wdt_warehouse_no": row.wdt_warehouse_no or "",
+        "payment_status": row.payment_status or "",
+        "payment_status_label": PAYMENT_STATUS_LABELS.get(row.payment_status or "", row.payment_status or ""),
+        "paid_amount": str(paid),
+        "outstanding_amount": str(_money(max(total - paid, Decimal("0")))),
+        "payment_date": _dt_text(row.payment_date, date_only=True),
+        "pay_company": row.pay_company or "",
+        "order_channel": row.order_channel or "",
+        "ship_warehouse": row.ship_warehouse or "",
+        "ship_note": row.ship_note or "",
+        "delivery_type": row.delivery_type or "",
+        "delivery_type_label": DELIVERY_TYPE_LABELS.get(row.delivery_type or "", ""),
+        "scratch_code": int(row.scratch_code or 0),
+        "shipping_status": row.shipping_status or "",
+        "shipping_status_label": SHIPPING_STATUS_LABELS.get(row.shipping_status or "", row.shipping_status or ""),
+        "shipped_at": _dt_text(row.shipped_at),
+        "logistics_company": row.logistics_company or "",
+        "logistics_no": row.logistics_no or "",
+        "signed_at": _dt_text(row.signed_at),
         "push_status": row.push_status or "",
+        "push_status_label": PUSH_STATUS_LABELS.get(row.push_status or "", row.push_status or ""),
         "push_message": row.push_message or "",
         "pushed_at": row.pushed_at.strftime("%Y-%m-%d %H:%M:%S") if row.pushed_at else "",
         "line_count": len(row.lines) if row.lines else 0,
@@ -711,7 +1334,9 @@ def _order_view(row: FxOrder, with_lines: bool = True, pmap: dict | None = None)
                 "goods_name": line.goods_name,
                 "spec_name": line.spec_name,
                 "quantity": str(line.quantity),
-                "unit_price": str(_money(line.unit_price)),
+                # 单价不能截成 2 位：件价常是箱价 ÷ 箱规（如 152/36=4.2222），
+                # 截断后反算箱价会差钱（4.22×36=151.92）。按库里的 4 位精度原样输出。
+                "unit_price": str(Decimal(line.unit_price or 0)),
                 "subtotal": str(_money(line.subtotal)),
                 "category": ((pmap or {}).get(line.product_id) or ("", ""))[0],
                 "top_category": ((pmap or {}).get(line.product_id) or ("", ""))[1],
@@ -721,12 +1346,29 @@ def _order_view(row: FxOrder, with_lines: bool = True, pmap: dict | None = None)
     return data
 
 
-def create_order(db: Session, distributor_id: int, lines: list[dict], remark: str = "", wdt_shop_no: str = "") -> dict:
+def create_order(
+    db: Session,
+    distributor_id: int,
+    lines: list[dict],
+    remark: str = "",
+    wdt_shop_no: str = "",
+    wdt_warehouse_no: str = "",
+    *,
+    order_channel: str = "",
+    ship_warehouse: str = "",
+    ship_note: str = "",
+    delivery_type: str = "",
+    scratch_code: int = 0,
+    order_date: datetime | None = None,
+) -> dict:
     distributor = db.get(FxDistributor, int(distributor_id or 0))
     if not distributor:
         raise ValueError("分销商不存在")
     if not distributor.active:
         raise ValueError(f"分销商已停用: {distributor.name}")
+    delivery_type = (delivery_type or "").strip()
+    if delivery_type and delivery_type not in DELIVERY_TYPES:
+        raise ValueError(f"配送方式只能是 自提/送货，收到: {delivery_type}")
     snapshot, total = _validate_lines(db, lines, distributor.id)
     row = FxOrder(
         order_no=_next_order_no(db),
@@ -734,8 +1376,20 @@ def create_order(db: Session, distributor_id: int, lines: list[dict], remark: st
         status="draft",
         total_amount=total,
         remark=(remark or "").strip(),
+        source_channel="手工",
+        payment_status="unpaid",
+        shipping_status="unshipped",
         wdt_shop_no=(wdt_shop_no or "").strip(),
+        wdt_warehouse_no=(wdt_warehouse_no or "").strip(),
+        # 订单头信息（用户 2026-10-28 要求下单时一次录全）
+        order_channel=(order_channel or "").strip()[:32],
+        ship_warehouse=(ship_warehouse or "").strip()[:80],
+        ship_note=(ship_note or "").strip()[:500],
+        delivery_type=delivery_type,
+        scratch_code=1 if scratch_code else 0,
     )
+    if order_date is not None:
+        row.order_date = order_date
     row.lines = [
         FxOrderLine(
             product_id=item["product_id"],
@@ -754,7 +1408,22 @@ def create_order(db: Session, distributor_id: int, lines: list[dict], remark: st
     return _order_view(row)
 
 
-def update_order(db: Session, order_id: int, distributor_id: int, lines: list[dict], remark: str = "") -> dict:
+def update_order(
+    db: Session,
+    order_id: int,
+    distributor_id: int,
+    lines: list[dict],
+    remark: str = "",
+    wdt_shop_no: str | None = None,
+    wdt_warehouse_no: str | None = None,
+    *,
+    order_channel: str | None = None,
+    ship_warehouse: str | None = None,
+    ship_note: str | None = None,
+    delivery_type: str | None = None,
+    scratch_code: int | None = None,
+    order_date: datetime | None = None,
+) -> dict:
     row = db.get(FxOrder, int(order_id or 0))
     if not row:
         raise ValueError("订单不存在")
@@ -767,6 +1436,26 @@ def update_order(db: Session, order_id: int, distributor_id: int, lines: list[di
     row.distributor_id = distributor.id
     row.remark = (remark or "").strip()
     row.total_amount = total
+    if wdt_shop_no is not None:
+        row.wdt_shop_no = (wdt_shop_no or "").strip()[:40]
+    if wdt_warehouse_no is not None:
+        row.wdt_warehouse_no = (wdt_warehouse_no or "").strip()[:40]
+    # 订单头字段：传 None 表示这次不动它，传空串表示清空
+    if order_channel is not None:
+        row.order_channel = (order_channel or "").strip()[:32]
+    if ship_warehouse is not None:
+        row.ship_warehouse = (ship_warehouse or "").strip()[:80]
+    if ship_note is not None:
+        row.ship_note = (ship_note or "").strip()[:500]
+    if delivery_type is not None:
+        value = (delivery_type or "").strip()
+        if value and value not in DELIVERY_TYPES:
+            raise ValueError(f"配送方式只能是 自提/送货，收到: {value}")
+        row.delivery_type = value
+    if scratch_code is not None:
+        row.scratch_code = 1 if scratch_code else 0
+    if order_date is not None:
+        row.order_date = order_date
     row.lines.clear()
     for item in snapshot:
         row.lines.append(
@@ -845,6 +1534,105 @@ def batch_push_orders(db: Session, order_ids: list[int]) -> dict:
     return {"pushed": done, "skipped": skipped, "failed": failed}
 
 
+def update_order_fulfillment(db: Session, order_id: int, data: dict) -> dict:
+    """更新订单的收款 / 发货 / 原始单号。
+
+    这些是业务执行状态，和审核状态分开：
+    - 审核通过只代表可以推送 / 发货，不代表钱已到账或货已发出；
+    - 收款、发货可分别维护，互不覆盖；
+    - 标记已收到但没填金额时，用订单总额补齐，避免页面显示“已收到 0 元”。
+    """
+    row = (
+        db.query(FxOrder)
+        .options(selectinload(FxOrder.lines))
+        .filter(FxOrder.id == int(order_id or 0))
+        .first()
+    )
+    if not row:
+        raise ValueError("订单不存在")
+
+    if "original_order_no" in data:
+        row.original_order_no = str(data.get("original_order_no") or "").strip()[:255]
+    if "source_channel" in data:
+        row.source_channel = str(data.get("source_channel") or "").strip()[:32]
+    # 订单头信息：下单页录漏了可以在这里补，不用回下单页重来
+    if "wdt_shop_no" in data:
+        row.wdt_shop_no = str(data.get("wdt_shop_no") or "").strip()[:40]
+    if "wdt_warehouse_no" in data:
+        row.wdt_warehouse_no = str(data.get("wdt_warehouse_no") or "").strip()[:40]
+    if "order_channel" in data:
+        row.order_channel = str(data.get("order_channel") or "").strip()[:32]
+    if "ship_warehouse" in data:
+        row.ship_warehouse = str(data.get("ship_warehouse") or "").strip()[:80]
+    if "ship_note" in data:
+        row.ship_note = str(data.get("ship_note") or "").strip()[:500]
+    if "delivery_type" in data:
+        value = str(data.get("delivery_type") or "").strip()
+        if value and value not in DELIVERY_TYPES:
+            raise ValueError(f"配送方式只能是 自提/送货，收到: {value}")
+        row.delivery_type = value
+    if "scratch_code" in data:
+        row.scratch_code = 1 if data.get("scratch_code") else 0
+
+    if "payment_status" in data:
+        status = str(data.get("payment_status") or "").strip()
+        if status not in PAYMENT_STATUSES:
+            raise ValueError(f"未知收款状态: {status}")
+        row.payment_status = status
+        if status == "received" and "paid_amount" not in data:
+            row.paid_amount = row.total_amount or Decimal("0")
+        if status == "received" and "payment_date" not in data and not row.payment_date:
+            row.payment_date = datetime.now()
+        if status == "unpaid":
+            if "paid_amount" not in data:
+                row.paid_amount = Decimal("0")
+            if "payment_date" not in data:
+                row.payment_date = None
+    if "paid_amount" in data:
+        try:
+            paid = Decimal(str(data.get("paid_amount") or "0"))
+        except Exception as exc:
+            raise ValueError("已收金额格式不正确") from exc
+        paid = _money(paid)
+        if paid < 0:
+            raise ValueError("已收金额不能为负数")
+        row.paid_amount = paid
+    if "payment_date" in data:
+        row.payment_date = _parse_dt(data.get("payment_date"), "收款日期")
+    if "pay_company" in data:
+        row.pay_company = str(data.get("pay_company") or "").strip()[:160]
+
+    paid_now = _money(row.paid_amount or Decimal("0"))
+    total_now = _money(row.total_amount or Decimal("0"))
+    if "payment_status" in data and row.payment_status == "partial" and paid_now <= 0:
+        raise ValueError("部分收款时，已收金额必须大于 0")
+    if "payment_status" in data and row.payment_status == "unpaid" and paid_now > 0:
+        raise ValueError("未收到时不能填写已收金额；请改为部分收款或已收到")
+    if "payment_status" in data and row.payment_status == "received" and total_now > 0 and paid_now <= 0:
+        raise ValueError("已收到时，已收金额必须大于 0")
+
+    if "shipping_status" in data:
+        status = str(data.get("shipping_status") or "").strip()
+        if status not in SHIPPING_STATUSES:
+            raise ValueError(f"未知发货状态: {status}")
+        row.shipping_status = status
+        if status in {"shipped", "partial"} and "shipped_at" not in data and not row.shipped_at:
+            row.shipped_at = datetime.now()
+        if status == "unshipped" and "shipped_at" not in data:
+            row.shipped_at = None
+    if "shipped_at" in data:
+        row.shipped_at = _parse_dt(data.get("shipped_at"), "发货时间")
+    if "logistics_company" in data:
+        row.logistics_company = str(data.get("logistics_company") or "").strip()[:100]
+    if "logistics_no" in data:
+        row.logistics_no = str(data.get("logistics_no") or "").strip()[:120]
+    if "signed_at" in data:
+        row.signed_at = _parse_dt(data.get("signed_at"), "签收时间")
+
+    db.commit()
+    return _order_view(row)
+
+
 def order_detail(db: Session, order_id: int) -> dict:
     row = (
         db.query(FxOrder)
@@ -886,7 +1674,9 @@ def list_orders(db: Session, status: str = "", distributor_id: int | None = None
     ids = _brand_dist_ids(db, brand)
     if ids is not None:
         stmt = stmt.filter(FxOrder.distributor_id.in_(ids) if ids else FxOrder.distributor_id == 0)
-    stmt = stmt.limit(max(1, min(limit, 500)))
+    # limit<=0 = 不限量（分销订单页要全量展示，查询/筛选在页面本地做）
+    if limit and limit > 0:
+        stmt = stmt.limit(max(1, min(limit, 500)))
     return [_order_view(row, with_lines=False) for row in stmt.all()]
 
 
@@ -1021,41 +1811,338 @@ def import_products(db: Session, items: list[dict]) -> dict:
 
 
 # ---------------------------------------------------------------- 推送旺店通
-def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str) -> dict:
-    """把分销订单组装成旺店通销售单报文。
+_MUNICIPALITIES = ("北京市", "上海市", "天津市", "重庆市")
 
-    字段口径按旺店通 openapi2 sales_trade_push.php；未配置的写空字符串，
-    实际字段以联调返回为准（推送框架先行，密钥配置后一次实测即可校准）。
+
+def _split_cn_address(value: str) -> tuple[str, str, str, str]:
+    """把中文详细地址拆成省 / 市 / 区县 / 详细地址。
+
+    旺店通 trade_push.php 要求 receiver_province / city / district 与地址库
+    匹配；如果只传详细地址，官方要求省市区之间用空格分隔才会尝试解析。
+    分销商档案里的地址是「上海市松江区潮富路78号」这种连续写法，所以这里
+    先拆出省市区，再把剩余部分作为 receiver_address 推送。
     """
-    trade: dict = {
-        "shop_no": shop_no,
+    text = (value or "").strip()
+    if not text:
+        return "", "", "", ""
+    for municipality in _MUNICIPALITIES:
+        if text.startswith(municipality):
+            rest = text[len(municipality):].strip()
+            match = re.match(r"^(.+?(?:区|县|市))", rest)
+            district = match.group(1) if match else ""
+            detail = rest[len(district):].strip() if district else rest
+            return municipality, municipality, district, detail or rest
+    province = ""
+    rest = text
+    match = re.match(r"^(.+?(?:省|自治区|特别行政区))", rest)
+    if match:
+        province = match.group(1)
+        rest = rest[len(province):].strip()
+    city = ""
+    match = re.match(r"^(.+?(?:市|自治州|地区|盟))", rest)
+    if match:
+        city = match.group(1)
+        rest = rest[len(city):].strip()
+    district = ""
+    match = re.match(r"^(.+?(?:区|县|旗|市))", rest)
+    if match:
+        district = match.group(1)
+        rest = rest[len(district):].strip()
+    return province, city, district, rest or text
+
+
+def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str) -> dict:
+    """把分销订单组装成旺店通 `trade_push.php` 报文（不在此处发请求）。
+
+    用户 2026-10-28 要求下单页把旺店通需要的字段都体现出来。官方必填项：
+    shop_no、tid、trade_status、delivery_term、buyer_nick、receiver_name、
+    receiver_province/city/district/address/mobile、post_amount、cod_amount、
+    ext_cod_fee、other_amount、paid、warehouse_no、order_list。
+
+    其中：
+    - 店铺/仓库由下单页选择，仓库只允许 HHZ-Glico（红盒子-格力高磐石仓）；
+    - 收货人/手机/地址取自分销商档案（下单页会显示，缺项会提示）；
+    - 金额取本系统订单总额，当前业务默认已付款、款到发货；
+    - 货品明细按官方 order_list 结构生成，而不是旧的 goods_list。
+    """
+    address = (distributor.delivery_address or "").strip()
+    province, city, district, detail = _split_cn_address(address)
+    receiver_name = (distributor.contact or distributor.name or "").strip()[:40]
+    receiver_mobile = (distributor.phone or "").strip()[:40]
+    buyer_nick = (distributor.name or f"FX{order.distributor_id}").strip()[:100]
+    warehouse_no = (
+        (getattr(order, "wdt_warehouse_no", "") or "").strip()
+        or (settings.wdt_warehouse_no or "").strip()
+        or DEFAULT_WDT_WAREHOUSE_NO
+    )
+
+    lines: list[dict] = []
+    for index, line in enumerate(order.lines or [], start=1):
+        goods_no = (line.goods_no or "").strip()
+        spec_no = (goods_no or line.spec_no or "").strip()
+        goods_name = (line.goods_name or spec_no or goods_no or "").strip()[:255]
+        lines.append({
+            "oid": f"{order.order_no}-{index:03d}",
+            "status": 30,
+            "refund_status": 0,
+            # 本系统 goods_no 就是旺店通商家编码（SKU/条码），goods_id 用它兜底；
+            # 没有平台 SPU 编码时不能留空，否则旺店通拒单。
+            "goods_id": goods_no or spec_no or str(line.product_id or ""),
+            "spec_id": (line.spec_no or goods_no or "").strip()[:40],
+            "goods_no": goods_no,
+            "spec_no": spec_no,
+            "goods_name": goods_name,
+            "spec_name": (line.spec_name or "").strip()[:100],
+            "num": _plain(Decimal(line.quantity or 0)),
+            "price": _plain(_money(Decimal(line.unit_price or 0))),
+            "adjust_amount": "0",
+            "discount": "0",
+            "share_discount": "0",
+        })
+
+    seller_memo = "；".join(x for x in (
+        (order.ship_note or "").strip(),
+        "配送：自提" if order.delivery_type == "pickup" else "",
+        "客户要求刮码" if int(order.scratch_code or 0) else "",
+    ) if x)[:1024]
+
+    trade = {
         "tid": order.order_no,  # 原始单号用分销订单号，便于两边互查
+        "trade_status": 30,     # 已支付待发货
+        "pay_status": 2,        # 已付款
+        "delivery_term": 1,     # 款到发货
+        "fenxiao_type": 2,      # 经销
         "trade_time": order.order_date.strftime("%Y-%m-%d %H:%M:%S") if order.order_date else "",
-        "pay_status": 2,  # 已付款
-        "delivery_term": 1,  # 现款现货
-        "buyer_message": order.remark or "",
-        "receiver_name": distributor.name,
-        "receiver_mobile": distributor.phone or "",
-        # 收货地址历史上取分销商「区域」。2026-10-28 起区域不再录入（旧值仍留在库里），
-        # 新分销商这里会是空串，推送后由旺店通侧补齐；不为删字段而丢掉老订单的地址。
-        "receiver_address": distributor.region or "",
-        "goods_list": [
-            {
-                "spec_no": line.goods_no,  # 明细快照里的编号即商品/规格编码
-                "num": _plain(Decimal(line.quantity or 0)),
-                "price": str(_money(line.unit_price)),
-            }
-            for line in (order.lines or [])
-        ],
+        "pay_time": (order.payment_date or order.order_date).strftime("%Y-%m-%d %H:%M:%S")
+        if (order.payment_date or order.order_date) else "",
+        "buyer_nick": buyer_nick,
+        "buyer_message": (order.remark or "")[:1024],
+        "seller_memo": seller_memo,
+        "receiver_name": receiver_name,
+        "receiver_mobile": receiver_mobile,
+        "receiver_province": province,
+        "receiver_city": city,
+        "receiver_district": district,
+        "receiver_address": (detail or address)[:256],
+        # 当前业务不收运费/到付款/其他费用，显式传 0，避免旺店通按缺省值算错。
+        "post_amount": "0",
+        "cod_amount": "0",
+        "ext_cod_fee": "0",
+        "other_amount": "0",
+        "paid": _plain(_money(Decimal(order.total_amount or 0))),
+        "warehouse_no": warehouse_no,
+        "order_list": lines,
     }
-    if settings.wdt_warehouse_no:
-        trade["warehouse_no"] = settings.wdt_warehouse_no
-    return trade
+    return {"shop_no": shop_no, "trade_list": [trade]}
+
+
+def detect_push_status(db: Session, order_ids: list[int] | None = None) -> dict:
+    """自动核对订单在旺店通里的真实状态，不再靠人点「推送旺店通」。
+
+    为什么需要这个：历史团单（格力高 B2B）本来就是在旺店通里开的单、出的库，
+    原表「出库-旺店通销售」那一列记着出库单号。这类单再让用户点一次推送，
+    既多余又危险（会在旺店通里造重复单）。所以按证据自动判定，判据从强到弱：
+
+    1. 销售出库单里能按 trade_no / src_trade_no 找到对应单号
+       —— 最硬的证据，顺便把真实出库时间写进 pushed_at；
+    2. 单据自己带旺店通单号（导入的历史团单，或以前推成功过的）
+       —— 说明它已经在旺店通里存在；
+    3. 单号什么都没有、但来源是历史团单导入
+       —— 标 history：不冒充已推送，也不再出现在待推送里。
+
+    只改「还没判定过」的单（push_status 为 "" / "history"），
+    已经 sent / failed 的一律不动，避免把失败记录洗白。
+    """
+    stmt = select(FxOrder)
+    if order_ids:
+        stmt = stmt.where(FxOrder.id.in_([int(i) for i in order_ids]))
+    orders = list(db.scalars(stmt).all())
+
+    # 出库单索引：一个旺店通单号可能既是 trade_no 又是 src_trade_no
+    shipped: dict[str, datetime] = {}
+    for so in db.scalars(select(StockoutOrder)).all():
+        for key in (so.trade_no, so.src_trade_no):
+            k = (key or "").strip()
+            if k and so.consign_time:
+                shipped.setdefault(k, so.consign_time)
+
+    stats = {"checked": 0, "shipped": 0, "pushed": 0, "history": 0, "kept": 0}
+    for o in orders:
+        stats["checked"] += 1
+        if o.push_status in ("sent", "failed"):
+            stats["kept"] += 1
+            continue
+        tids = [t.strip() for t in (o.wdt_tid or "").split(",") if t.strip()]
+        hit = next((shipped[t] for t in tids if t in shipped), None)
+        if hit:
+            o.push_status = "sent"
+            o.push_message = f"自动核对：旺店通已出库（{hit:%Y-%m-%d %H:%M}）"[:480]
+            o.pushed_at = o.pushed_at or hit
+            stats["shipped"] += 1
+        elif tids:
+            o.push_status = "sent"
+            o.push_message = (
+                f"自动核对：单据已含旺店通单号 {tids[0]}" + (f" 等 {len(tids)} 个" if len(tids) > 1 else "")
+            )[:480]
+            o.pushed_at = o.pushed_at or o.order_date
+            stats["pushed"] += 1
+        elif (o.remark or "").startswith("团单导入"):
+            if o.push_status == "history":
+                stats["kept"] += 1
+                continue
+            o.push_status = "history"
+            o.push_message = "历史团单：原表未记录旺店通单号，未在系统内推送"[:480]
+            stats["history"] += 1
+        else:
+            stats["kept"] += 1
+    db.commit()
+    return stats
+
+
+def reconcile_orders_stockout(db: Session) -> dict:
+    """订单 ⇄ 出库件数核对（单位口径按旺店通销售出库单反推确认）。
+
+    旺店通销售出库单里的 `goods_count` / `sell_price` 是**基本单位（件）**口径，
+    而分销订单按业务习惯录入、库里的 quantity 也是基本单位（件），两边应当 1:1。
+    历史上的错单是「按箱录但按件存」，相差一个箱规（如 36 倍）；2026-10-28 已用
+    scripts/fix_order_units_20261028.py 统一成件口径，所以这里按件直比，并把
+    差额折算成箱数（diff ÷ 箱规）方便业务直观理解。
+
+    另外补两类靠单号比不出来的问题：
+    - 重复单：多张分销订单共用同一个旺店通单号（同一批出库被重复认领）；
+    - 金额不符：整单金额与出库单金额不一致。
+    """
+    # 出库单号索引：一个出库单可能同时记着 trade_no / src_trade_no / src_tids 多个号
+    so_no_by_oid: dict[int, str] = {}
+    so_meta: dict[str, dict] = {}
+    so_by_tid: dict[str, set[str]] = {}
+    for so in db.scalars(select(StockoutOrder)).all():
+        sno = so.stockout_no
+        so_no_by_oid[so.id] = sno
+        so_meta[sno] = {
+            "consign_time": so.consign_time.strftime("%Y-%m-%d %H:%M") if so.consign_time else "",
+            "amount": Decimal(so.goods_total_amount or 0),
+        }
+        tids: set[str] = set()
+        for key in (so.trade_no, so.src_trade_no, so.src_tids):
+            for t in (key or "").split(","):
+                t = t.strip()
+                if t:
+                    tids.add(t)
+        for t in tids:
+            so_by_tid.setdefault(t, set()).add(sno)
+
+    # 出库明细按 (单号, 规格) 聚合件数（同一规格可能拆多张出库单）
+    so_qty: dict[tuple[str, str], Decimal] = {}
+    so_name: dict[str, str] = {}
+    for it in db.scalars(select(StockoutItem)).all():
+        sno = so_no_by_oid.get(it.order_id)
+        spec = (it.spec_no or "").strip()
+        if not sno or not spec:
+            continue
+        k = (sno, spec)
+        so_qty[k] = so_qty.get(k, Decimal("0")) + (it.goods_count or 0)
+        so_name.setdefault(spec, it.goods_name or "")
+
+    products = {p.spec_no: p for p in db.scalars(select(FxProduct)).all()}
+    orders = db.scalars(select(FxOrder).order_by(FxOrder.order_no)).all()
+
+    # 旺店通单号被哪些分销订单占用：>1 就是重复单（同一批出库被认领两次）
+    tid_owners: dict[str, list[str]] = {}
+    for o in orders:
+        for t in (o.wdt_tid or "").split(","):
+            t = t.strip()
+            if t:
+                tid_owners.setdefault(t, []).append(o.order_no)
+
+    rows: list[dict] = []
+    stats = {"checked": 0, "match": 0, "mismatch": 0, "no_ship": 0, "duplicate": 0}
+    for o in orders:
+        if not o.lines:
+            continue
+        stats["checked"] += 1
+        wdt_tids = [t.strip() for t in (o.wdt_tid or "").split(",") if t.strip()]
+        snos: set[str] = set()
+        for t in [o.order_no] + wdt_tids:
+            snos |= so_by_tid.get(t, set())
+        dup_with = sorted({n for t in wdt_tids for n in tid_owners.get(t, []) if n != o.order_no})
+
+        o_qty: dict[str, Decimal] = {}
+        o_name: dict[str, str] = {}
+        for line in o.lines:
+            spec = (line.goods_no or "").strip()
+            if not spec:
+                continue
+            o_qty[spec] = o_qty.get(spec, Decimal("0")) + (line.quantity or 0)
+            o_name.setdefault(spec, line.goods_name or "")
+
+        base = {
+            "order_id": o.id,
+            "order_no": o.order_no,
+            "order_date": o.order_date.strftime("%Y-%m-%d") if o.order_date else "",
+            "push_status": o.push_status,
+            "order_amount": str(Decimal(o.total_amount or 0)),
+        }
+        if not snos:
+            stats["no_ship"] += 1
+            rows.append({**base, "status": "no_ship",
+                         "total_order": str(sum(o_qty.values(), Decimal("0"))),
+                         "total_stockout": "0", "stockouts": [], "duplicate_with": dup_with,
+                         "amount_diff": "", "lines": [
+                             {"spec_no": s, "goods_name": o_name.get(s, ""), "order_qty": str(q),
+                              "stockout_qty": "0", "diff": str(-q), "pack_qty": 0, "diff_boxes": ""}
+                             for s, q in o_qty.items()]})
+            continue
+
+        specs = sorted(set(o_qty) | {s for (sn, s) in so_qty if sn in snos})
+        lines_out = []
+        qty_ok = True
+        for spec in specs:
+            oq = o_qty.get(spec, Decimal("0"))
+            sq = sum((so_qty.get((sn, spec), Decimal("0")) for sn in snos), Decimal("0"))
+            diff = sq - oq
+            if diff != 0:
+                qty_ok = False
+            prod = products.get(spec)
+            pack = int(prod.pack_qty or 0) if prod else 0
+            lines_out.append({
+                "spec_no": spec,
+                "goods_name": o_name.get(spec) or so_name.get(spec) or "",
+                "order_qty": str(oq),
+                "stockout_qty": str(sq),
+                "diff": str(diff),
+                "pack_qty": pack,
+                "diff_boxes": (str((diff / pack).quantize(Decimal("0.01"))) if pack and diff else ""),
+            })
+
+        so_amount = sum((so_meta[s]["amount"] for s in snos), Decimal("0"))
+        amount_diff = (so_amount - Decimal(o.total_amount or 0))
+        if dup_with:
+            worst = "duplicate"
+        elif not qty_ok or amount_diff != 0:
+            worst = "mismatch"
+        else:
+            worst = "match"
+        stats[worst] += 1
+        consign = max((so_meta[s]["consign_time"] for s in snos if so_meta[s]["consign_time"]), default="")
+        rows.append({**base, "status": worst,
+                     "total_order": str(sum(o_qty.values(), Decimal("0"))),
+                     "total_stockout": str(sum((q for (sn, _), q in so_qty.items() if sn in snos), Decimal("0"))),
+                     "stockout_amount": str(so_amount),
+                     "amount_diff": (str(amount_diff) if amount_diff else ""),
+                     "stockouts": sorted(snos), "consign_time": consign,
+                     "duplicate_with": dup_with, "lines": lines_out})
+
+    # 问题单排最前：数量/金额不符 → 重复单 → 未找到出库单 → 一致
+    rank = {"mismatch": 0, "duplicate": 1, "no_ship": 2, "match": 3}
+    rows.sort(key=lambda r: (rank[r["status"]], r["order_date"] or "", r["order_no"]))
+    return {"stats": stats, "rows": rows}
 
 
 def push_order_to_wangdian(db: Session, order_id: int) -> dict:
     """把已审核的分销订单推送到旺店通（销售单）。
 
+    报文按旺店通 `trade_push.php`（trade_list + order_list）组装；
     未配置密钥 / 店铺号时报清晰的 ValueError，不落失败记录；
     推送失败落 push_status=failed 并把报错存 push_message，便于重试前排查。
     """
@@ -1095,6 +2182,14 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
         new_tid = str(result.get("tid") or result.get("trade_id") or "")
         if new_tid:
             order.wdt_tid = new_tid
+        elif not order.wdt_tid:
+            # trade_push 的响应只返回 new_count/chg_count，不回 tid；
+            # 本系统推送时 tid 就是 order_no，记下来便于订单详情追溯。
+            order.wdt_tid = order.order_no
+        new_count = int(result.get("new_count") or 0)
+        chg_count = int(result.get("chg_count") or 0)
+        if not message and (new_count or chg_count):
+            message = f"新增 {new_count} 单，更新 {chg_count} 单"
     order.push_status = "sent"
     order.push_message = message[:480]
     order.pushed_at = datetime.now()
@@ -1103,14 +2198,39 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
 
 
 def create_and_push_order(
-    db: Session, distributor_id: int, lines: list[dict], remark: str = "", wdt_shop_no: str = ""
+    db: Session,
+    distributor_id: int,
+    lines: list[dict],
+    remark: str = "",
+    wdt_shop_no: str = "",
+    wdt_warehouse_no: str = "",
+    *,
+    order_channel: str = "",
+    ship_warehouse: str = "",
+    ship_note: str = "",
+    delivery_type: str = "",
+    scratch_code: int = 0,
+    order_date: datetime | None = None,
 ) -> dict:
     """下单页一键流程：创建订单 → 自动审核通过 → 推送旺店通。
 
     推送失败不回滚订单（单据已落库、状态为已审核），把报错带给前端，
     用户在「分销订单」页修正后可重推。
     """
-    view = create_order(db, distributor_id, lines, remark, wdt_shop_no=wdt_shop_no)
+    view = create_order(
+        db,
+        distributor_id,
+        lines,
+        remark,
+        wdt_shop_no=wdt_shop_no,
+        wdt_warehouse_no=wdt_warehouse_no,
+        order_channel=order_channel,
+        ship_warehouse=ship_warehouse,
+        ship_note=ship_note,
+        delivery_type=delivery_type,
+        scratch_code=scratch_code,
+        order_date=order_date,
+    )
     order = db.get(FxOrder, int(view["id"]))
     transition_order(db, order.id, "submit")
     transition_order(db, order.id, "approve")

@@ -3,6 +3,13 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>经营总览 · 红盒子供销平台</title>
+<script>
+/* 直接打开本页（未被主壳 iframe 嵌入）时，同一个标签内跳回主壳，避免多出一份"平台"页面 */
+(function(){
+  if (window.self !== window.top) return;
+  location.replace('/?open=' + encodeURIComponent('wb-overview'));
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -216,6 +223,12 @@ function soInit(){
 
 checkWdt();
 soInit();
+
+/* 双击表头排序：店铺/平台分布都是整表渲染、不分页，直接排 DOM 即可 */
+if(window.fxTable){
+  fxTable.sort(document.querySelector('#soShopRows').closest('table'));
+  fxTable.sort(document.querySelector('#soPlatRows').closest('table'));
+}
 </script>
 </body>
 </html>

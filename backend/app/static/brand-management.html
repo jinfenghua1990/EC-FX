@@ -1,0 +1,432 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>品牌管理 · 红盒子供销平台</title>
+<script>
+/* 直接打开本页（未被主壳 iframe 嵌入）时，同一个标签内跳回主壳对应标签。 */
+(function(){
+  if (window.self !== window.top) return;
+  location.replace('/?open=prod-brand');
+})();
+</script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --sidebar:#1b2735; --sidebar-hover:#24334a; --active:#2463eb;
+  --bg:#f4f6fa; --card:#fff; --line:#e8ecf3; --muted:#7b8798;
+  --text:#1c2740; --blue:#2463eb; --green:#18a05e; --orange:#f59e0b; --red:#e5484d;
+}
+html,body{min-height:100%}
+body{font-family:Inter,"PingFang SC","Microsoft YaHei",sans-serif;background:var(--bg);color:var(--text);display:flex;min-height:100vh}
+.sidebar{width:216px;background:var(--sidebar);color:#c6d0de;display:flex;flex-direction:column;flex-shrink:0}
+.brand{display:flex;align-items:center;gap:10px;padding:20px 18px 16px;font-size:16px;font-weight:700;color:#fff}
+.brand .logo{width:30px;height:30px;border-radius:8px;background:var(--blue);display:flex;align-items:center;justify-content:center;font-size:16px}
+.nav{flex:1;padding:6px 10px}
+.nav a{display:flex;align-items:center;gap:10px;padding:11px 12px;margin:2px 0;border-radius:9px;color:#aab6c8;text-decoration:none;font-size:14px}
+.nav a .ic{width:18px;text-align:center;font-size:15px}
+.nav a:hover{background:var(--sidebar-hover);color:#fff}
+.nav a.active{background:var(--active);color:#fff;font-weight:600}
+.main{flex:1;min-width:0;display:flex;flex-direction:column;min-height:100vh}
+.topbar{background:var(--card);border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;padding:0 24px;height:52px;flex-shrink:0}
+.crumbs{font-size:13px;color:var(--muted)}
+.crumbs b{color:var(--text);font-weight:600}
+.topright{display:flex;align-items:center;gap:14px;font-size:13px;color:var(--muted)}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:5px}
+.content{padding:20px 24px 40px;overflow:auto;flex:1;min-height:0}
+.btn{border:1px solid #d6dce6;background:#fff;border-radius:8px;padding:7px 14px;font-size:13px;cursor:pointer;color:var(--text);font-weight:500;font-family:inherit;white-space:nowrap;transition:border-color .12s,background .12s,color .12s}
+.btn:hover{border-color:#b9c4d4;background:#fbfcff}
+.btn.primary{background:var(--blue);border-color:var(--blue);color:#fff}
+.btn.primary:hover{background:#1d54cf;border-color:#1d54cf}
+.btn.mini{padding:5px 10px;font-size:12px;border-radius:7px}
+.btn.danger{color:var(--red);border-color:#f1c6c7;background:#fffafa}
+.btn.danger:hover{background:#fdeaea;border-color:#e8a5a7}
+.btn.ghost{border-color:transparent;background:transparent;color:#667085}
+.btn.ghost:hover{background:#eef2f8;border-color:#e1e7f0}
+.page-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;flex-wrap:wrap;margin-bottom:16px}
+h1.page{font-size:22px;letter-spacing:-.3px;margin-bottom:5px}
+.subtitle{font-size:13px;color:var(--muted);line-height:1.6;max-width:760px}
+.page-actions{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;display:flex;gap:12px;align-items:flex-start;min-width:0}
+.stat .ico{width:38px;height:38px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:17px;flex-shrink:0;background:#eef4ff;color:var(--blue)}
+.stat .ico.green{background:#e5f6ee;color:var(--green)}
+.stat .ico.gray{background:#eef1f6;color:#667085}
+.stat .ico.amber{background:#fdf3df;color:#b54708}
+.stat .k{font-size:12px;color:var(--muted);margin-bottom:5px}
+.stat .v{font-size:21px;font-weight:750;letter-spacing:-.3px;line-height:1.1}
+.stat .s{font-size:11px;color:var(--muted);margin-top:4px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.toolbar{background:var(--card);border:1px solid var(--line);border-radius:12px 12px 0 0;padding:12px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap;border-bottom:0}
+.search{flex:1;min-width:200px;max-width:360px;position:relative}
+.search input{width:100%;min-height:36px;border:1px solid #d8dee9;border-radius:8px;padding:7px 11px 7px 32px;font-size:13px;font-family:inherit;background:#fff}
+.search input:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(36,99,235,.12)}
+.search .mg{position:absolute;left:10px;top:50%;transform:translateY(-50%);font-size:13px;color:#98a2b3;pointer-events:none}
+.seg{display:flex;background:#f1f4f9;border-radius:8px;padding:3px;gap:2px}
+.seg button{border:0;background:transparent;border-radius:6px;padding:6px 11px;font-size:12.5px;font-family:inherit;color:#667085;cursor:pointer;white-space:nowrap}
+.seg button:hover{color:#344054}
+.seg button.on{background:#fff;color:#1d4ed8;font-weight:700;box-shadow:0 1px 3px rgba(16,24,40,.1)}
+.toolbar .spacer{flex:1}
+.table-card{background:var(--card);border:1px solid var(--line);border-radius:0 0 12px 12px;overflow:hidden}
+.table-wrap{overflow:auto;max-height:calc(100vh - 330px);min-height:260px}
+table{width:100%;border-collapse:collapse;font-size:13px;min-width:880px}
+th{background:#f7f9fc;text-align:left;padding:10px 12px;font-weight:600;border-bottom:1px solid var(--line);white-space:nowrap;color:#5b6778;position:sticky;top:0;z-index:1}
+td{padding:10px 12px;border-bottom:1px solid #f0f3f8;white-space:nowrap;vertical-align:middle}
+tbody tr:hover td{background:#fafbfe}
+tr.off td{color:#98a2b3;background:#fcfcfd}
+tr.unmanaged td{background:#fffdf7}
+tr.unmanaged:hover td{background:#fffcf0}
+.brand-cell{display:flex;align-items:center;gap:10px;min-width:220px}
+.brand-avatar{width:36px;height:36px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:800;color:#fff;flex-shrink:0;overflow:hidden;box-shadow:inset 0 0 0 1px rgba(16,24,40,.06)}
+.brand-avatar img{width:100%;height:100%;object-fit:contain;background:#fff;padding:4px}
+.brand-cell .nm{font-weight:700;color:#344054;max-width:300px;overflow:hidden;text-overflow:ellipsis}
+.brand-cell .meta{font-size:11px;color:#98a2b3;margin-top:3px;max-width:320px;overflow:hidden;text-overflow:ellipsis}
+.brand-cell .meta code{font-family:inherit;background:#f1f4f9;border-radius:4px;padding:0 4px;color:#667085}
+.tag{display:inline-flex;align-items:center;gap:4px;border-radius:999px;padding:3px 8px;font-size:11px;font-weight:700;white-space:nowrap}
+.tag.on{background:#e5f6ee;color:#0d7a47}
+.tag.off{background:#eef1f6;color:#7b8798}
+.tag.new{background:#fff4e5;color:#b54708}
+.pill{display:inline-flex;min-width:28px;justify-content:center;background:#f1f4f9;border-radius:999px;padding:2px 8px;font-size:11.5px;font-weight:700;color:#475467}
+.pill.blue{background:#eef4ff;color:#1d4ed8}
+.ops{display:flex;gap:5px;align-items:center}
+.empty{padding:52px 20px;text-align:center;color:#98a2b3;font-size:13px}
+.empty b{display:block;color:#475467;font-size:14px;margin-bottom:5px}
+.muted{color:#98a2b3}
+.foot-note{padding:10px 14px;border-top:1px solid #f0f3f8;color:#98a2b3;font-size:11.5px;display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap}
+/* 弹窗 */
+.backdrop{position:fixed;inset:0;background:rgba(16,24,40,.45);display:none;align-items:center;justify-content:center;z-index:99;padding:20px}
+.backdrop.show{display:flex}
+.modal{background:#fff;border-radius:14px;width:min(600px,96vw);max-height:90vh;overflow:auto;box-shadow:0 24px 70px rgba(16,24,40,.28);display:flex;flex-direction:column}
+.mh{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;padding:18px 22px 14px;border-bottom:1px solid var(--line);flex-shrink:0}
+.mh h2{font-size:17px;margin-bottom:4px}
+.mh .sub{font-size:12px;color:var(--muted);line-height:1.5}
+.mb{padding:16px 22px 20px;overflow:auto}
+.mf{padding:12px 22px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px;background:#fff;flex-shrink:0}
+.form-grid{display:grid;grid-template-columns:1fr 1fr;gap:12px 14px}
+.field{min-width:0}
+.field.full{grid-column:1/-1}
+.field label{display:block;font-size:12px;font-weight:600;color:#667085;margin-bottom:5px}
+.field label .req{color:var(--red)}
+.field input,.field textarea{width:100%;min-height:38px;border:1px solid #d8dee9;border-radius:8px;padding:7px 10px;font-size:13.5px;font-family:inherit;background:#fff}
+.field textarea{min-height:72px;resize:vertical}
+.field input:focus,.field textarea:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(36,99,235,.12)}
+.field .hint{font-size:11px;color:#98a2b3;margin-top:4px;line-height:1.45}
+.field.check{display:flex;align-items:center;gap:8px;padding-top:22px}
+.field.check label{margin:0;display:flex;align-items:center;gap:7px;cursor:pointer;color:#475467;font-size:13px}
+.field.check input{width:16px;height:16px;min-height:0;accent-color:var(--blue);margin:0}
+.preview{display:flex;align-items:center;gap:10px;background:#f8fafc;border:1px solid #e8edf5;border-radius:9px;padding:9px 11px;margin-top:12px}
+.preview .brand-avatar{width:32px;height:32px;border-radius:8px}
+.preview .pv-name{font-size:12.5px;font-weight:700;color:#344054}
+.preview .pv-sub{font-size:11px;color:#98a2b3;margin-top:2px}
+.err{display:none;margin-top:12px;border:1px solid #f2c7c8;background:#fff5f5;color:#b42318;border-radius:8px;padding:8px 10px;font-size:12.5px;line-height:1.5}
+.err.show{display:block}
+#toast{position:fixed;right:24px;bottom:26px;background:#1c2740;color:#fff;padding:10px 16px;border-radius:9px;font-size:13px;opacity:0;transform:translateY(8px);pointer-events:none;transition:opacity .18s,transform .18s;z-index:120;max-width:420px;box-shadow:0 10px 30px rgba(16,24,40,.25)}
+#toast.show{opacity:1;transform:translateY(0)}
+@media(max-width:900px){.stats{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:640px){
+  .content{padding:14px}
+  .stats{grid-template-columns:1fr 1fr}
+  .form-grid{grid-template-columns:1fr}
+  .field.full{grid-column:auto}
+  .table-wrap{max-height:none}
+}
+</style>
+<link rel="stylesheet" href="/static/ui-type.css?v=20261028">
+<script src="/static/embed.js"></script>
+</head>
+<body>
+<aside class="sidebar">
+  <div class="brand"><span class="logo">🏷</span>红盒子供销平台</div>
+  <nav class="nav">
+    <a href="/"><span class="ic">🏠</span>经营总览</a>
+    <a href="/distribution?tab=distributors"><span class="ic">🤝</span>分销管理</a>
+    <a class="active" href="/brand-management"><span class="ic">🏷</span>品牌管理</a>
+    <a href="/distribution?tab=products"><span class="ic">📦</span>商品档案</a>
+  </nav>
+</aside>
+
+<div class="main">
+  <div class="topbar">
+    <div class="crumbs">商品管理 / <b>品牌管理</b></div>
+    <div class="topright"><span><span class="dot"></span>品牌主数据</span><button class="btn mini" onclick="load()">刷新</button></div>
+  </div>
+  <div class="content">
+    <div class="page-head">
+      <div>
+        <h1 class="page">品牌管理</h1>
+        <div class="subtitle">统一维护品牌名称、短名、编码、排序、启停和删除。分销商档案从这里勾选授权品牌，顶栏品牌切换器只显示启用的品牌；商品档案里的品牌会按名称关联到这份主数据。删除前会校验商品和分销商引用，仍在使用的品牌请改为停用。</div>
+      </div>
+      <div class="page-actions">
+        <button class="btn" onclick="syncProducts()" title="把商品档案里出现、但还没建档的品牌补进本页">↻ 同步商品品牌</button>
+        <button class="btn primary" onclick="openBrandModal()">＋ 新建品牌</button>
+      </div>
+    </div>
+
+    <div class="stats" id="stats"></div>
+
+    <div class="toolbar">
+      <div class="search"><span class="mg">⌕</span><input id="search" placeholder="搜索品牌名称 / 短名 / 编码" oninput="renderTable()"></div>
+      <div class="seg" id="statusSeg">
+        <button class="on" data-status="all" onclick="setStatus('all')">全部</button>
+        <button data-status="active" onclick="setStatus('active')">启用</button>
+        <button data-status="inactive" onclick="setStatus('inactive')">停用</button>
+      </div>
+      <div class="spacer"></div>
+      <span class="muted" id="countTip"></span>
+    </div>
+    <div class="table-card">
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>品牌</th><th>编码 / 短名</th><th>排序</th><th>在售商品</th><th>授权分销商</th><th>状态</th><th style="width:200px">操作</th>
+          </tr></thead>
+          <tbody id="brandBody"></tbody>
+        </table>
+      </div>
+      <div class="foot-note"><span>停用品牌不会出现在顶栏普通品牌清单，但历史商品和已授权分销商数据保留。</span><span id="loadTip"></span></div>
+    </div>
+  </div>
+</div>
+
+<div class="backdrop" id="brandModal"><div class="modal">
+  <div class="mh">
+    <div><h2 id="brandModalTitle">新建品牌</h2><div class="sub">品牌全名会与商品档案、分销商授权名称关联，改名时自动级联更新。</div></div>
+    <button class="btn mini" type="button" onclick="closeModal()">✕</button>
+  </div>
+  <div class="mb">
+    <div class="form-grid">
+      <div class="field full"><label>品牌全名 <span class="req">*</span></label><input id="fName" placeholder="如：格力高/Glico"><div class="hint">必须和商品档案里的品牌名一致；已有品牌改名会自动更新商品和分销商授权。</div></div>
+      <div class="field"><label>短名</label><input id="fShort" placeholder="留空自动取 / 前面的部分"><div class="hint">顶栏和品牌卡片显示用</div></div>
+      <div class="field"><label>品牌编码</label><input id="fCode" placeholder="选填，如 GLICO"></div>
+      <div class="field"><label>排序</label><input id="fSort" type="number" step="1" value="0"><div class="hint">数字越小越靠前</div></div>
+      <div class="field"><label>启用状态</label><div class="field check" style="padding-top:0"><label><input id="fActive" type="checkbox" checked>启用该品牌</label></div></div>
+      <div class="field full"><label>LOGO 文件名 / 地址</label><input id="fLogo" list="logoOptions" placeholder="如 glico.png；留空则用品牌首字色块" oninput="renderPreview()"><datalist id="logoOptions"><option value="glico.png"><option value="quaker.png"><option value="lays.png"><option value="lindt.png"><option value="samyang.png"><option value="purenatural.png"></datalist><div class="hint">存放于 /static/brand-logos/ 的文件名，也可以填完整图片 URL。</div></div>
+      <div class="field full"><label>备注</label><textarea id="fNote" placeholder="选填，例如品牌归属、对接人、结算说明"></textarea></div>
+    </div>
+    <div class="preview"><div class="brand-avatar" id="pvAvatar">品</div><div><div class="pv-name" id="pvName">品牌预览</div><div class="pv-sub" id="pvSub">短名 / 编码</div></div></div>
+    <div class="err" id="formErr"></div>
+  </div>
+  <div class="mf"><button class="btn danger" type="button" id="btnDeleteBrand" style="margin-right:auto;display:none" onclick="deleteBrand()">删除品牌</button><button class="btn" type="button" onclick="closeModal()">取消</button><button class="btn primary" type="button" onclick="saveBrand()" id="btnSave">保存品牌</button></div>
+</div></div>
+
+<div id="toast"></div>
+<script>
+"use strict";
+const $ = id => document.getElementById(id);
+const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const state = { brands: [], status: "all", editingId: null, loading: false };
+const PALETTE = ["#2463eb","#0e9f9a","#d97706","#7c5cbf","#c2417a","#0f9d6e","#dc5a3a","#5b6b84","#3f9142","#b5442d","#2b7de9","#8b6f47"];
+
+function toast(msg, ms){
+  const t = $("toast");
+  if (!t) return;
+  t.textContent = msg; t.classList.add("show");
+  setTimeout(() => t.classList.remove("show"), ms || 2400);
+}
+function colorOf(name){
+  let h = 0;
+  for (const ch of String(name || "")) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return PALETTE[h % PALETTE.length];
+}
+function shortName(name){
+  const s = String(name || "");
+  return s.includes("/") ? s.split("/", 1)[0] : s;
+}
+function logoSrc(logo){
+  const s = String(logo || "").trim();
+  if (!s) return "";
+  if (/^https?:\/\//i.test(s) || s.startsWith("/")) return s;
+  return "/static/brand-logos/" + encodeURIComponent(s);
+}
+function avatarHtml(brand, cls){
+  const s = String((brand && (brand.short_name || shortName(brand.name || brand.brand))) || "?");
+  const ch = esc(s.slice(0, 1) || "?");
+  const src = logoSrc(brand && brand.logo);
+  const bg = colorOf(brand && (brand.name || brand.brand));
+  return `<div class="${cls || "brand-avatar"}" style="background:${bg}">${src ? `<img src="${esc(src)}" alt="${ch}" onerror="this.remove()">` : ch}</div>`;
+}
+function api(path, options){
+  return fetch(path, Object.assign({headers:{"Content-Type":"application/json"}}, options || {}))
+    .then(async res => {
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.detail || res.statusText);
+      return data;
+    });
+}
+function notifyShell(){
+  try { if (window.parent && window.parent !== window && typeof window.parent.__fxReloadBrands === "function") window.parent.__fxReloadBrands(); } catch (e) {}
+}
+
+async function load(){
+  if (state.loading) return;
+  state.loading = true;
+  $("loadTip").textContent = "正在加载…";
+  try {
+    const data = await api("/api/fx/brands?include_inactive=1");
+    state.brands = Array.isArray(data.brands) ? data.brands : [];
+    renderStats(); renderTable(); notifyShell();
+    $("loadTip").textContent = "已加载 " + state.brands.length + " 个品牌";
+  } catch (e) {
+    state.brands = []; renderStats(); renderTable();
+    $("loadTip").textContent = "加载失败：" + e.message;
+    toast("品牌加载失败：" + e.message);
+  } finally { state.loading = false; }
+}
+
+function renderStats(){
+  const total = state.brands.length;
+  const active = state.brands.filter(b => b.active).length;
+  const inactive = total - active;
+  const products = state.brands.reduce((sum, b) => sum + (Number(b.product_count || b.count) || 0), 0);
+  const distributors = state.brands.reduce((sum, b) => sum + (Number(b.distributor_count) || 0), 0);
+  $("stats").innerHTML = `
+    <div class="stat"><div class="ico">🏷</div><div><div class="k">品牌总数</div><div class="v">${total}</div><div class="s">含商品里尚未建档的品牌</div></div></div>
+    <div class="stat"><div class="ico green">●</div><div><div class="k">启用品牌</div><div class="v">${active}</div><div class="s">顶栏品牌切换器可见</div></div></div>
+    <div class="stat"><div class="ico gray">○</div><div><div class="k">停用品牌</div><div class="v">${inactive}</div><div class="s">保留历史数据，不出现在普通清单</div></div></div>
+    <div class="stat"><div class="ico amber">📦</div><div><div class="k">在售商品覆盖</div><div class="v">${products}</div><div class="s">${distributors} 条分销商授权关系</div></div></div>`;
+}
+
+function setStatus(status){
+  state.status = status;
+  [...$("statusSeg").querySelectorAll("button")].forEach(b => b.classList.toggle("on", b.dataset.status === status));
+  renderTable();
+}
+
+function visibleBrands(){
+  const q = ($("search").value || "").trim().toLowerCase();
+  return state.brands.filter(b => {
+    if (state.status === "active" && !b.active) return false;
+    if (state.status === "inactive" && b.active) return false;
+    if (!q) return true;
+    return [b.name, b.brand, b.short_name, b.code].some(v => String(v || "").toLowerCase().includes(q));
+  });
+}
+
+function renderTable(){
+  const rows = visibleBrands();
+  const body = $("brandBody");
+  const q = ($("search").value || "").trim();
+  $("countTip").textContent = q ? `筛选出 ${rows.length} / ${state.brands.length}` : `共 ${state.brands.length} 个品牌`;
+  if (!rows.length) {
+    body.innerHTML = `<tr><td colspan="7"><div class="empty"><b>${state.brands.length ? "没有符合筛选条件的品牌" : "还没有品牌"}</b>${state.brands.length ? "试试调整搜索词或状态筛选。" : "点右上角「新建品牌」，或先把商品档案里的品牌同步进来。"}</div></td></tr>`;
+    return;
+  }
+  body.innerHTML = rows.map(b => {
+    const name = b.name || b.brand || "";
+    const managed = b.managed !== false && b.id != null;
+    const count = Number(b.product_count ?? b.count ?? 0);
+    const distCount = Number(b.distributor_count || 0);
+    const rowClass = [!b.active ? "off" : "", !managed ? "unmanaged" : ""].filter(Boolean).join(" ");
+    const status = b.active ? `<span class="tag on">启用</span>` : `<span class="tag off">停用</span>`;
+    const meta = [b.short_name && b.short_name !== name ? "短名 " + b.short_name : "", b.code ? `编码 <code>${esc(b.code)}</code>` : ""].filter(Boolean).join(" · ");
+    return `<tr class="${rowClass}">
+      <td><div class="brand-cell">${avatarHtml(b)}<div><div class="nm" title="${esc(name)}">${esc(name)}</div><div class="meta">${meta || (managed ? "已建档" : "商品里出现，尚未纳入品牌主数据")}</div></div></div></td>
+      <td>${b.code ? `<span class="pill">${esc(b.code)}</span>` : `<span class="muted">-</span>`}<div class="meta" style="font-size:11px;color:#98a2b3;margin-top:3px">${esc(b.short_name || shortName(name))}</div></td>
+      <td>${Number(b.sort_order || 0)}</td>
+      <td><span class="pill blue">${count}</span></td>
+      <td><span class="pill">${distCount}</span></td>
+      <td>${status}${managed ? "" : ` <span class="tag new">待建档</span>`}</td>
+      <td><div class="ops">
+        ${managed
+          ? `<button class="btn mini" onclick="openBrandModal(${b.id})">编辑</button><button class="btn mini ${b.active ? "danger" : ""}" onclick="toggleBrand(${b.id})">${b.active ? "停用" : "启用"}</button><button class="btn mini ghost" onclick="deleteBrand(${b.id})" title="有商品或分销商引用时不能删除">删除</button>`
+          : `<button class="btn mini primary" data-brand="${esc(name)}" onclick="openBrandModal(null, this.dataset.brand)">纳入管理</button>`}
+      </div></td>
+    </tr>`;
+  }).join("");
+}
+
+function openBrandModal(id, presetName){
+  state.editingId = id || null;
+  const brand = id ? state.brands.find(b => b.id === id) : null;
+  $("brandModalTitle").textContent = brand ? "编辑品牌" : "新建品牌";
+  $("fName").value = brand ? brand.name : (presetName || "");
+  $("fShort").value = brand ? (brand.short_name || "") : "";
+  $("fCode").value = brand ? (brand.code || "") : "";
+  $("fSort").value = brand ? (brand.sort_order || 0) : 0;
+  $("fLogo").value = brand ? (brand.logo || "") : "";
+  $("fActive").checked = brand ? !!brand.active : true;
+  $("fNote").value = brand ? (brand.note || "") : "";
+  $("formErr").textContent = "";
+  $("formErr").classList.remove("show");
+  $("btnDeleteBrand").style.display = brand ? "" : "none";
+  $("brandModal").classList.add("show");
+  renderPreview();
+  setTimeout(() => $("fName").focus(), 50);
+}
+function closeModal(){ $("brandModal").classList.remove("show"); }
+function renderPreview(){
+  const name = $("fName").value.trim();
+  const short = $("fShort").value.trim() || shortName(name);
+  const code = $("fCode").value.trim();
+  $("pvAvatar").outerHTML = avatarHtml({name, short_name: short, logo: $("fLogo").value.trim()}, "brand-avatar").replace('class="brand-avatar"', 'class="brand-avatar" id="pvAvatar"');
+  $("pvName").textContent = name || "品牌预览";
+  $("pvSub").textContent = [short, code].filter(Boolean).join(" / ") || "短名 / 编码";
+}
+function showFormError(msg){ const e = $("formErr"); e.textContent = msg; e.classList.toggle("show", !!msg); }
+
+async function saveBrand(){
+  const name = $("fName").value.trim();
+  if (!name) { showFormError("品牌全名必填"); $("fName").focus(); return; }
+  const body = {
+    name,
+    short_name: $("fShort").value.trim(),
+    code: $("fCode").value.trim(),
+    logo: $("fLogo").value.trim(),
+    sort_order: Number($("fSort").value || 0),
+    active: $("fActive").checked,
+    note: $("fNote").value.trim(),
+  };
+  const btn = $("btnSave");
+  btn.disabled = true; btn.textContent = "保存中…";
+  try {
+    if (state.editingId) await api("/api/fx/brands/" + state.editingId, {method:"PUT", body:JSON.stringify(body)});
+    else await api("/api/fx/brands", {method:"POST", body:JSON.stringify(body)});
+    closeModal();
+    toast(state.editingId ? "品牌已更新" : "品牌已创建");
+    await load();
+  } catch (e) {
+    showFormError(e.message);
+  } finally { btn.disabled = false; btn.textContent = "保存品牌"; }
+}
+
+async function toggleBrand(id){
+  const brand = state.brands.find(b => b.id === id);
+  if (!brand) return;
+  try {
+    const r = await api("/api/fx/brands/" + id + "/toggle", {method:"POST"});
+    toast(`品牌「${brand.name}」已${r.brand.active ? "启用" : "停用"}`);
+    await load();
+  } catch (e) { toast("操作失败：" + e.message, 5000); }
+}
+
+async function deleteBrand(id){
+  const brandId = id || state.editingId;
+  const brand = state.brands.find(b => b.id === brandId);
+  if (!brand) return;
+  const warn = `确定删除品牌「${brand.name}」？\n\n删除后不可恢复。如果仍有商品或分销商在使用该品牌，系统会拒绝删除，请先解除关联或改为停用。`;
+  if (!window.confirm(warn)) return;
+  try {
+    await api("/api/fx/brands/" + brandId, {method:"DELETE"});
+    closeModal();
+    toast(`品牌「${brand.name}」已删除`);
+    await load();
+  } catch (e) {
+    if ($("brandModal").classList.contains("show")) showFormError(e.message);
+    else toast("删除失败：" + e.message, 6000);
+  }
+}
+
+async function syncProducts(){
+  try {
+    const r = await api("/api/fx/brands/sync-products", {method:"POST"});
+    toast(r.created ? `已纳入 ${r.created} 个商品品牌：${(r.names || []).join("、")}` : "商品品牌都已建档，无需同步");
+    await load();
+  } catch (e) { toast("同步失败：" + e.message); }
+}
+
+$("fName").addEventListener("input", renderPreview);
+$("fShort").addEventListener("input", renderPreview);
+$("fCode").addEventListener("input", renderPreview);
+load();
+</script>
+</body>
+</html>
