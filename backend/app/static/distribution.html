@@ -240,6 +240,16 @@ tr.dirty .topcat-in{border-color:#e8a33a;background:#fffaef}
 .eo-tbl .num{text-align:right}
 .eo-empty{padding:10px 2px;color:#98a2b3;font-size:12.5px}
 .scope-tag{margin-left:10px;padding:2px 8px;border-radius:10px;background:#eef4ff;color:#2463eb;font-size:11.5px;font-weight:600;display:none}
+/* 订单状态处理：状态标签与批量条 */
+.ost-chips{display:flex;gap:6px;flex-wrap:wrap}
+.ost-chip{padding:4px 11px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:12.5px;font-weight:600;color:#5b6778;cursor:pointer;font-family:inherit;transition:background .13s,color .13s,border-color .13s}
+.ost-chip:hover{border-color:#c3cddd}
+.ost-chip.on{background:var(--blue);border-color:var(--blue);color:#fff}
+.ost-chip .n{margin-left:5px;font-weight:700}
+.ost-chip.warn.on{background:var(--red);border-color:var(--red)}
+.ost-bar{display:flex;align-items:center;gap:8px;padding:8px 12px;border-bottom:1px solid var(--line);background:#f8fafc;font-size:12.5px;color:#5b6778}
+.ost-bar.off{display:none}
+.ost-bar b{color:var(--blue)}
 .scope-tag.show{display:inline-block}
 /* 订单明细编辑 */
 .line-box{border:1px solid var(--line);border-radius:10px;margin-top:12px}
@@ -292,6 +302,7 @@ toast{display:none}
       <button class="tab" id="tabProducts" data-tab="products" onclick="switchTab('products')">商品</button>
       <button class="tab" data-tab="entry" onclick="switchTab('entry')">下单</button>
       <button class="tab" data-tab="orders" onclick="switchTab('orders')">分销订单</button>
+      <button class="tab" data-tab="ostatus" onclick="switchTab('ostatus')">订单状态处理</button>
       <button class="tab" data-tab="prices" onclick="switchTab('prices')">价格</button>
       <button class="tab" data-tab="statements" onclick="switchTab('statements')">对账单</button>
     </div>
@@ -426,6 +437,34 @@ toast{display:none}
           <th data-col="tid">订单号</th><th data-col="dist">分销商</th><th data-col="status">状态</th><th data-col="amount" class="num">金额</th><th data-col="lines" class="num">明细</th><th data-col="date">下单时间</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="orderBody"></tbody></table>
         <div class="empty" id="orderEmpty" style="display:none">还没有订单</div>
+      </div>
+    </div>
+
+    <!-- 订单状态处理：待审核 / 已审核 / 异常 三合一 -->
+    <div class="card" id="panel-ostatus" style="display:none">
+      <div class="head">
+        <h3>订单状态处理</h3>
+        <div class="ost-chips" id="ostChips"></div>
+        <select id="ostDist" style="width:170px" onchange="renderOstatus()"></select>
+        <button class="btn" onclick="loadOstatus()">⟳ 刷新</button>
+      </div>
+      <div class="hint">待审核 / 已审核 / 推送异常的单都在这一页处理。点上面的状态标签切换，勾订单后可<b>批量审核、驳回、取消、重推旺店通</b>；单击或双击任意一行看订单明细。</div>
+      <div class="ost-bar off" id="ostBar">
+        <span>已选 <b id="ostSelCount">0</b> 张</span>
+        <button class="btn primary" onclick="ostBatch('approve')">✓ 审核通过</button>
+        <button class="btn" onclick="ostBatch('submit')">↑ 提交</button>
+        <button class="btn" onclick="ostBatch('reject')">↩ 驳回</button>
+        <button class="btn danger" onclick="ostBatch('cancel')">✕ 取消</button>
+        <button class="btn" onclick="ostBatchPush()">⟳ 重推旺店通</button>
+      </div>
+      <div class="tbl">
+        <table class="cols" data-ckey="ostatus">
+          <colgroup><col style="width:36px"><col style="width:170px"><col style="width:220px"><col style="width:110px"><col style="width:110px"><col style="width:64px"><col style="width:150px"><col style="width:130px"><col style="width:200px"></colgroup>
+          <thead><tr>
+          <th data-col="ck" title="勾选后可批量处理"><input type="checkbox" id="ostSelAll" onchange="ostToggleAll(this)"></th>
+          <th data-col="tid">订单号</th><th data-col="dist">分销商</th><th data-col="status">状态</th><th data-col="amount" class="num">金额</th><th data-col="lines" class="num">明细</th><th data-col="date">下单时间</th><th data-col="push">推送旺店通</th><th data-col="ops">操作</th>
+        </tr></thead><tbody id="ostBody"></tbody></table>
+        <div class="empty" id="ostEmpty" style="display:none">当前筛选下没有订单</div>
       </div>
     </div>
 
@@ -597,7 +636,9 @@ const state = { distributors: [], products: [], orders: [], overview: null, tab:
   // 全部品牌（不受顶栏当前品牌过滤，用于分销商「分销品牌」勾选项）
   allBrands: [],
   // 下单页：当前分销商的近期订单（点/双击弹明细用）
-  entryOrders: [] };
+  entryOrders: [],
+  // 订单状态处理页：全量订单（本地按状态切）+ 当前状态筛选 + 已勾选 id
+  ostatus: [], ostFilter: "submitted", ostSel: new Set() };
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -626,7 +667,7 @@ async function loadAll(){
     state.maintenance = prod.maintenance || null;
     await loadOrders();
     renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
-    fillEntrySelects(); loadStockOverview(); loadWdtShops(); loadEntryOrders();
+    fillEntrySelects(); loadStockOverview(); loadWdtShops(); loadEntryOrders(); loadOstatus();
     loadInventoryBadge(); loadTopCatOptions();
     $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
     // 顶部常驻提示：让用户随时知道「现在是在哪个品牌下操作」，含订单/价格/对账全站
@@ -641,13 +682,14 @@ async function loadAll(){
 function switchTab(name){
   state.tab = name;
   document.querySelectorAll(".tab").forEach(t => t.classList.toggle("active", t.dataset.tab === name));
-  ["distributors","products","entry","orders","prices","statements"].forEach(p => {
+  ["distributors","products","entry","orders","ostatus","prices","statements"].forEach(p => {
     $("panel-" + p).style.display = p === name ? "" : "none";
   });
-  const names = { distributors: "分销商", products: "商品", entry: "分销下单", orders: "分销订单", prices: "经销商价格", statements: "对账单" };
+  const names = { distributors: "分销商", products: "商品", entry: "分销下单", orders: "分销订单", ostatus: "订单状态处理", prices: "经销商价格", statements: "对账单" };
   $("crumbTab").textContent = names[name];
   if (name === "entry") { renderEntry(); loadEntryOrders(); }
   if (name === "orders") loadOrders();
+  if (name === "ostatus") loadOstatus();
   if (name === "prices") loadPrices();
   if (name === "statements") loadStatements();
 }
@@ -1639,6 +1681,9 @@ function fillOrderSelects(){
   // 对账单页：可全量，也可按分销商筛
   $("stmtDist").innerHTML = `<option value="">全部分销商</option>` +
     state.distributors.filter(d => d.active).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
+  // 订单状态处理页
+  $("ostDist").innerHTML = `<option value="">全部分销商</option>` +
+    state.distributors.filter(d => d.active).map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("");
 }
 
 function renderOrders(){
@@ -1664,6 +1709,122 @@ function renderOrders(){
       <td class="ops">${ops.join("")}</td></tr>`;
   }).join("");
   applyColOrder(tableOf("order"));
+}
+
+/* ---------- 订单状态处理：待审核 / 已审核 / 推送异常 三合一 ---------- */
+/* 一次把订单全拉下来，本地按状态切 —— 这样每个状态标签上的数字才准，切页签也不用反复请求 */
+const OST_FILTERS = [
+  { key: "submitted", label: "待审核" },
+  { key: "approved",  label: "已审核" },
+  { key: "abnormal",  label: "推送异常", warn: true },
+  { key: "draft",     label: "草稿" },
+  { key: "cancelled", label: "已取消" },
+  { key: "",          label: "全部" },
+];
+
+function ostMatch(o, key){
+  if (!key) return true;
+  // 「异常」= 推旺店通失败的单（待重推）；未推送不算异常，只是还没推
+  if (key === "abnormal") return o.push_status === "failed";
+  return o.status === key;
+}
+
+function ostRows(){
+  const distId = $("ostDist") ? $("ostDist").value : "";
+  return state.ostatus.filter(o => ostMatch(o, state.ostFilter) && (!distId || String(o.distributor_id) === distId));
+}
+
+async function loadOstatus(){
+  if (!$("ostBody")) return;
+  try {
+    const params = new URLSearchParams();
+    if (state.brand) params.set("brand", state.brand);   // 同样受顶栏品牌作用域限制
+    params.set("limit", "500");
+    const data = await api("/api/fx/orders?" + params.toString());
+    state.ostatus = data.orders || [];
+    state.ostSel = new Set();
+  } catch (e) { state.ostatus = []; toast("订单加载失败: " + e.message); }
+  renderOstatus();
+}
+
+function renderOstatus(){
+  if (!$("ostBody")) return;
+  $("ostChips").innerHTML = OST_FILTERS.map(f => {
+    const n = state.ostatus.filter(o => ostMatch(o, f.key)).length;
+    return `<button type="button" class="ost-chip${f.warn ? " warn" : ""}${state.ostFilter === f.key ? " on" : ""}" onclick="ostSetFilter('${f.key}')">${f.label}<span class="n">${n}</span></button>`;
+  }).join("");
+  const rows = ostRows();
+  $("ostEmpty").style.display = rows.length ? "none" : "";
+  $("ostBody").innerHTML = rows.map(o => {
+    const ops = [];
+    if (o.status === "draft") ops.push(`<button class="btn mini" onclick="action(${o.id},'submit')">提交</button>`,
+      `<button class="btn mini danger" onclick="action(${o.id},'cancel')">取消</button>`);
+    else if (o.status === "submitted") ops.push(`<button class="btn mini primary" onclick="action(${o.id},'approve')">审核通过</button>`,
+      `<button class="btn mini" onclick="action(${o.id},'reject')">驳回</button>`,
+      `<button class="btn mini danger" onclick="action(${o.id},'cancel')">取消</button>`);
+    if (o.status === "approved" && o.push_status !== "sent") ops.push(`<button class="btn mini" onclick="pushOrder(${o.id})">推送WDT</button>`);
+    ops.splice(0, 0, `<button class="btn mini" onclick="viewOrder(${o.id})">查看</button>`);
+    const push = o.push_status === "sent"
+      ? `<span class="tag on" title="${esc(o.pushed_at)}">已推送</span>`
+      : (o.push_status === "failed"
+        ? `<span class="tag warn" title="失败原因：${esc(o.push_message || "未知")}\n可勾上后点「重推旺店通」">推送失败</span>`
+        : `<span class="tag off">未推送</span>`);
+    return `<tr onclick="viewOrder(${o.id})" ondblclick="viewOrder(${o.id})" title="点击 / 双击查看订单明细">
+      <td onclick="event.stopPropagation()"><input type="checkbox" class="ost-ck" ${state.ostSel.has(o.id) ? "checked" : ""} onchange="ostCheck(${o.id}, this.checked)"></td>
+      <td><b>${esc(o.order_no)}</b></td><td>${esc(o.distributor_name)}</td>
+      <td><span class="tag ${o.status}">${esc(o.status_label)}</span></td>
+      <td class="num"><b>${money(o.total_amount)}</b></td>
+      <td class="num">${o.line_count}</td><td>${esc(o.order_date)}</td>
+      <td>${push}</td>
+      <td class="ops" onclick="event.stopPropagation()">${ops.join("")}</td></tr>`;
+  }).join("");
+  // 表头全选框：全选打勾、部分选显示半选
+  const all = $("ostSelAll");
+  if (all) {
+    const picked = rows.filter(o => state.ostSel.has(o.id)).length;
+    all.checked = rows.length > 0 && picked === rows.length;
+    all.indeterminate = picked > 0 && picked < rows.length;
+  }
+  applyColOrder(tableOf("ostatus"));
+  ostRefreshSel();
+}
+
+function ostSetFilter(key){ state.ostFilter = key; state.ostSel.clear(); renderOstatus(); }
+function ostCheck(id, on){ on ? state.ostSel.add(id) : state.ostSel.delete(id); renderOstatus(); }
+function ostToggleAll(el){
+  ostRows().forEach(o => el.checked ? state.ostSel.add(o.id) : state.ostSel.delete(o.id));
+  renderOstatus();
+}
+function ostRefreshSel(){
+  const n = state.ostSel.size;
+  if ($("ostSelCount")) $("ostSelCount").textContent = n;
+  if ($("ostBar")) $("ostBar").classList.toggle("off", n === 0);
+}
+
+async function ostBatch(action){
+  const ids = [...state.ostSel];
+  if (!ids.length) return toast("先勾选订单");
+  const labels = { approve: "审核通过", reject: "驳回", cancel: "取消", submit: "提交" };
+  const label = labels[action] || action;
+  if (!confirm(`对已选 ${ids.length} 张订单执行「${label}」？\n（状态不允许的单会跳过并单独提示）`)) return;
+  try {
+    const r = await api("/api/fx/orders/batch-action", { method: "POST", body: JSON.stringify({ ids, action }) });
+    toast(`已${label} ${r.updated} 张` + (r.failed.length ? `，${r.failed.length} 张跳过（状态不允许）` : ""));
+    if (r.failed.length) console.warn("批量处理跳过的订单:", r.failed);
+    await loadOstatus(); loadOrders();
+  } catch (e) { toast("批量处理失败: " + e.message); }
+}
+
+async function ostBatchPush(){
+  const ids = [...state.ostSel];
+  if (!ids.length) return toast("先勾选订单");
+  if (!confirm(`重推旺店通：已选 ${ids.length} 张。\n只有「已审核且未推送成功」的会推，已推送过的自动跳过。继续？`)) return;
+  try {
+    const r = await api("/api/fx/orders/batch-push", { method: "POST", body: JSON.stringify({ ids }) });
+    toast(`推送成功 ${r.pushed} 张，跳过 ${r.skipped} 张，失败 ${r.failed.length} 张`);
+    if (r.failed.length) console.warn("推送失败的订单:", r.failed);
+    await loadOstatus(); loadOrders();
+  } catch (e) { toast("批量推送失败: " + e.message); }
 }
 
 function addLineRow(data){
@@ -2341,7 +2502,7 @@ if (__tab === "orders" && __status) $("orderStatus").value = __status;
 
 loadAll();
 
-if (__tab && ["distributors", "products", "entry", "orders", "prices", "statements"].indexOf(__tab) >= 0) switchTab(__tab);
+if (__tab && ["distributors", "products", "entry", "orders", "ostatus", "prices", "statements"].indexOf(__tab) >= 0) switchTab(__tab);
 </script>
 </body>
 </html>

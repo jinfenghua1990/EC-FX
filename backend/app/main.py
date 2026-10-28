@@ -28,7 +28,8 @@ from .services.adjustments import (
     create_adjustment, effective_stockout_rows, list_adjustments, stockout_adjustment_summary,
 )
 from .services.distribution import (
-    FX_ORDER_STATUSES, STATUS_LABELS, create_and_push_order, create_distributor, create_order, create_product,
+    FX_ORDER_STATUSES, STATUS_LABELS, batch_push_orders, batch_transition_orders,
+    create_and_push_order, create_distributor, create_order, create_product,
     delete_price, fx_overview, import_distributors, import_products,
     list_distributors, list_orders, list_prices, list_products, list_statements,
     list_brands, list_top_categories, set_top_categories,
@@ -141,6 +142,12 @@ class FxOrderPayload(BaseModel):
     auto_push: bool = False
     # 推送目标店铺号（如 hhz-xxqd）；留空回退 .env 的 WDT_SHOP_NO
     wdt_shop_no: str = ""
+
+
+class FxOrderBatchPayload(BaseModel):
+    """批量订单处理：ids 是要处理的订单 id，action 只对 batch-action 生效。"""
+    ids: list[int] = Field(default_factory=list)
+    action: str = ""
 
 
 class FxPricePayload(BaseModel):
@@ -1078,9 +1085,10 @@ def fx_purchase_orders_refresh_prices(
 
 @app.get("/api/fx/orders")
 def fx_orders(status: str = "", distributor_id: int | None = None, limit: int = 200, brand: str = "",
-              db: Session = Depends(get_db)):
+              push_status: str = "", db: Session = Depends(get_db)):
     try:
-        return {"orders": list_orders(db, status=status, distributor_id=distributor_id, limit=limit, brand=brand)}
+        return {"orders": list_orders(db, status=status, distributor_id=distributor_id, limit=limit,
+                                      brand=brand, push_status=push_status)}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -1091,6 +1099,26 @@ def fx_order_detail(order_id: int, db: Session = Depends(get_db)):
         return order_detail(db, order_id)
     except ValueError as exc:
         raise HTTPException(404, str(exc)) from exc
+
+
+# 注意：batch-* 是 4 段路径，与下方 5 段的 {order_id}/{action} 不冲突，但保持定义在前面更保险
+@app.post("/api/fx/orders/batch-action")
+def fx_order_batch_action(payload: FxOrderBatchPayload, db: Session = Depends(get_db)):
+    """批量改状态（审核通过 / 驳回 / 取消 / 提交）。一单不合法不影响其它单。"""
+    if not payload.ids:
+        raise HTTPException(400, "请先勾选订单")
+    try:
+        return {"ok": True, **batch_transition_orders(db, payload.ids, payload.action)}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
+@app.post("/api/fx/orders/batch-push")
+def fx_order_batch_push(payload: FxOrderBatchPayload, db: Session = Depends(get_db)):
+    """批量重推旺店通：只推已审核且未推送成功的，已推送过的自动跳过。"""
+    if not payload.ids:
+        raise HTTPException(400, "请先勾选订单")
+    return {"ok": True, **batch_push_orders(db, payload.ids)}
 
 
 @app.post("/api/fx/orders")

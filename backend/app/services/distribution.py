@@ -723,6 +723,52 @@ def transition_order(db: Session, order_id: int, action: str) -> dict:
     return _order_view(row)
 
 
+def batch_transition_orders(db: Session, order_ids: list[int], action: str) -> dict:
+    """批量改订单状态：逐单走同一套流转规则，合法的改、不合法的单独报出来。
+
+    不做「一单失败整批回滚」—— 已改的单留着，失败的列出来让你单独处理，
+    避免因为一张脏单把整批合法操作全废掉。
+    """
+    if action not in {"submit", "approve", "reject", "cancel"}:
+        raise ValueError(f"未知订单动作: {action}")
+    done, failed = 0, []
+    for oid in order_ids or []:
+        try:
+            row = db.get(FxOrder, int(oid or 0))
+            if not row:
+                raise ValueError("订单不存在")
+            target = FX_TRANSITIONS.get(row.status, {}).get(action)
+            if not target:
+                raise ValueError(f"当前状态[{STATUS_LABELS.get(row.status, row.status)}]不允许执行: {action}")
+            row.status = target
+            done += 1
+        except ValueError as exc:
+            failed.append({"id": int(oid), "error": str(exc)})
+    db.commit()
+    return {"updated": done, "failed": failed}
+
+
+def batch_push_orders(db: Session, order_ids: list[int]) -> dict:
+    """批量重推旺店通：只推已审核且没推成功的；已推送过的跳过不重复推。"""
+    done, skipped, failed = 0, 0, []
+    for oid in order_ids or []:
+        try:
+            order = db.get(FxOrder, int(oid or 0))
+            if not order:
+                raise ValueError("订单不存在")
+            if order.status != "approved":
+                skipped += 1
+                continue
+            if order.push_status == "sent":
+                skipped += 1
+                continue
+            push_order_to_wangdian(db, order.id)
+            done += 1
+        except ValueError as exc:
+            failed.append({"id": int(oid), "error": str(exc)})
+    return {"pushed": done, "skipped": skipped, "failed": failed}
+
+
 def order_detail(db: Session, order_id: int) -> dict:
     row = (
         db.query(FxOrder)
@@ -745,7 +791,7 @@ def _brand_dist_ids(db: Session, brand: str) -> set[int] | None:
 
 
 def list_orders(db: Session, status: str = "", distributor_id: int | None = None, limit: int = 200,
-                brand: str = "") -> list[dict]:
+                brand: str = "", push_status: str = "") -> list[dict]:
     stmt = (
         db.query(FxOrder)
         .options(selectinload(FxOrder.lines))
@@ -755,6 +801,9 @@ def list_orders(db: Session, status: str = "", distributor_id: int | None = None
         if status not in FX_ORDER_STATUSES:
             raise ValueError(f"未知订单状态: {status}")
         stmt = stmt.filter(FxOrder.status == status)
+    # push_status：旺店通推送结果过滤。"failed" = 异常单（推送失败待重推）
+    if push_status:
+        stmt = stmt.filter(FxOrder.push_status == push_status)
     if distributor_id:
         stmt = stmt.filter(FxOrder.distributor_id == int(distributor_id))
     # 品牌作用域：订单本身不带品牌，按「下单的分销商被授权的品牌」判断

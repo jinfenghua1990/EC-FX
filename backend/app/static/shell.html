@@ -176,9 +176,7 @@ const MENUS = [
   { key: 'order', label: '分销订单', icon: '🧾', children: [
     { key: 'order-entry', label: '分销下单', icon: '🛒', url: '/distribution?embed=1&tab=entry' },
     { key: 'order-all', label: '分销订单', icon: '🧾', url: '/distribution?embed=1&tab=orders' },
-    { key: 'order-pending', label: '待审核订单', icon: '⏳', url: '/distribution?embed=1&tab=orders&status=submitted' },
-    { key: 'order-approved', label: '已审核订单', icon: '✅', url: '/distribution?embed=1&tab=orders&status=approved' },
-    { key: 'order-abnormal', label: '订单异常', icon: '⚠️', url: ph('订单异常', '分销订单', 'P6'), planned: true, phase: 'P6' },
+    { key: 'order-status', label: '订单状态处理', icon: '🔧', url: '/distribution?embed=1&tab=ostatus' },
     { key: 'order-search', label: '订单查询', icon: '🔎', url: '/distribution?embed=1&tab=orders', badge: '页内' },
   ]},
   { key: 'purchase', label: '采购与到货', icon: '🚛', children: [
