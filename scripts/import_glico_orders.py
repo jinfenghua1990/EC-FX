@@ -6,7 +6,9 @@
   一个客户团单块  -> 1 个 FxOrder（status=approved，remark 带「团单导入·{sheet}」前缀）
   块的付款公司    -> FxDistributor（按名去重，brands=格力高/Glico，note=B2B团单导入）
   明细行          -> FxOrderLine（条码匹配 fx_products.barcode/spec_no，匹配不上也保留行）
-  出库-旺店通单号 -> fx_orders.wdt_tid（历史单已在旺店通出过库，不再走系统推送）
+  出库-旺店通单号 -> fx_orders.wdt_tid（块内全部收集、逗号拼接；历史单已在旺店通出过库，不再走系统推送）
+  系统内部单号    -> FX+YYYYMMDD+3位流水（如 FX20261028001），独立于旺店通单号，
+                     便于一个客户多个旺店通单号合并付款的场景
   订单日期        -> 块内多数付款日期，缺省用 sheet 月份的 1 号
 重复执行会先清掉上一次导入（remark LIKE '团单导入%'）再重灌，不影响手工数据。
 
@@ -88,17 +90,18 @@ def next_distributor_code(cur):
 
 
 def next_order_no(cur, d: date):
+    """系统内部单号：FX + YYYYMMDD + 3位流水，如 FX20261028001。
+    一个客户可能多个旺店通单号合并付款，所以旺店通单号只作关联字段（wdt_tid），
+    内部单号保持独立稳定。"""
     prefix = f"FX{d.strftime('%Y%m%d')}"
-    rows = cur.execute(
-        "select order_no from fx_orders where order_no like ?", (prefix + "-%",)
-    ).fetchall()
     mx = 0
-    for (no,) in rows:
-        try:
-            mx = max(mx, int(no.rsplit("-", 1)[1]))
-        except (IndexError, ValueError):
-            continue
-    return f"{prefix}-{mx + 1:04d}"
+    for (no,) in cur.execute(
+        "select order_no from fx_orders where order_no like ?", (prefix + "%",)
+    ).fetchall():
+        tail = no[len(prefix):].replace("-", "")
+        if tail.isdigit():
+            mx = max(mx, int(tail))
+    return f"{prefix}{mx + 1:03d}"
 
 
 def match_product(cur, barcode):
@@ -152,6 +155,11 @@ def parse_sheet(ws):
     # 数量列优先级：实发 > 发货 > 到货 > 订货 > 合计（同名重复列取先出现的）
     qty_col = find_col("实发总计", "发货数量", "实发", "发货情况", "实际到货", "客户订货", "订单数量", "订单合计", "原订货", "合计/箱", "合计")
     price_col = find_col("供货价/箱", "供货价")
+    # 旺店通出库单号列：新表叫「出库-旺店通销售」，旧表叫「对应旺店通出库单号」，
+    # 兜底按「包含旺店通」找列
+    wdt_col = find_col("出库-旺店通销售", "出库-旺店通", "旺店通销售出库单", "对应旺店通出库单号")
+    if wdt_col is None:
+        wdt_col = next((j for k, j in colmap.items() if "旺店通" in k), None)
     subtotal_col = find_col("销售小计")
     if subtotal_col is None:  # 旧表用两个「小计」（成本/销售），取最后一个
         xs = [j for k, j in colmap.items() if "小计" in k]
@@ -215,11 +223,14 @@ def parse_sheet(ws):
             # 旧表「付款方」是人名（如 钟军）：仍作为客户名保留
             pass
         pd = to_date(pay_date_raw)
-        wdt_no = g("出库-旺店通销售") or g("出库-旺店通")
-        if not wdt_no:
-            wdt_no = g("旺店通销售出库单")
-        if wdt_no and not re.match(r"^\d{8,}$", wdt_no):
-            wdt_no = ""
+        wdt_no = ""
+        if wdt_col is not None:
+            raw = gcol(wdt_col)
+            if raw is not None:
+                # 去 Excel 粘连的不换行空格；老 sheet 数据行下还会重复出现表头文字
+                wdt_no = str(raw).replace("\xa0", "").strip()
+                if wdt_no and not re.match(r"^\d{8,14}$", wdt_no):
+                    wdt_no = ""
         cur_blk["lines"].append({
             "category": str(cat).strip(),
             "barcode": g("条形码"),
@@ -388,8 +399,9 @@ def main(xlsx):
                 odate = None
             if not odate:
                 odate = date(y, m, 1)
-            # 旺店通出库单号：取块内第一个
-            wdt = next((l["wdt_no"] for l in lines if l["wdt_no"]), "")
+            # 旺店通出库单号：块内全部收集（一块多次出库对应多个单号），逗号拼接
+            wdts = sorted({l["wdt_no"] for l in lines if l["wdt_no"]})
+            wdt = ",".join(wdts)[:120]
             addr = blk["addr"][:300]
             handling = Counter(l["handling"] for l in lines if l["handling"])
             htxt = "、".join(f"{k}x{v}" for k, v in handling.most_common(3))
