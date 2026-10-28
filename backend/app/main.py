@@ -31,7 +31,7 @@ from .services.distribution import (
     FX_ORDER_STATUSES, STATUS_LABELS, create_and_push_order, create_distributor, create_order, create_product,
     delete_price, fx_overview, import_distributors, import_products,
     list_distributors, list_orders, list_prices, list_products, list_statements,
-    list_brands,
+    list_brands, list_top_categories, set_top_categories,
     order_detail, push_order_to_wangdian, set_price, set_tier1_prices, statement_excel_bytes,
     transition_order, toggle_distributor, toggle_product, update_distributor,
     update_order, update_product,
@@ -94,6 +94,8 @@ class FxProductPayload(BaseModel):
     note: str = ""
     brand: str = ""
     category: str = ""
+    # 大类：与分类独立的一层，用户自己维护
+    top_category: str = ""
 
 
 class FxTier1PriceItem(BaseModel):
@@ -104,6 +106,15 @@ class FxTier1PriceItem(BaseModel):
 
 class FxTier1PricesPayload(BaseModel):
     items: list[FxTier1PriceItem] = []
+
+
+class FxTopCategoryItem(BaseModel):
+    product_id: int
+    top_category: str = ""
+
+
+class FxTopCategoriesPayload(BaseModel):
+    items: list[FxTopCategoryItem] = []
 
 
 class FxBatchDiscountPayload(BaseModel):
@@ -716,6 +727,25 @@ def fx_product_tier1_prices(payload: FxTier1PricesPayload, db: Session = Depends
         for item in payload.items
     ]
     return {"ok": True, **set_tier1_prices(db, rows)}
+
+
+@app.get("/api/fx/products/top-categories")
+def fx_product_top_categories(db: Session = Depends(get_db)):
+    """已用过的大类值（去重排序）—— 页面自动补全用，也方便看清填过哪些。"""
+    return {"ok": True, "top_categories": list_top_categories(db)}
+
+
+@app.put("/api/fx/products/top-categories")
+def fx_product_set_top_categories(payload: FxTopCategoriesPayload, db: Session = Depends(get_db)):
+    """批量保存「大类」：商品表里直接填，一次提交多行。
+
+    只写 top_category，绝不动 category —— 分类是用户后续还要用的，不能互相覆盖。
+    注意本路由必须声明在 /api/fx/products/{product_id} 之前。
+    """
+    if not payload.items:
+        raise HTTPException(400, "没有需要保存的大类")
+    rows = [{"product_id": item.product_id, "top_category": item.top_category} for item in payload.items]
+    return {"ok": True, **set_top_categories(db, rows)}
 
 
 @app.post("/api/fx/products/backfill-list-price")

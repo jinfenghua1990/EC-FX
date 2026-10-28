@@ -146,7 +146,10 @@ class FxProduct(Base):
     spec_no: Mapped[str] = mapped_column(String(160), default="", index=True)
     goods_no: Mapped[str] = mapped_column(String(80), default="", index=True)
     barcode: Mapped[str] = mapped_column(String(60), default="")
+    # category = 分类（细的：百奇/百醇/麦片/咖啡…）；top_category = 大类（更粗的一层）。
+    # 两者并存、互不覆盖 —— 用户 2026-10-28 明确「分类要保留，后续有用」，大类单独一列自己维护。
     category: Mapped[str] = mapped_column(String(100), default="")
+    top_category: Mapped[str] = mapped_column(String(100), default="", index=True)
     brand: Mapped[str] = mapped_column(String(100), default="")
     source: Mapped[str] = mapped_column(String(20), default="manual", index=True)
     wdt_synced_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

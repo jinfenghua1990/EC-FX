@@ -311,7 +311,9 @@ def _product_view(row: FxProduct) -> dict:
         "spec_no": row.spec_no or "",
         "goods_no": row.goods_no or "",
         "barcode": row.barcode or "",
+        # 分类 = 细分类（百奇/百醇/麦片…）；大类 = 更粗的一层，用户自己维护，报表按它汇总
         "category": row.category or "",
+        "top_category": row.top_category or "",
         "brand": row.brand or "",
         "source": row.source or "manual",
         "wdt_synced_at": row.wdt_synced_at.strftime("%Y-%m-%d %H:%M") if row.wdt_synced_at else "",
@@ -342,9 +344,10 @@ def create_product(db: Session, data: dict) -> dict:
         base_price=base_price,
         tier1_price=_parse_money(data.get("tier1_price"), "一级分销价"),
         note=(data.get("note") or "").strip(),
-        # 手工建品也能指定品牌/分类：否则手工商品品牌为空，永远进不了顶部品牌维度
+        # 手工建品也能指定品牌/分类/大类：否则手工商品品牌为空，永远进不了顶部品牌维度
         brand=(data.get("brand") or "").strip(),
         category=(data.get("category") or "").strip(),
+        top_category=(data.get("top_category") or "").strip(),
         active=1,
     )
     db.add(row)
@@ -377,7 +380,7 @@ def update_product(db: Session, product_id: int, data: dict) -> dict:
         old_val = row.tier1_price
         row.tier1_price = new_val
         log_price_change(db, row, old_val, new_val, source="manual", note="编辑商品弹窗")
-    for field in ("name", "spec", "unit", "note", "brand", "category"):
+    for field in ("name", "spec", "unit", "note", "brand", "category", "top_category"):
         if field in data and data[field] is not None:
             setattr(row, field, str(data[field]).strip())
     if "pack_qty" in data and data["pack_qty"] is not None:
@@ -424,6 +427,41 @@ def set_tier1_prices(db: Session, items: list[dict]) -> dict:
         updated += 1
     db.commit()
     return {"updated": updated, "errors": errors}
+
+
+def set_top_categories(db: Session, items: list[dict]) -> dict:
+    """批量设「大类」（商品表里直接填，一次提交）。
+
+    与「分类」category 完全独立：只写 top_category，绝不动 category，
+    也不反过来用大类覆盖分类 —— 用户明确「分类要保留，后续有用」。
+    - 传字符串 = 设大类；传空字符串 = 清空。
+    """
+    updated = 0
+    errors: list[dict] = []
+    for index, item in enumerate(items, start=1):
+        product_id = item.get("product_id")
+        row = db.get(FxProduct, int(product_id or 0)) if str(product_id or "").isdigit() else None
+        if not row:
+            errors.append({"row": index, "message": f"商品不存在: {product_id}"})
+            continue
+        value = str(item.get("top_category") or "").strip()
+        if value == (row.top_category or ""):
+            continue  # 没变化就不算一次更新
+        row.top_category = value
+        updated += 1
+    db.commit()
+    return {"updated": updated, "errors": errors}
+
+
+def list_top_categories(db: Session) -> list[str]:
+    """已经用过的大类值（去重、排序）—— 页面下拉/自动补全用，也方便看出填过哪些。"""
+    rows = db.execute(
+        select(FxProduct.top_category)
+        .where(FxProduct.top_category != "")
+        .distinct()
+        .order_by(FxProduct.top_category)
+    ).all()
+    return [r[0] for r in rows if r[0]]
 
 
 # ---------------------------------------------------------------- 分销订单
@@ -506,7 +544,7 @@ def _validate_lines(db: Session, lines: list[dict], distributor_id: int | None =
     return normalized, _money(total)
 
 
-def _order_view(row: FxOrder, with_lines: bool = True) -> dict:
+def _order_view(row: FxOrder, with_lines: bool = True, pmap: dict | None = None) -> dict:
     data = {
         "id": row.id,
         "order_no": row.order_no,
@@ -526,6 +564,8 @@ def _order_view(row: FxOrder, with_lines: bool = True) -> dict:
         "line_count": len(row.lines) if row.lines else 0,
     }
     if with_lines:
+        # 大类/分类按当前商品资料取（不快照）：报表要按最新归类出数，
+        # 商品后来改了归类，报表跟着变才对得上账。
         data["lines"] = [
             {
                 "id": line.id,
@@ -537,6 +577,8 @@ def _order_view(row: FxOrder, with_lines: bool = True) -> dict:
                 "quantity": str(line.quantity),
                 "unit_price": str(_money(line.unit_price)),
                 "subtotal": str(_money(line.subtotal)),
+                "category": ((pmap or {}).get(line.product_id) or ("", ""))[0],
+                "top_category": ((pmap or {}).get(line.product_id) or ("", ""))[1],
             }
             for line in (row.lines or [])
         ]
@@ -909,6 +951,16 @@ def list_statements(db: Session, distributor_id: int | None = None, month: str =
         month_value = month
         selected = [o for o in orders if (o.order_date.strftime("%Y-%m") if o.order_date else "未知") == month]
 
+    # 一次性把明细里出现过的商品归类查出来：订单行只存商品快照，
+    # 大类/分类要从商品资料带出来（报表按最新归类出数，不是快照）
+    pids = {line.product_id for o in selected for line in (o.lines or []) if line.product_id}
+    pmap: dict[int, tuple[str, str]] = {}
+    if pids:
+        pmap = {
+            p.id: (p.category or "", p.top_category or "")
+            for p in db.query(FxProduct).filter(FxProduct.id.in_(pids)).all()
+        }
+
     return {
         "distributor": _distributor_view(distributor) if distributor else None,
         "months": sorted(
@@ -924,7 +976,7 @@ def list_statements(db: Session, distributor_id: int | None = None, month: str =
             reverse=True,
         ),
         "month": month_value,
-        "orders": [_order_view(order) for order in selected],
+        "orders": [_order_view(order, pmap=pmap) for order in selected],
         "total_amount": str(_money(sum(Decimal(o.total_amount or 0) for o in selected))),
     }
 
@@ -947,11 +999,11 @@ def statement_excel_bytes(db: Session, distributor_id: int, month: str) -> tuple
     ws = wb.active
     ws.title = "对账单"
     ws.append([f"{dist.name}（{dist.code}） {month} 分销对账单"])
-    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=8)
+    ws.merge_cells(start_row=1, start_column=1, end_row=1, end_column=10)
     ws.cell(row=1, column=1).font = Font(bold=True, size=13)
     ws.cell(row=1, column=1).alignment = Alignment(horizontal="center")
     ws.append([])
-    ws.append(["订单号", "下单时间", "商品编号", "商品名称", "规格", "数量", "单价（元）", "小计（元）"])
+    ws.append(["订单号", "下单时间", "大类", "分类", "商品编号", "商品名称", "规格", "数量", "单价（元）", "小计（元）"])
     for cell in ws[3]:
         cell.font = Font(bold=True)
 
@@ -960,6 +1012,8 @@ def statement_excel_bytes(db: Session, distributor_id: int, month: str) -> tuple
             ws.append([
                 order["order_no"],
                 order["order_date"],
+                line.get("top_category") or "",
+                line.get("category") or "",
                 line["goods_no"],
                 line["goods_name"],
                 line["spec_name"],
@@ -968,12 +1022,12 @@ def statement_excel_bytes(db: Session, distributor_id: int, month: str) -> tuple
                 float(Decimal(line["subtotal"])),
             ])
     ws.append([])
-    ws.append(["合计", "", "", "", "", "", "", float(Decimal(data["total_amount"]))])
+    ws.append(["合计", "", "", "", "", "", "", "", "", float(Decimal(data["total_amount"]))])
     for cell in ws[ws.max_row]:
         cell.font = Font(bold=True)
 
     # 简单列宽，肉眼可读即可
-    widths = (16, 18, 14, 24, 14, 8, 12, 12)
+    widths = (16, 18, 12, 12, 14, 24, 14, 8, 12, 12)
     for index, width in enumerate(widths, start=1):
         ws.column_dimensions[chr(64 + index)].width = width
 

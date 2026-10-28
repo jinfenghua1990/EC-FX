@@ -191,6 +191,11 @@ tr.row-pending:hover td{background:#ffe6e6}
 /* 缺分销价：输入框标红边框（不填不结算），比浅黄更醒目，一眼能扫出哪些还没设价 */
 .tier-in.need{background:#fff7f7;border-color:var(--red);box-shadow:0 0 0 2px rgba(229,72,77,.12)}
 .tier-in.need::placeholder{color:#d98a8c}
+/* 大类：表格里直接填的输入框，改了会变黄底，等「保存大类」提交 */
+.topcat-in{width:100%;min-height:28px;border:1px solid #d8dee9;border-radius:7px;padding:2px 8px;font-size:12.5px;font-family:inherit;background:#fff;color:var(--text)}
+.topcat-in::placeholder{color:#b6bfcc}
+.topcat-in:focus{outline:0;border-color:#0f9d6e;box-shadow:0 0 0 3px rgba(15,157,110,.14)}
+tr.dirty .topcat-in{border-color:#e8a33a;background:#fffaef}
 .tab-badge{display:inline-block;min-width:17px;padding:0 5px;margin-left:5px;border-radius:999px;
   background:var(--red);color:#fff;font-size:10.5px;line-height:17px;text-align:center;font-weight:700;vertical-align:1px}
 /* 弹窗 */
@@ -293,7 +298,8 @@ toast{display:none}
       <div class="head">
         <h3>商品目录（含税价）<span id="prodBrandTag" class="tag" style="display:none;margin-left:8px"></span></h3>
         <input id="prodSearch" placeholder="搜索 SKU / 名称 / 条码 / 品牌" oninput="renderProducts()" style="width:220px">
-        <select id="prodCategory" style="width:130px" onchange="renderProducts()" title="按大类筛选（百奇/百醇/百力滋/组合装…，来源：商品分类）"></select>
+        <select id="prodTopCategory" style="width:118px" onchange="renderProducts()" title="按「大类」筛选（自己维护的那一层，与分类互不干扰）"></select>
+        <select id="prodCategory" style="width:130px" onchange="renderProducts()" title="按「分类」筛选（百奇/百醇/百力滋/组合装…，来源：商品分类，保留不动）"></select>
         <button class="btn" id="btnWdtSync" onclick="syncWdtProducts()" title="从旺店通商品档案拉取货品与规格">⟳ 从旺店通同步</button>
         <button class="btn" id="btnPurchaseSync" onclick="syncPurchaseOrders()" title="从旺店通采购单拉取真实采购价（含税、已折后）">⇣ 同步采购单</button>
         <button class="btn" id="btnFillBase" onclick="fillBaseFromPurchase()" title="把采购价填进「标价」为空的商品（不影响已有价格的商品）">⇡ 用采购价补零价</button>
@@ -304,20 +310,24 @@ toast{display:none}
           <input id="tierZhe" type="number" step="0.1" min="0.1" max="9.9" placeholder="8.5" style="width:66px" title="折扣：填 8.5 表示 8.5 折（填 0.85 也可以）">
           <span style="color:#8a94a6">折</span>
           <button class="btn primary" onclick="applyTierDiscount()" title="一级价 = 标价 × 折扣，批量写入勾选的商品；箱价自动按 一级价×箱规 算">按标价×折扣设一级价</button>
+          <input id="selTopCat" list="topcatOptions" placeholder="大类" style="width:78px" title="填一个大类，点右边按钮批量写到勾选的商品上">
+          <button class="btn" onclick="applyTopCatToSelected()" title="把左边填的大类写到勾选的商品上（只改大类，绝不动分类）">设大类</button>
         </span>
         <button class="btn" onclick="openImportModal('prod')">⇪ 批量导入</button>
         <button class="btn primary" onclick="openProdModal()">＋ 新建商品</button>
         <button class="btn" id="btnSaveTier" onclick="saveTier1Prices()" style="display:none;border-color:#2463eb;color:#2463eb">保存改价 <b id="tierDirtyCount">0</b></button>
+        <button class="btn" id="btnSaveTopCat" onclick="saveTopCategories()" style="display:none;border-color:#0f9d6e;color:#0f9d6e">保存大类 <b id="topcatDirtyCount">0</b></button>
+        <datalist id="topcatOptions"></datalist>
       </div>
       <div class="hint" id="wdtSyncHint" style="display:none"></div>
       <!-- 待维护提醒条：由 renderNeedBar() 根据 /api/fx/products 的 maintenance 汇总渲染 -->
       <div class="needbar" id="prodNeed" style="display:none"></div>
       <div class="tbl">
         <table class="cols" data-ckey="prod">
-          <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:110px"><col style="width:120px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:80px"><col style="width:60px"><col style="width:130px"></colgroup>
+          <colgroup><col style="width:34px"><col style="width:130px"><col style="width:230px"><col style="width:112px"><col style="width:118px"><col style="width:130px"><col style="width:96px"><col style="width:110px"><col style="width:120px"><col style="width:104px"><col style="width:92px"><col style="width:118px"><col style="width:58px"><col style="width:76px"><col style="width:80px"><col style="width:60px"><col style="width:130px"></colgroup>
           <thead><tr>
           <th data-col="ck" title="勾选后用上方「按标价×折扣设一级价」批量定价"><input type="checkbox" id="prodSelAll" onchange="toggleAllProd(this)"></th>
-          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="list" class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">品牌标价(含税)</th><th data-col="purchase" class="num">采购价(含税)</th><th data-col="tier1">一级分销价(含税)</th><th data-col="tierbox" class="num" title="一级分销箱价 = 一级分销价 × 箱规；未定价或没箱规显示 —">一级箱价(含税)</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="barcode">条码</th><th data-col="unit">单位</th><th data-col="pack">箱规</th><th data-col="source" title="这个商品是哪儿来的：旺店通同步 / 手工建 / 导入">来源</th><th data-col="status">状态</th><th data-col="ops">操作</th>
+          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="list" class="num" title="品牌标价（含税）。只用于算分销折扣率，利润按采购入库价算">品牌标价(含税)</th><th data-col="purchase" class="num">采购价(含税)</th><th data-col="tier1">一级分销价(含税)</th><th data-col="tierbox" class="num" title="一级分销箱价 = 一级分销价 × 箱规；未定价或没箱规显示 —">一级箱价(含税)</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="topcat" title="更粗的一层归类，自己填；填的内容只进「大类」，不会动右边的「分类」">大类</th><th data-col="category">分类</th><th data-col="barcode">条码</th><th data-col="unit">单位</th><th data-col="pack">箱规</th><th data-col="source" title="这个商品是哪儿来的：旺店通同步 / 手工建 / 导入">来源</th><th data-col="status">状态</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="prodBody"></tbody></table>
         <div class="empty" id="prodEmpty" style="display:none">还没有商品。点「⟳ 从旺店通同步」把旺店通商品档案接过来，或手工新建。</div>
       </div>
@@ -403,7 +413,7 @@ toast{display:none}
         <input id="stmtMonth" type="month" onchange="loadStatements()" style="width:170px">
         <button class="btn" onclick="exportStatement()">导出 Excel</button>
       </div>
-      <div class="hint">不选月份 = 看各月汇总（点月份可下钻）；选定月份 = 显示该月已审核订单明细。「导出 Excel」需同时选好分销商与月份，导出为逐商品明细对账单。</div>
+      <div class="hint">不选月份 = 看各月汇总（点月份可下钻）；选定月份 = 显示该月已审核订单明细。「导出 Excel」需同时选好分销商与月份，导出为逐商品明细对账单，明细里带<b>大类 / 分类</b>两列（大类没填就是空的，去「商品」页填）。</div>
       <div class="line-total" style="justify-content:flex-start" id="stmtSummary"></div>
       <div class="tbl">
         <table><thead id="stmtHead"></thead><tbody id="stmtBody"></tbody></table>
@@ -454,6 +464,7 @@ toast{display:none}
         </div>
       </div>
       <div><label>品牌</label><input id="pBrand" list="brandOptions" placeholder="如 格力高/Glico"><datalist id="brandOptions"></datalist></div>
+      <div><label>大类</label><input id="pTopCat" list="topcatOptions" placeholder="如 饼干（自己维护的一层）"></div>
       <div><label>分类</label><input id="pCat" placeholder="如 零食"></div>
     </div>
     <div class="hint" id="pPurchaseHint" style="display:none"></div>
@@ -564,7 +575,7 @@ async function loadAll(){
     await loadOrders();
     renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
     fillEntrySelects(); loadStockOverview(); loadWdtShops();
-    loadInventoryBadge();
+    loadInventoryBadge(); loadTopCatOptions();
     $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
   } catch (e) { toast("加载失败: " + e.message); }
 }
@@ -839,12 +850,21 @@ function productMatchesNeed(p){
 function renderProducts(){
   const kw = ($("prodSearch").value || "").toLowerCase();
   const body = $("prodBody"), empty = $("prodEmpty"), tag = $("prodBrandTag");
-  // 大类下拉：选项随商品动态刷新，保留当前选中
+  // 大类下拉（自己维护的那一层）与分类下拉（原有）并列：两个筛选互不干扰，可叠加
+  const tsel = $("prodTopCategory");
+  if (tsel) {
+    const keep = tsel.value;
+    const tops = [...new Set(state.products.filter(p => p.active && (p.top_category || "").trim()).map(p => (p.top_category || "").trim()))]
+      .sort((a, b) => a.localeCompare(b, "zh"));
+    tsel.innerHTML = `<option value="">全部大类</option>` + tops.map(c => `<option value="${esc(c)}"${c === keep ? " selected" : ""}>${esc(c)}</option>`).join("");
+  }
+  const topcat = tsel ? tsel.value : "";
+  // 分类下拉：选项随商品动态刷新，保留当前选中
   const sel = $("prodCategory");
   if (sel) {
     const keep = sel.value;
     const cats = [...new Set(state.products.filter(p => p.active && (p.category || "").trim()).map(p => (p.category || "").trim()))].sort();
-    sel.innerHTML = `<option value="">全部大类</option>` + cats.map(c => `<option value="${esc(c)}"${c === keep ? " selected" : ""}>${esc(c)}</option>`).join("");
+    sel.innerHTML = `<option value="">全部分类</option>` + cats.map(c => `<option value="${esc(c)}"${c === keep ? " selected" : ""}>${esc(c)}</option>`).join("");
   }
   const cat = sel ? sel.value : "";
   // 品牌维度：顶栏选了品牌就只展示该品牌商品，并在标题旁标出来
@@ -854,10 +874,11 @@ function renderProducts(){
   }
   const rows = state.products.filter(p => {
     if (state.brand && (p.brand || "") !== state.brand) return false;
+    if (topcat && (p.top_category || "").trim() !== topcat) return false;
     if (cat && (p.category || "").trim() !== cat) return false;
     if (!productMatchesNeed(p)) return false;
     if (!kw) return true;
-    return ((p.sku||"") + (p.name||"") + (p.spec||"") + (p.barcode||"") + (p.category||"") + (p.brand||"")).toLowerCase().includes(kw);
+    return ((p.sku||"") + (p.name||"") + (p.spec||"") + (p.barcode||"") + (p.category||"") + (p.top_category||"") + (p.brand||"")).toLowerCase().includes(kw);
   });
   empty.style.display = rows.length ? "none" : "";
   empty.textContent = state.need
@@ -899,6 +920,9 @@ function renderProducts(){
     <td class="num tier-box-cell">${boxCell}</td>
     <td title="${esc(p.spec)}">${esc(p.spec) || "-"}</td>
     <td>${esc(p.brand) || "-"}</td>
+    <td class="topcat-cell"><input class="topcat-in" type="text" list="topcatOptions" data-id="${p.id}" data-orig="${esc(p.top_category || "")}"
+         value="${esc(p.top_category || "")}" placeholder="未分大类" title="大类：自己填的一层归类，只进这里，不会动「分类」"
+         oninput="onTopCatInput(this)"></td>
     <td>${esc(p.category) || "-"}</td><td>${esc(p.barcode) || "-"}</td><td>${esc(p.unit)}</td>
     <td>${esc(p.pack_spec) || "—"}</td>
     <td title="${esc(p.source) || ""}">${sourceLabel(p.source)}</td>
@@ -911,6 +935,7 @@ function renderProducts(){
     </td></tr>`;
   }).join("");
   refreshTierDirty();
+  refreshTopCatDirty();
   // 重新渲染后勾选已清空，把「已选 N」工具条同步回隐藏，避免挂着旧数字
   onProdCheck();
   applyColOrder(tableOf("prod"));  // 行重建了，把列的顺序/显隐重新套一遍
@@ -1078,6 +1103,65 @@ function refreshTierDirty(){
   if (!btn) return;
   btn.style.display = n ? "" : "none";
   $("tierDirtyCount").textContent = n;
+}
+
+/* ---------- 大类：表格里直接填 + 批量设 + 一次保存 ---------- */
+/* 口径（用户 2026-10-28）：大类是单独一层，值由用户自己维护；
+   填大类绝不动「分类」，改分类也不动大类 —— 两边是两个字段，互不覆盖。 */
+function dirtyTopCatRows(){
+  return [...$("prodBody").querySelectorAll("tr")].filter(r => {
+    const i = r.querySelector(".topcat-in");
+    return i && i.value.trim() !== (i.dataset.orig || "");
+  });
+}
+function refreshTopCatDirty(){
+  const n = dirtyTopCatRows().length, btn = $("btnSaveTopCat");
+  if (!btn) return;
+  btn.style.display = n ? "" : "none";
+  $("topcatDirtyCount").textContent = n;
+}
+function onTopCatInput(input){
+  input.closest("tr").classList.toggle("dirty", input.value.trim() !== (input.dataset.orig || ""));
+  refreshTopCatDirty();
+}
+async function saveTopCategories(){
+  const rows = dirtyTopCatRows();
+  if (!rows.length) { toast("没有改过的大类"); return; }
+  const items = rows.map(r => {
+    const i = r.querySelector(".topcat-in");
+    return { product_id: Number(i.dataset.id), top_category: i.value.trim() };
+  });
+  try {
+    const res = await api("/api/fx/products/top-categories", { method: "PUT", body: JSON.stringify({ items }) });
+    toast(`已保存 ${res.updated} 个商品的大类（分类不受影响）`);
+    await loadAll();
+    switchTab("products");
+  } catch (e) { toast("保存失败: " + e.message); }
+}
+/* 勾选一批商品，把同一个大类写进去：比一个个填快得多 */
+async function applyTopCatToSelected(){
+  const ids = checkedProdIds();
+  if (!ids.length) { toast("先勾选要设大类的商品"); return; }
+  const val = ($("selTopCat").value || "").trim();
+  if (!val) { toast("先填一个大类再点「设大类」"); return; }
+  if (!confirm(`把 ${ids.length} 个商品的大类设为「${val}」？\n只改大类，分类保持原样。`)) return;
+  try {
+    const res = await api("/api/fx/products/top-categories", { method: "PUT",
+      body: JSON.stringify({ items: ids.map(id => ({ product_id: id, top_category: val })) }) });
+    toast(`已把 ${res.updated} 个商品的大类设为「${val}」`);
+    await loadAll();
+    switchTab("products");
+  } catch (e) { toast("设置失败: " + e.message); }
+}
+/* 大类候选：已填过的值，填新商品时能直接挑，避免同一个大类打出两种写法 */
+async function loadTopCatOptions(){
+  try {
+    const res = await api("/api/fx/products/top-categories");
+    const list = res.top_categories || [];
+    state.topCategories = list;
+    const dl = $("topcatOptions");
+    if (dl) dl.innerHTML = list.map(c => `<option value="${esc(c)}"></option>`).join("");
+  } catch (e) { /* 候选拉不到不影响页面用，忽略 */ }
 }
 
 async function saveTier1Prices(){
@@ -1302,7 +1386,7 @@ function openProdModal(id){
   state.prodEditId = id || null;
   const p = id ? state.products.find(x => x.id === id) : null;
   $("prodModalTitle").textContent = p ? "编辑商品 · " + p.name : "新建商品";
-  ["pSku","pName","pSpec","pPrice","pNote","pBrand","pCat","pPackQty","pTier1"].forEach(k => $(k).value = "");
+  ["pSku","pName","pSpec","pPrice","pNote","pBrand","pCat","pTopCat","pPackQty","pTier1"].forEach(k => $(k).value = "");
   $("pUnit").value = "箱";
   $("pPackUnit").value = "箱";
   // 品牌候选：取自现有商品，新建时可直接挑已有品牌，也能手输新品牌
@@ -1314,7 +1398,8 @@ function openProdModal(id){
     $("pPackQty").value = p.pack_qty > 0 ? p.pack_qty : "";
     $("pPackUnit").value = p.pack_unit || "箱";
     $("pTier1").value = p.tier1_price > 0 ? p.tier1_price : "";
-    $("pBrand").value = p.brand || ""; $("pCat").value = p.category || ""; }
+    $("pBrand").value = p.brand || ""; $("pCat").value = p.category || "";
+    $("pTopCat").value = p.top_category || ""; }
   // 采购价只读提示：编辑已有商品时把真实成本摊开给用户看，避免只凭记忆填「标价」
   const ph = $("pPurchaseHint"), cost = p ? (parseFloat(p.purchase_price) || 0) : 0;
   if (ph) {
@@ -1358,7 +1443,8 @@ async function saveProd(){
     unit: $("pUnit").value.trim() || "箱", base_price: $("pPrice").value || "0", note: $("pNote").value.trim(),
     tier1_price: $("pTier1").value === "" ? null : $("pTier1").value,
     pack_qty: parseInt($("pPackQty").value, 10) || 0, pack_unit: $("pPackUnit").value.trim() || "箱",
-    brand: $("pBrand").value.trim(), category: $("pCat").value.trim() };
+    brand: $("pBrand").value.trim(), category: $("pCat").value.trim(),
+    top_category: $("pTopCat").value.trim() };
   try {
     if (state.prodEditId) await api("/api/fx/products/" + state.prodEditId, { method: "PUT", body: JSON.stringify(body) });
     else await api("/api/fx/products", { method: "POST", body: JSON.stringify(body) });
