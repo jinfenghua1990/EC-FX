@@ -2175,7 +2175,7 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
             raise ValueError(
                 f"旺店通单号 {'、'.join(tids)} 已被 {'、'.join(conflicts)} 占用，"
                 "同一张旺店通单不能由多张分销订单重复认领；"
-                "请先核对并清理重复单（订单详情 → 改单号/删除）后再推送"
+                "请先在「订单 ⇄ 件数核对」里核对重复单、确认单号归属并清理后再推送"
             )
     distributor = order.distributor
     if not distributor:
