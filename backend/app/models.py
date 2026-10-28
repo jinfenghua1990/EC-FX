@@ -88,6 +88,13 @@ class FxDistributor(Base):
     contact: Mapped[str] = mapped_column(String(80), default="")
     phone: Mapped[str] = mapped_column(String(60), default="")
     email: Mapped[str] = mapped_column(String(160), default="")
+    # 税号：开票用。新建时可作为识别码，允许为空（很多小分销商没有/不提供）
+    tax_no: Mapped[str] = mapped_column(String(80), default="", index=True)
+    # brands：该分销商被授权分销的品牌，逗号分隔存（如 "格力高,桂格"）。
+    # 空 = 还没录授权品牌：顶部选了具体品牌时它不出现（只在「全部品牌」下可见），
+    # 绝不默认成「全品牌通吃」，免得给它看到别的品牌的货。
+    brands: Mapped[str] = mapped_column(String(500), default="")
+    # region（区域）已停用：2026-10-28 起页面不再显示也不再录入，旧数据保留在库里不删
     region: Mapped[str] = mapped_column(String(120), default="")
     note: Mapped[str] = mapped_column(String(1000), default="")
     active: Mapped[int] = mapped_column(Integer, default=1, index=True)

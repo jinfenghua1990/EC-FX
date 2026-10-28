@@ -71,12 +71,15 @@ class AdjustmentPayload(BaseModel):
 
 
 class FxDistributorPayload(BaseModel):
-    code: str
+    # 编码允许缺省：不填 / 填空都由后端自动生成（D001、D002…），前端不再强制手填
+    code: str = ""
     name: str
     contact: str = ""
     phone: str = ""
     email: str = ""
-    region: str = ""
+    tax_no: str = ""
+    # 授权分销的品牌（可多个）。空数组 = 没录授权，选了具体品牌时这个分销商不出现
+    brands: list[str] = Field(default_factory=list)
     note: str = ""
 
 
@@ -657,8 +660,9 @@ def fx_system_overview(db: Session = Depends(get_db)):
 
 
 @app.get("/api/fx/distributors")
-def fx_distributors(include_inactive: int = 1, db: Session = Depends(get_db)):
-    return {"distributors": list_distributors(db, include_inactive=bool(include_inactive))}
+def fx_distributors(include_inactive: int = 1, brand: str = "", db: Session = Depends(get_db)):
+    # brand = 顶栏切换的当前品牌：只回该品牌授权内的分销商（空 = 全部品牌）
+    return {"distributors": list_distributors(db, include_inactive=bool(include_inactive), brand=brand)}
 
 
 @app.post("/api/fx/distributors")
@@ -1073,9 +1077,10 @@ def fx_purchase_orders_refresh_prices(
 
 
 @app.get("/api/fx/orders")
-def fx_orders(status: str = "", distributor_id: int | None = None, limit: int = 200, db: Session = Depends(get_db)):
+def fx_orders(status: str = "", distributor_id: int | None = None, limit: int = 200, brand: str = "",
+              db: Session = Depends(get_db)):
     try:
-        return {"orders": list_orders(db, status=status, distributor_id=distributor_id, limit=limit)}
+        return {"orders": list_orders(db, status=status, distributor_id=distributor_id, limit=limit, brand=brand)}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
 
@@ -1185,10 +1190,11 @@ def fx_products_import(payload: FxImportPayload, db: Session = Depends(get_db)):
 
 
 @app.get("/api/fx/statements")
-def fx_statements(distributor_id: int | None = None, month: str = "", db: Session = Depends(get_db)):
+def fx_statements(distributor_id: int | None = None, month: str = "", brand: str = "",
+                  db: Session = Depends(get_db)):
     if month and not (len(month) == 7 and month[:4].isdigit() and month[5:7].isdigit() and month[4] == "-"):
         raise HTTPException(400, "month 格式应为 YYYY-MM")
-    return list_statements(db, distributor_id=distributor_id, month=month)
+    return list_statements(db, distributor_id=distributor_id, month=month, brand=brand)
 
 
 @app.get("/api/fx/statements/export")

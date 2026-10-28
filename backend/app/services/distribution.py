@@ -17,7 +17,7 @@ import io
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
@@ -153,11 +153,44 @@ def _pack_qty(value) -> int:
 
 
 # ---------------------------------------------------------------- 分销商
-def list_distributors(db: Session, include_inactive: bool = True) -> list[dict]:
+def brand_list_of(row: FxDistributor) -> list[str]:
+    """把 brands 字段（逗号分隔）解析成品牌清单，去掉空值与重复，保持录入顺序。"""
+    out: list[str] = []
+    for b in (row.brands or "").split(","):
+        b = b.strip()
+        if b and b not in out:
+            out.append(b)
+    return out
+
+
+def distributor_in_brand(row: FxDistributor, brand: str) -> bool:
+    """该分销商在「当前品牌」下是否可见。
+
+    brand 为空 = 全部品牌，一律可见；brand 非空时，只有勾了这个品牌的才出现。
+    没勾任何品牌的分销商 = 还没录授权，选了具体品牌时看不到（不算全品牌通吃）。
+    """
+    if not brand:
+        return True
+    return brand in brand_list_of(row)
+
+
+def list_distributors(db: Session, include_inactive: bool = True, brand: str = "") -> list[dict]:
     stmt = select(FxDistributor).order_by(FxDistributor.id.desc())
     if not include_inactive:
         stmt = stmt.where(FxDistributor.active == 1)
+    brand = (brand or "").strip()
+    if brand:
+        # 先在 SQL 里按逗号分隔项粗筛（brands 存成 "格力高,桂格"），
+        # 再用 distributor_in_brand 精确兜底，避免 "格力高" 误命中 "格力高食品"
+        stmt = stmt.where(or_(
+            FxDistributor.brands == brand,
+            FxDistributor.brands.like(brand + ",%"),
+            FxDistributor.brands.like("%," + brand + ",%"),
+            FxDistributor.brands.like("%," + brand),
+        ))
     rows = db.scalars(stmt).all()
+    if brand:
+        rows = [r for r in rows if distributor_in_brand(r, brand)]
     return [_distributor_view(r) for r in rows]
 
 
@@ -169,6 +202,8 @@ def _distributor_view(row: FxDistributor) -> dict:
         "contact": row.contact,
         "phone": row.phone,
         "email": row.email,
+        "tax_no": row.tax_no or "",
+        "brands": brand_list_of(row),
         "region": row.region,
         "note": row.note,
         "active": bool(row.active),
@@ -176,11 +211,33 @@ def _distributor_view(row: FxDistributor) -> dict:
     }
 
 
+def _brands_to_text(value) -> str:
+    """录入的品牌可能是数组（前端勾选）也可能是逗号串（批量导入），统一成去重后的逗号串。"""
+    items = value if isinstance(value, (list, tuple, set)) else str(value or "").split(",")
+    out: list[str] = []
+    for b in items:
+        b = str(b).strip()
+        if b and b not in out:
+            out.append(b)
+    return ",".join(out)
+
+
+def _next_distributor_code(db: Session) -> str:
+    """编码留空时自动生成：从 D001 起找第一个没人用的号（编号保持连续，不跳号）。"""
+    used = set(db.scalars(select(FxDistributor.code)).all())
+    n = 1
+    while f"D{n:03d}" in used:
+        n += 1
+    return f"D{n:03d}"
+
+
 def create_distributor(db: Session, data: dict) -> dict:
     code = (data.get("code") or "").strip()
     name = (data.get("name") or "").strip()
-    if not code or not name:
-        raise ValueError("分销商编码和名称必填")
+    if not name:
+        raise ValueError("分销商名称必填")
+    if not code:
+        code = _next_distributor_code(db)
     exists = db.scalar(select(FxDistributor).where(FxDistributor.code == code))
     if exists:
         raise ValueError(f"分销商编码已存在: {code}")
@@ -190,7 +247,8 @@ def create_distributor(db: Session, data: dict) -> dict:
         contact=(data.get("contact") or "").strip(),
         phone=(data.get("phone") or "").strip(),
         email=(data.get("email") or "").strip(),
-        region=(data.get("region") or "").strip(),
+        tax_no=(data.get("tax_no") or "").strip(),
+        brands=_brands_to_text(data.get("brands")),
         note=(data.get("note") or "").strip(),
         active=1,
     )
@@ -209,9 +267,11 @@ def update_distributor(db: Session, distributor_id: int, data: dict) -> dict:
         if dup:
             raise ValueError(f"分销商编码已存在: {new_code}")
         row.code = new_code
-    for field in ("name", "contact", "phone", "email", "region", "note"):
+    for field in ("name", "contact", "phone", "email", "tax_no", "note"):
         if field in data and data[field] is not None:
             setattr(row, field, str(data[field]).strip())
+    if "brands" in data and data["brands"] is not None:
+        row.brands = _brands_to_text(data["brands"])
     if "name" in data and not (data.get("name") or "").strip():
         raise ValueError("分销商名称不能为空")
     db.commit()
@@ -675,7 +735,17 @@ def order_detail(db: Session, order_id: int) -> dict:
     return _order_view(row)
 
 
-def list_orders(db: Session, status: str = "", distributor_id: int | None = None, limit: int = 200) -> list[dict]:
+def _brand_dist_ids(db: Session, brand: str) -> set[int] | None:
+    """当前品牌下可见的分销商 id 集合；brand 为空返回 None（= 不过滤）。"""
+    brand = (brand or "").strip()
+    if not brand:
+        return None
+    rows = db.scalars(select(FxDistributor)).all()
+    return {r.id for r in rows if distributor_in_brand(r, brand)}
+
+
+def list_orders(db: Session, status: str = "", distributor_id: int | None = None, limit: int = 200,
+                brand: str = "") -> list[dict]:
     stmt = (
         db.query(FxOrder)
         .options(selectinload(FxOrder.lines))
@@ -687,6 +757,10 @@ def list_orders(db: Session, status: str = "", distributor_id: int | None = None
         stmt = stmt.filter(FxOrder.status == status)
     if distributor_id:
         stmt = stmt.filter(FxOrder.distributor_id == int(distributor_id))
+    # 品牌作用域：订单本身不带品牌，按「下单的分销商被授权的品牌」判断
+    ids = _brand_dist_ids(db, brand)
+    if ids is not None:
+        stmt = stmt.filter(FxOrder.distributor_id.in_(ids) if ids else FxOrder.distributor_id == 0)
     stmt = stmt.limit(max(1, min(limit, 500)))
     return [_order_view(row, with_lines=False) for row in stmt.all()]
 
@@ -837,6 +911,8 @@ def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str)
         "buyer_message": order.remark or "",
         "receiver_name": distributor.name,
         "receiver_mobile": distributor.phone or "",
+        # 收货地址历史上取分销商「区域」。2026-10-28 起区域不再录入（旧值仍留在库里），
+        # 新分销商这里会是空串，推送后由旺店通侧补齐；不为删字段而丢掉老订单的地址。
         "receiver_address": distributor.region or "",
         "goods_list": [
             {
@@ -925,7 +1001,7 @@ def create_and_push_order(
 
 
 # ---------------------------------------------------------------- 分销商对账单
-def list_statements(db: Session, distributor_id: int | None = None, month: str = "") -> dict:
+def list_statements(db: Session, distributor_id: int | None = None, month: str = "", brand: str = "") -> dict:
     """按月汇总已审核订单；指定月份时返回该月订单明细（供页面表格 / Excel 用）。"""
     stmt = (
         db.query(FxOrder)
@@ -935,6 +1011,10 @@ def list_statements(db: Session, distributor_id: int | None = None, month: str =
     )
     if distributor_id:
         stmt = stmt.filter(FxOrder.distributor_id == int(distributor_id))
+    # 品牌作用域：与订单页同一口径 —— 按下单分销商被授权的品牌过滤
+    ids = _brand_dist_ids(db, brand)
+    if ids is not None:
+        stmt = stmt.filter(FxOrder.distributor_id.in_(ids) if ids else FxOrder.distributor_id == 0)
     orders = stmt.all()
 
     months_map: dict[str, dict] = {}

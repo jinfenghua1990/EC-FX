@@ -220,6 +220,12 @@ tr.dirty .topcat-in{border-color:#e8a33a;background:#fffaef}
 .modal input,.modal select,.modal textarea{width:100%;min-height:36px;border:1px solid #d8dee9;border-radius:8px;padding:7px 10px;font-size:13.5px;font-family:inherit}
 .modal textarea{min-height:64px;resize:vertical}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
+.brand-checks{display:flex;flex-wrap:wrap;gap:7px 16px;margin:6px 0 10px;padding:8px 10px;border:1px solid #e3e8f0;border-radius:8px;background:#f8fafc}
+.brand-checks label{display:flex;align-items:center;gap:5px;font-size:13px;color:#3c4759;cursor:pointer}
+.brand-checks input{width:14px;height:14px;accent-color:#2463eb;cursor:pointer}
+.brand-checks .none-tip{color:#98a2b3;font-size:12px}
+.scope-tag{margin-left:10px;padding:2px 8px;border-radius:10px;background:#eef4ff;color:#2463eb;font-size:11.5px;font-weight:600;display:none}
+.scope-tag.show{display:inline-block}
 /* 订单明细编辑 */
 .line-box{border:1px solid var(--line);border-radius:10px;margin-top:12px}
 .line-head{display:flex;gap:8px;align-items:center;background:#f7f9fc;padding:8px 10px;border-bottom:1px solid var(--line);border-radius:10px 10px 0 0}
@@ -254,7 +260,7 @@ toast{display:none}
 
 <div class="main">
   <div class="topbar">
-    <div class="crumbs">红盒子供销平台&nbsp;/&nbsp;<b id="crumbTab">分销商</b></div>
+    <div class="crumbs">红盒子供销平台&nbsp;/&nbsp;<b id="crumbTab">分销商</b><span id="brandScope" class="scope-tag"></span></div>
     <div class="topright">
       <span>端口 <b>8050</b></span>
       <span>版本 <b id="topVersion">--</b></span>
@@ -285,9 +291,9 @@ toast{display:none}
       </div>
       <div class="tbl">
         <table class="cols" data-ckey="dist">
-          <colgroup><col style="width:110px"><col style="width:240px"><col style="width:90px"><col style="width:135px"><col style="width:120px"><col style="width:80px"><col style="width:140px"></colgroup>
+          <colgroup><col style="width:96px"><col style="width:150px"><col style="width:210px"><col style="width:150px"><col style="width:90px"><col style="width:135px"><col style="width:80px"><col style="width:140px"></colgroup>
           <thead><tr>
-          <th data-col="code">编码</th><th data-col="name">名称</th><th data-col="contact">联系人</th><th data-col="phone">电话</th><th data-col="region">区域</th><th data-col="status">状态</th><th data-col="ops">操作</th>
+          <th data-col="code" title="留空自动生成（D001、D002…）">编码</th><th data-col="taxno" title="开票用的纳税人识别号，选填">税号</th><th data-col="name">名称</th><th data-col="brands" title="该分销商被授权分销的品牌，可多个；没勾 = 选了具体品牌时它不出现">分销品牌</th><th data-col="contact">联系人</th><th data-col="phone">电话</th><th data-col="status">状态</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="distBody"></tbody></table>
         <div class="empty" id="distEmpty" style="display:none">还没有分销商，点右上角「新建分销商」开始</div>
       </div>
@@ -342,6 +348,7 @@ toast{display:none}
         <input id="entrySearch" placeholder="搜索 SKU / 名称 / 条码" oninput="renderEntry()" style="width:190px">
         <select id="entryCategory" style="width:120px" onchange="renderEntry()"></select>
         <select id="entryBrand" style="width:130px" onchange="renderEntry()"></select>
+        <span id="entryBrandTip" style="font-size:12px;color:#8a94a6;white-space:nowrap"></span>
         <span id="entryStockBadge" class="inv-badge" title="现货 = 最新库存快照；未同步时点「分销订单」页的同步按钮">现货：加载中</span>
         <input id="entryRemark" placeholder="备注（选填）" style="width:200px">
         <span style="border-left:1px solid #d8dee9;padding-left:10px;white-space:nowrap">
@@ -428,13 +435,15 @@ toast{display:none}
   <div class="mh"><h2 id="distModalTitle">新建分销商</h2><button class="btn" onclick="closeModal('distModal')">✕</button></div>
   <div class="mb">
     <div class="form-grid">
-      <div><label>编码 *</label><input id="dCode" placeholder="如 FX001"></div>
+      <div><label>编码</label><input id="dCode" placeholder="留空自动生成 D001"></div>
+      <div><label>税号</label><input id="dTaxNo" placeholder="纳税人识别号，开票用"></div>
       <div><label>名称 *</label><input id="dName"></div>
       <div><label>联系人</label><input id="dContact"></div>
       <div><label>电话</label><input id="dPhone"></div>
       <div><label>邮箱</label><input id="dEmail"></div>
-      <div><label>区域</label><input id="dRegion"></div>
     </div>
+    <label>分销品牌（可多选，勾了才能下这些品牌的货）</label>
+    <div id="dBrands" class="brand-checks"></div>
     <label>备注</label><textarea id="dNote"></textarea>
     <div class="err" id="distErr"></div>
   </div>
@@ -549,7 +558,9 @@ const state = { distributors: [], products: [], orders: [], overview: null, tab:
   // 下单页：最新快照现货（spec_no → qty）与快照日期
   stockQty: {}, stockDate: "",
   // 旺店通店铺列表（下单页选推送店铺）
-  wdtShops: [] };
+  wdtShops: [],
+  // 全部品牌（不受顶栏当前品牌过滤，用于分销商「分销品牌」勾选项）
+  allBrands: [] };
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -568,15 +579,25 @@ async function api(path, options){
 
 async function loadAll(){
   try {
-    const [ov, dist, prod] = await Promise.all([
-      api("/api/fx/overview"), api("/api/fx/distributors"), api("/api/fx/products")]);
+    // 品牌作用域：顶栏切了品牌就全站只处理这个品牌的数据（空 = 全部品牌）
+    const bq = state.brand ? "?brand=" + encodeURIComponent(state.brand) : "";
+    const [ov, dist, prod, br] = await Promise.all([
+      api("/api/fx/overview"), api("/api/fx/distributors" + bq), api("/api/fx/products" + bq),
+      api("/api/fx/brands")]);   // 品牌清单不按当前品牌过滤：分销商授权要能看到所有品牌
     state.overview = ov; state.distributors = dist.distributors; state.products = prod.products;
+    state.allBrands = (br.brands || []).map(b => b.brand).filter(Boolean);
     state.maintenance = prod.maintenance || null;
     await loadOrders();
     renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
     fillEntrySelects(); loadStockOverview(); loadWdtShops();
     loadInventoryBadge(); loadTopCatOptions();
     $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
+    // 顶部常驻提示：让用户随时知道「现在是在哪个品牌下操作」，含订单/价格/对账全站
+    const scope = $("brandScope");
+    if (scope) {
+      scope.textContent = state.brand ? `当前品牌：${state.brand} · 本页所有数据只含该品牌` : "";
+      scope.classList.toggle("show", !!state.brand);
+    }
   } catch (e) { toast("加载失败: " + e.message); }
 }
 
@@ -601,7 +622,16 @@ function fillEntrySelects(){
   distSel.innerHTML = actives.map(d => `<option value="${d.id}">${esc(d.name)}</option>`).join("")
     || `<option value="">（先到「分销商」页新建）</option>`;
   const brands = [...new Set(state.products.filter(p => p.active && p.brand).map(p => p.brand))].sort();
-  $("entryBrand").innerHTML = `<option value="">全部品牌</option>` + brands.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join("");
+  // 顶栏已经选了品牌时，下单页的品牌下拉就跟着锁定，不给人「切到别的品牌」的机会
+  if (state.brand) {
+    $("entryBrand").innerHTML = `<option value="${esc(state.brand)}">${esc(state.brand)}（当前品牌）</option>`;
+    $("entryBrand").disabled = true;
+    $("entryBrand").title = "已跟随顶栏品牌 " + state.brand;
+  } else {
+    $("entryBrand").innerHTML = `<option value="">全部品牌</option>` + brands.map(b => `<option value="${esc(b)}">${esc(b)}</option>`).join("");
+    $("entryBrand").disabled = false;
+    $("entryBrand").title = "";
+  }
   const cats = [...new Set(state.products.filter(p => p.active && p.category).map(p => p.category))].sort();
   $("entryCategory").innerHTML = `<option value="">全部分类</option>` + cats.map(c => `<option value="${esc(c)}">${esc(c)}</option>`).join("");
 }
@@ -658,16 +688,41 @@ async function onEntryDistChange(){
   renderEntry();
 }
 
+/* 这个分销商这次能下哪些品牌的货：
+   分销商档案里勾的授权品牌 ∩ 顶栏当前品牌。
+   分销商没勾 = 还没录授权，此时只受顶栏品牌约束（顶栏也是「全部品牌」才不限）。 */
+function entryAllowedBrands(){
+  const d = state.distributors.find(x => String(x.id) === String(($("entryDist") || {}).value));
+  const distBrands = (d && Array.isArray(d.brands) ? d.brands : []).filter(Boolean);
+  const top = state.brand ? [state.brand] : [];
+  if (distBrands.length && top.length) return distBrands.filter(b => top.includes(b));
+  return distBrands.length ? distBrands : top;
+}
+
 function renderEntry(){
   if (!$("entryBody")) return;
   const kw = ($("entrySearch").value || "").toLowerCase();
   const brand = $("entryBrand").value;
   const cat = $("entryCategory").value;
+  const allowed = entryAllowedBrands();
+  const tip = $("entryBrandTip");
+  const distName = (state.distributors.find(x => String(x.id) === String($("entryDist").value)) || {}).name || "";
+  if (tip) {
+    tip.textContent = allowed.length
+      ? `可下品牌：${allowed.join("、")}${distName ? "（" + distName + " 的授权品牌）" : ""}`
+      : (distName ? `${distName} 还没勾授权品牌，请到「分销商」页勾选` : "");
+  }
   const rows = state.products.filter(p => p.active
     && (!kw || (p.sku + p.name + (p.barcode || "")).toLowerCase().includes(kw))
     && (!brand || p.brand === brand)
+    && (!allowed.length || allowed.includes(p.brand))
     && (!cat || p.category === cat));
   $("entryEmpty").style.display = rows.length ? "none" : "";
+  if (!rows.length && allowed.length === 0 && $("entryDist").value) {
+    $("entryEmpty").textContent = "该分销商在当前品牌下没有可下单的货：到「分销商」页把授权品牌勾上。";
+  } else if (!rows.length) {
+    $("entryEmpty").textContent = "没有符合条件的商品：换个关键词，或到「商品」页检查商品是否启用。";
+  }
   $("entryBody").innerHTML = rows.map(p => {
     const pr = entryPriceOf(p);
     const sq = state.stockQty[p.spec_no];
@@ -737,11 +792,13 @@ async function submitEntryOrder(){
 function renderDistributors(){
   const kw = ($("distSearch").value || "").toLowerCase();
   const body = $("distBody"), empty = $("distEmpty");
-  const rows = state.distributors.filter(d => !kw || (d.code + d.name + d.contact + d.region).toLowerCase().includes(kw));
+  const rows = state.distributors.filter(d => !kw
+    || (d.code + (d.tax_no || "") + d.name + d.contact + d.phone + (d.brands || []).join(" ")).toLowerCase().includes(kw));
   empty.style.display = rows.length ? "none" : "";
   body.innerHTML = rows.map(d => `<tr>
-    <td><b>${esc(d.code)}</b></td><td>${esc(d.name)}</td><td>${esc(d.contact) || "-"}</td>
-    <td>${esc(d.phone) || "-"}</td><td>${esc(d.region) || "-"}</td>
+    <td><b>${esc(d.code)}</b></td><td title="${esc(d.tax_no || "")}">${esc(d.tax_no) || "-"}</td><td>${esc(d.name)}</td>
+    <td>${(d.brands || []).length ? (d.brands).map(b => `<span class="tag mini-tag">${esc(b)}</span>`).join(" ") : "<span style=\"color:#c3cad6\">未授权</span>"}</td><td>${esc(d.contact) || "-"}</td>
+    <td>${esc(d.phone) || "-"}</td>
     <td><span class="tag ${d.active ? "on" : "off"}">${d.active ? "启用" : "停用"}</span></td>
     <td class="ops">
       <button class="btn mini" onclick='openDistModal(${d.id})'>编辑</button>
@@ -750,21 +807,35 @@ function renderDistributors(){
   applyColOrder(tableOf("dist"));
 }
 
+function fillDistBrandChecks(selected){
+  const box = $("dBrands"), list = state.allBrands || [];
+  if (!box) return;
+  box.innerHTML = list.length
+    ? list.map(b => `<label><input type="checkbox" value="${esc(b)}"${selected.includes(b) ? " checked" : ""}>${esc(b)}</label>`).join("")
+    : `<span class="none-tip">还没有品牌：先在「商品」页同步商品，品牌会自动带出来</span>`;
+}
+
+function collectDistBrands(){
+  const box = $("dBrands");
+  return box ? [...box.querySelectorAll("input:checked")].map(i => i.value) : [];
+}
+
 function openDistModal(id){
   state.distEditId = id || null;
   const d = id ? state.distributors.find(x => x.id === id) : null;
   $("distModalTitle").textContent = d ? "编辑分销商 · " + d.name : "新建分销商";
-  ["dCode","dName","dContact","dPhone","dEmail","dRegion","dNote"].forEach(k => $(k).value = "");
-  if (d) { $("dCode").value = d.code; $("dName").value = d.name; $("dContact").value = d.contact;
-    $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dRegion").value = d.region; $("dNote").value = d.note; }
+  ["dCode","dTaxNo","dName","dContact","dPhone","dEmail","dNote"].forEach(k => $(k).value = "");
+  fillDistBrandChecks(d ? (d.brands || []) : []);
+  if (d) { $("dCode").value = d.code; $("dTaxNo").value = d.tax_no || ""; $("dName").value = d.name; $("dContact").value = d.contact;
+    $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dNote").value = d.note; }
   showError("distErr", ""); openModal("distModal");
-  setTimeout(() => $(d ? "dName" : "dCode").focus(), 50);
+  setTimeout(() => $("dName").focus(), 50);
 }
 
 async function saveDist(){
-  const body = { code: $("dCode").value.trim(), name: $("dName").value.trim(),
+  const body = { code: $("dCode").value.trim(), tax_no: $("dTaxNo").value.trim(), name: $("dName").value.trim(),
     contact: $("dContact").value.trim(), phone: $("dPhone").value.trim(),
-    email: $("dEmail").value.trim(), region: $("dRegion").value.trim(), note: $("dNote").value.trim() };
+    email: $("dEmail").value.trim(), brands: collectDistBrands(), note: $("dNote").value.trim() };
   try {
     if (state.distEditId) await api("/api/fx/distributors/" + state.distEditId, { method: "PUT", body: JSON.stringify(body) });
     else await api("/api/fx/distributors", { method: "POST", body: JSON.stringify(body) });
@@ -1460,8 +1531,10 @@ async function toggleProd(id){
 /* ---------- 订单 ---------- */
 async function loadOrders(){
   try {
-    const status = $("orderStatus").value || "";
-    const data = await api("/api/fx/orders" + (status ? "?status=" + status : ""));
+    const params = new URLSearchParams();
+    if ($("orderStatus").value) params.set("status", $("orderStatus").value);
+    if (state.brand) params.set("brand", state.brand);   // 只显示授权了当前品牌的分销商的订单
+    const data = await api("/api/fx/orders" + (params.toString() ? "?" + params.toString() : ""));
     state.orders = data.orders;
   } catch (e) { state.orders = []; toast("订单加载失败: " + e.message); }
   renderOrders();
@@ -1797,6 +1870,7 @@ async function loadStatements(){
     const params = new URLSearchParams();
     if ($("stmtDist").value) params.set("distributor_id", $("stmtDist").value);
     if ($("stmtMonth").value) params.set("month", $("stmtMonth").value);
+    if (state.brand) params.set("brand", state.brand);
     state.statement = await api("/api/fx/statements" + (params.toString() ? "?" + params.toString() : ""));
     renderStatements();
   } catch (e) { toast(e.message); }
@@ -1843,7 +1917,7 @@ function openImportModal(kind){
   const isDist = kind === "dist";
   $("importTitle").textContent = isDist ? "批量导入分销商" : "批量导入商品";
   $("importHint").innerHTML = isDist
-    ? `每行一个分销商，逗号分隔：<b>编码, 名称, 联系人, 电话, 区域, 备注</b><br>例如：<code>FX001, 上海xx商贸, 王经理, 13800000000, 华东, 月结30天</code><br>已存在的编码自动跳过，不会重复。`
+    ? `每行一个分销商，逗号分隔：<b>编码, 名称, 税号, 联系人, 电话, 备注</b><br>例如：<code>, 上海xx商贸, 91310115XXXXXXXXXX, 王经理, 13800000000, 月结30天</code><br><b>编码留空会自动生成</b>（D001、D002…）；已存在的编码自动跳过，不会重复。`
     : `每行一个商品，逗号分隔：<b>SKU, 名称, 规格, 单位, 标价, 备注, 箱规, 一级分销价</b><br>例如：<code>GL001, 巧克力礼盒, 24×100g, 件, 168.00, , 24/箱, 188.00</code><br>箱规写「24/箱」或直接写数字 24；一级分销价留空 = 待定。已存在的 SKU 自动跳过，不会重复。`;
   $("importText").value = "";
   showError("importErr", "");
@@ -1860,7 +1934,7 @@ async function runImport(){
   const rows = parseImportLines($("importText").value);
   if (!rows.length) { showError("importErr", "没有可导入的内容（每行一条，字段用逗号分隔）"); return; }
   const items = importKind === "dist"
-    ? rows.map(f => ({ code: f[0] || "", name: f[1] || "", contact: f[2] || "", phone: f[3] || "", region: f[4] || "", note: f[5] || "" }))
+    ? rows.map(f => ({ code: f[0] || "", name: f[1] || "", tax_no: f[2] || "", contact: f[3] || "", phone: f[4] || "", note: f[5] || "" }))
     : rows.map(f => {
         // 箱规支持「24/箱」「24」两种写法：斜杠前是数量，斜杠后是单位
         const pack = (f[6] || "").replace(/\s/g, "");
@@ -1899,6 +1973,17 @@ try {
   colOrderStore = JSON.parse(localStorage.getItem(COLO_KEY) || "{}") || {};
   colHideStore = JSON.parse(localStorage.getItem(COLH_KEY) || "{}") || {};
 } catch (e) { colwStore = {}; colOrderStore = {}; colHideStore = {}; }
+/* 2026-10-28：分销商表删掉「区域」列、新增「税号」列。老的顺序/隐藏记录里还留着 region，
+   这里就地清掉并把 taxno 插到「编码」后面，免得税号被挤到最后一列、区域变成幽灵列。 */
+["dist"].forEach(k => {
+  const clean = arr => (Array.isArray(arr) ? arr.filter(c => c !== "region") : arr);
+  colOrderStore[k] = clean(colOrderStore[k]);
+  colHideStore[k] = clean(colHideStore[k]);
+  if (Array.isArray(colOrderStore[k]) && colOrderStore[k].length && !colOrderStore[k].includes("taxno")) {
+    const at = colOrderStore[k].indexOf("code");
+    colOrderStore[k].splice(at < 0 ? 0 : at + 1, 0, "taxno");
+  }
+});
 const saveColw = () => { try { localStorage.setItem(COLW_KEY, JSON.stringify(colwStore)); } catch (e) {} };
 const saveColOrder = () => { try { localStorage.setItem(COLO_KEY, JSON.stringify(colOrderStore)); } catch (e) {} };
 const saveColHide = () => { try { localStorage.setItem(COLH_KEY, JSON.stringify(colHideStore)); } catch (e) {} };

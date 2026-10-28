@@ -161,10 +161,7 @@ const MENUS = [
   { key: 'dist', label: '分销管理', icon: '🤝', children: [
     { key: 'dist-archive', label: '分销商档案', icon: '🏢', url: '/distribution?embed=1&tab=distributors' },
     { key: 'dist-apply', label: '分销商申请审核', icon: '📝', url: ph('分销商申请审核', '分销管理', 'P3'), planned: true, phase: 'P3' },
-    { key: 'dist-level', label: '分销商等级', icon: '🏅', url: ph('分销商等级', '分销管理', 'P2'), planned: true, phase: 'P2' },
-    { key: 'dist-region', label: '分销区域', icon: '🗺', url: ph('分销区域', '分销管理', 'P2'), planned: true, phase: 'P2' },
     { key: 'dist-price', label: '分销价格', icon: '💰', url: '/distribution?embed=1&tab=prices' },
-    { key: 'dist-agreement', label: '分销协议', icon: '📄', url: ph('分销协议', '分销管理', 'P3'), planned: true, phase: 'P3' },
     { key: 'dist-rebate', label: '返利政策', icon: '％', url: ph('返利政策', '分销管理', 'P4'), planned: true, phase: 'P4' },
     { key: 'dist-statement', label: '对账管理', icon: '📑', url: '/distribution?embed=1&tab=statements' },
   ]},
@@ -176,12 +173,12 @@ const MENUS = [
     { key: 'prod-catalog', label: '分销商品目录', icon: '📚', url: ph('分销商品目录', '商品管理', 'P6'), planned: true, phase: 'P6' },
     { key: 'prod-stock', label: '商品库存与可供货状态', icon: '📊', url: ph('商品库存与可供货状态', '商品管理', 'P6'), planned: true, phase: 'P6' },
   ]},
-  { key: 'order', label: '订单管理', icon: '🧾', children: [
+  { key: 'order', label: '分销订单', icon: '🧾', children: [
     { key: 'order-entry', label: '分销下单', icon: '🛒', url: '/distribution?embed=1&tab=entry' },
     { key: 'order-all', label: '分销订单', icon: '🧾', url: '/distribution?embed=1&tab=orders' },
     { key: 'order-pending', label: '待审核订单', icon: '⏳', url: '/distribution?embed=1&tab=orders&status=submitted' },
     { key: 'order-approved', label: '已审核订单', icon: '✅', url: '/distribution?embed=1&tab=orders&status=approved' },
-    { key: 'order-abnormal', label: '订单异常', icon: '⚠️', url: ph('订单异常', '订单管理', 'P6'), planned: true, phase: 'P6' },
+    { key: 'order-abnormal', label: '订单异常', icon: '⚠️', url: ph('订单异常', '分销订单', 'P6'), planned: true, phase: 'P6' },
     { key: 'order-search', label: '订单查询', icon: '🔎', url: '/distribution?embed=1&tab=orders', badge: '页内' },
   ]},
   { key: 'purchase', label: '采购与到货', icon: '🚛', children: [
