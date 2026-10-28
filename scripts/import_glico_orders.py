@@ -259,42 +259,128 @@ def main(xlsx):
     unmatched = Counter()
     month_totals = {}
 
+    def norm_payer(name):
+        """付款方名归一：谢建华的变体（谢建华-已付款、谢建华&彩霞…）归一成谢建华。"""
+        name = (name or "").strip()
+        if not name:
+            return ""
+        if re.match(r"^谢建华", name):
+            return "谢建华"
+        return name
+
+    def receiver_of(addr):
+        """从送货块头提取（收货电话key, 收货人名）。
+
+        块头形如「公司-送货地址：上海市松江区潮富路78号、186-1620-4493、王师傅」
+        或「送货地址：…，汪于成，18321003298------自提」。电话是最稳的收货点标识。
+        """
+        if not addr:
+            return None, ""
+        m = re.search(r"1[3-9]\d[\d-]{8,13}", addr)
+        if not m:
+            return None, ""
+        phone = re.sub(r"\D", "", m.group(0))
+        segs = [s.strip() for s in re.split(r"[、，]", addr) if s.strip()]
+        pi = next((i for i, s in enumerate(segs) if m.group(0) in s), None)
+        rcv = ""
+        if pi is not None:
+            for j in (pi + 1, pi - 1):  # 收货人名在电话后一段（王师傅）或前一段（汪于成）
+                if 0 <= j < len(segs):
+                    cand = re.sub(r"-+自提$", "", segs[j]).strip()
+                    cand = re.split(r"\s", cand)[0]  # 去掉可能粘在一起的公司名尾巴
+                    if cand and len(cand) <= 12 and not re.search(r"\d{6,}|路|号|栋|楼|地址", cand):
+                        rcv = cand
+                        break
+        return phone, rcv
+
+    # ---- 第一遍：收拢所有月表的团单块，按「收货人（送货电话）」归组 ----
+    # 用户 2026-10-28 定的规则：同一个收货点 = 同一个客户，
+    # 块里五花八门的付款公司（威太仓下出现过 9 种付款方）只是这个客户的付款账户。
+    # 没有收货信息的块，退回按付款公司归组。
+    groups = {}
     for sheet in wb.sheetnames:
         if sheet in SKIP_SHEETS:
             continue
-        ym = sheet_month(sheet)
         blocks = parse_sheet(wb[sheet])
         if not blocks:
             stats["sheets_skipped"] += 1
             continue
-        y, m = ym if ym else (2025, 1)
+        stats["sheets_ok"] += 1
         for blk in blocks:
+            phone, rcv = receiver_of(blk["addr"])
+            payers = Counter(norm_payer(l["pay_company"]) for l in blk["lines"] if l["pay_company"])
+            if phone:
+                key = "rcv:" + phone
+            else:
+                payer = payers.most_common(1)[0][0] if payers else norm_payer(blk["company"])
+                key = "pay:" + (payer or f"未识别-{sheet}")
+            g = groups.setdefault(key, {
+                "phone": phone, "names": Counter(), "payers": Counter(),
+                "receivers": Counter(), "blocks": [], "first_sheet": sheet,
+            })
+            if blk["company"]:
+                g["names"][norm_payer(blk["company"])] += 1
+            g["payers"].update(payers)
+            if rcv:
+                g["receivers"][rcv] += 1
+            g["blocks"].append((sheet, blk))
+
+    # ---- 组名归并：不同 key 算出同一个客户名时（如 优华 有收货块+无收货块），
+    # 合并成一组——付款账户取并集、收货信息取有值的那个，绝不互相覆盖。 ----
+    def resolve_name(g):
+        return (g["names"].most_common(1)[0][0] if g["names"]
+                else g["payers"].most_common(1)[0][0] if g["payers"]
+                else f"未识别客户-{g['first_sheet']}")
+
+    by_name = {}
+    for key, g in groups.items():
+        name = resolve_name(g)
+        if name in by_name:
+            tgt = by_name[name]
+            tgt["payers"].update(g["payers"])
+            tgt["receivers"].update(g["receivers"])
+            tgt["phone"] = tgt["phone"] or g["phone"]
+            tgt["blocks"].extend(g["blocks"])
+        else:
+            g["name"] = name
+            by_name[name] = g
+
+    # ---- 第二遍：每个收货组建一个分销商，组内每块建一张订单 ----
+    for name, g in by_name.items():
+        contact = "/".join(r for r, _ in g["receivers"].most_common())
+        phone = g["phone"] or ""
+        # 付款账户 = 该客户名下出现过的所有付款方（不含客户名自身）
+        accounts = [p for p, _ in g["payers"].most_common() if p and p != name]
+        row = cur.execute("select id from fx_distributors where name=?", (name,)).fetchone()
+        if row:
+            dist_id = row[0]
+            # 已存在（如手工建过）：付款账户取并集，收货信息只在原来为空时补
+            old = cur.execute("select contact, phone, pay_accounts from fx_distributors where id=?", (dist_id,)).fetchone()
+            merged = []
+            for acc in (old[2] or "").split(",") + accounts:
+                acc = acc.strip()
+                if acc and acc not in merged:
+                    merged.append(acc)
+            cur.execute(
+                "update fx_distributors set contact=?, phone=?, pay_accounts=? where id=?",
+                (old[0] or contact, old[1] or phone, ",".join(merged), dist_id),
+            )
+        else:
+            code = next_distributor_code(cur)
+            cur.execute(
+                "insert into fx_distributors(code,name,contact,phone,email,tax_no,brands,region,pay_accounts,note,active,created_at,updated_at)"
+                " values(?,?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))",
+                (code, name, contact, phone, "", "", BRAND, "", ",".join(accounts), "B2B团单导入", 1),
+            )
+            dist_id = cur.lastrowid
+            stats["distributors_created"] += 1
+        stats["dist_groups"] = stats.get("dist_groups", [])
+        stats["dist_groups"].append(f"{name}｜收货:{contact or '-'} {phone}｜付款账户{len(accounts)}个:{','.join(accounts[:6])}{'…' if len(accounts) > 6 else ''}")
+
+        for sheet, blk in g["blocks"]:
             lines = blk["lines"]
-            # 客户名：块内付款公司多数派 > 块头识别 > 兜底
-            comps = Counter(l["pay_company"] for l in lines if l["pay_company"])
-            company = comps.most_common(1)[0][0] if comps else blk["company"]
-            if not company:
-                company = f"未识别客户-{y}年{m}月-{len(blocks)}"
-            # 同一客户的名字变体归一（如「谢建华-已付款」「谢建华&彩霞」→ 谢建华）
-            if company != "谢建华" and re.match(r"^谢建华[-、&＆*·]", company):
-                company = "谢建华"
-            # 分销商
-            if company not in dist_cache:
-                row = cur.execute(
-                    "select id from fx_distributors where name=?", (company,)
-                ).fetchone()
-                if row:
-                    dist_cache[company] = row[0]
-                else:
-                    code = next_distributor_code(cur)
-                    cur.execute(
-                        "insert into fx_distributors(code,name,contact,phone,email,tax_no,brands,region,note,active,created_at,updated_at)"
-                        " values(?,?,?,?,?,?,?,?,?,?,datetime('now'),datetime('now'))",
-                        (code, company, "", "", "", "", BRAND, "", "B2B团单导入", 1),
-                    )
-                    dist_cache[company] = cur.lastrowid
-                    stats["distributors_created"] += 1
-            dist_id = dist_cache[company]
+            ym = sheet_month(sheet)
+            y, m = ym if ym else (2025, 1)
             # 订单日期：块内付款日期多数派 > sheet 月 1 号；串月（如旧表序列号误判）回落 sheet 月
             ds = Counter(l["pay_date"] for l in lines if l["pay_date"])
             odate = ds.most_common(1)[0][0] if ds else None
@@ -333,18 +419,17 @@ def main(xlsx):
                 nlines += 1
             stats["orders"] += 1
             stats["lines"] += nlines
-            if prod:
-                stats["lines_matched"] += 0  # 占位
             month_totals.setdefault(f"{y}-{m:02d}", [0, 0.0])
             month_totals[f"{y}-{m:02d}"][0] += 1
             month_totals[f"{y}-{m:02d}"][1] += total
-        stats["sheets_ok"] += 1
     wb.close()
     conn.commit()
 
-    print("=== 导入完成 ===")
+    print("=== 导入完成（按收货人归组） ===")
     print(f"sheet 解析成功: {stats['sheets_ok']}，跳过: {stats['sheets_skipped']}")
-    print(f"分销商新建: {stats['distributors_created']}")
+    print(f"客户（收货组）: {stats['distributors_created']} 个新建")
+    for line in stats["dist_groups"]:
+        print("  " + line)
     print(f"订单: {stats['orders']}，明细行: {stats['lines']}")
     for k in sorted(month_totals):
         n, amt = month_totals[k]
