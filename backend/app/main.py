@@ -32,7 +32,7 @@ from .services.distribution import (
     create_and_push_order, create_distributor, create_order, create_product,
     delete_price, fx_overview, import_distributors, import_products,
     list_distributors, list_orders, list_prices, list_products, list_statements,
-    list_brands, list_top_categories, set_top_categories,
+    list_brands, list_top_categories, merge_distributors, set_top_categories,
     order_detail, push_order_to_wangdian, set_price, set_tier1_prices, statement_excel_bytes,
     transition_order, toggle_distributor, toggle_product, update_distributor,
     update_order, update_product,
@@ -43,6 +43,8 @@ from .services.product_maintenance import backfill_list_prices, summary_from_db,
 from .services.wdt_purchase import (
     list_purchase_orders,
     list_purchase_prices,
+    purchase_brands,
+    purchase_months,
     purchase_order_summary,
     refresh_product_purchase_prices,
     set_cost_warehouse,
@@ -81,6 +83,8 @@ class FxDistributorPayload(BaseModel):
     tax_no: str = ""
     # 授权分销的品牌（可多个）。空数组 = 没录授权，选了具体品牌时这个分销商不出现
     brands: list[str] = Field(default_factory=list)
+    # 付款账户（可多个）：同一个客户从不同公司/个人账户付款时都记这里，对账用
+    pay_accounts: list[str] = Field(default_factory=list)
     note: str = ""
 
 
@@ -697,6 +701,21 @@ def fx_distributor_toggle(distributor_id: int, db: Session = Depends(get_db)):
         raise HTTPException(404 if "不存在" in str(exc) else 400, str(exc)) from exc
 
 
+class FxDistributorMergePayload(BaseModel):
+    """分销商合并：把 source_ids 几行并进 target_id 一行（同一客户多个付款公司）。"""
+    target_id: int
+    source_ids: list[int] = Field(default_factory=list)
+
+
+@app.post("/api/fx/distributors/merge")
+def fx_distributor_merge(payload: FxDistributorMergePayload, db: Session = Depends(get_db)):
+    try:
+        result = merge_distributors(db, payload.target_id, payload.source_ids)
+        return {"ok": True, **result}
+    except ValueError as exc:
+        raise HTTPException(400, str(exc)) from exc
+
+
 @app.get("/api/fx/products")
 def fx_products(include_inactive: int = 1, brand: str = "", db: Session = Depends(get_db)):
     """商品列表 + 待维护汇总。
@@ -935,15 +954,22 @@ def fx_purchase_orders(
     month: str = "",
     keyword: str = "",
     abnormal: int = -1,
+    brand: str = "",
     limit: int = 200,
     db: Session = Depends(get_db),
 ):
-    """采购单列表。采购单是成本的唯一来源，后续与商品/分销订单的关联也从这里接。"""
+    """采购单列表。采购单是成本的唯一来源，后续与商品/分销订单的关联也从这里接。
+
+    brand：品牌筛选（品牌只在明细上，按「含该品牌货品的采购单」过滤）。
+    brands：下拉候选，始终返回全量品牌，避免选了品牌之后下拉自己被筛没。
+    """
     if month and not (len(month) == 7 and month[:4].isdigit() and month[5:7].isdigit() and month[4] == "-"):
         raise HTTPException(400, "month 格式应为 YYYY-MM")
     return {
-        "summary": purchase_order_summary(db),
-        "orders": list_purchase_orders(db, month=month, keyword=keyword, abnormal=abnormal, limit=limit),
+        "summary": purchase_order_summary(db, brand=brand),
+        "orders": list_purchase_orders(db, month=month, keyword=keyword, abnormal=abnormal, limit=limit, brand=brand),
+        "brands": purchase_brands(db),
+        "months": purchase_months(db),
     }
 
 

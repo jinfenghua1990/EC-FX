@@ -221,6 +221,15 @@ tr.dirty .topcat-in{border-color:#e8a33a;background:#fffaef}
 .modal textarea{min-height:64px;resize:vertical}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .brand-checks{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 10px;padding:12px;border:1px solid #e3e8f0;border-radius:10px;background:#f8fafc}
+/* 分销商勾选列 + 合并弹窗 */
+.cell-pick{padding:0 4px;text-align:center}
+.cell-pick input{width:15px;height:15px;accent-color:#2463eb;cursor:pointer;display:block;margin:0 auto}
+tr.pick-on td{background:#f2f7ff}
+.merge-list{display:flex;flex-direction:column;gap:8px;max-height:300px;overflow:auto;margin:4px 0 10px}
+.merge-list .merge-opt{display:flex;align-items:flex-start;gap:9px;padding:9px 12px;background:#fff;border:1px solid #dfe5ee;border-radius:9px;font-size:13.5px;cursor:pointer}
+.merge-list .merge-opt:hover{border-color:#9db4e8}
+.merge-list .merge-opt:has(input:checked){border-color:#2463eb;background:#eef4ff}
+.merge-list input{width:16px;height:16px;accent-color:#2463eb;flex-shrink:0;margin:1px 0 0}
 .brand-checks label{display:inline-flex;align-items:center;gap:8px;font-size:14.5px;font-weight:600;color:#3c4759;cursor:pointer;padding:8px 14px;background:#fff;border:1px solid #dfe5ee;border-radius:9px;white-space:nowrap;transition:border-color .12s,background .12s,color .12s}
 .brand-checks label:hover{border-color:#9db4e8}
 .brand-checks input{width:17px;height:17px;accent-color:#2463eb;cursor:pointer;flex-shrink:0;margin:0}
@@ -313,15 +322,17 @@ toast{display:none}
     <div class="card" id="panel-distributors">
       <div class="head">
         <h3>分销商档案</h3>
-        <input id="distSearch" placeholder="搜索编码 / 名称" oninput="renderDistributors()" style="width:200px">
+        <input id="distSearch" placeholder="搜索编码 / 名称 / 付款账户" oninput="renderDistributors()" style="width:200px">
+        <button class="btn" id="distMergeBtn" onclick="openDistMergeModal()" style="display:none">⇄ 合并所选</button>
         <button class="btn" onclick="openImportModal('dist')">⇪ 批量导入</button>
         <button class="btn primary" onclick="openDistModal()">＋ 新建分销商</button>
       </div>
       <div class="tbl">
         <table class="cols" data-ckey="dist">
-          <colgroup><col style="width:96px"><col style="width:150px"><col style="width:210px"><col style="width:150px"><col style="width:90px"><col style="width:135px"><col style="width:80px"><col style="width:140px"></colgroup>
+          <colgroup><col style="width:34px"><col style="width:96px"><col style="width:150px"><col style="width:210px"><col style="width:170px"><col style="width:150px"><col style="width:90px"><col style="width:135px"><col style="width:80px"><col style="width:140px"></colgroup>
           <thead><tr>
-          <th data-col="code" title="留空自动生成（D001、D002…）">编码</th><th data-col="taxno" title="开票用的纳税人识别号，选填">税号</th><th data-col="name">名称</th><th data-col="brands" title="该分销商被授权分销的品牌，可多个；没勾 = 选了具体品牌时它不出现">分销品牌</th><th data-col="contact">联系人</th><th data-col="phone">电话</th><th data-col="status">状态</th><th data-col="ops">操作</th>
+          <th data-col="pick" title="勾选两行以上可合并为同一个客户（同一客户多个付款公司的场景）"><input type="checkbox" id="distPickAll" onchange="distPickAll(this.checked)" title="全选/全不选"></th>
+          <th data-col="code" title="留空自动生成（D001、D002…）">编码</th><th data-col="taxno" title="开票用的纳税人识别号，选填">税号</th><th data-col="name">名称</th><th data-col="payacc" title="这个客户用来付款的账户/公司名，可多个；合并客户时自动汇总">付款账户</th><th data-col="brands" title="该分销商被授权分销的品牌，可多个；没勾 = 选了具体品牌时它不出现">分销品牌</th><th data-col="contact">联系人</th><th data-col="phone">电话</th><th data-col="status">状态</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="distBody"></tbody></table>
         <div class="empty" id="distEmpty" style="display:none">还没有分销商，点右上角「新建分销商」开始</div>
       </div>
@@ -518,6 +529,8 @@ toast{display:none}
       <div><label>电话</label><input id="dPhone"></div>
       <div><label>邮箱</label><input id="dEmail"></div>
     </div>
+    <label>付款账户（可多个，逗号/顿号隔开：这个客户付款的公司名或个人名，对账时按任一账户都能对到它）</label>
+    <input id="dPayAccounts" placeholder="如：上海优华贸易有限公司,钟军">
     <label>分销品牌（可多选，勾了才能下这些品牌的货）</label>
     <div id="dBrands" class="brand-checks"></div>
     <label>备注</label><textarea id="dNote"></textarea>
@@ -526,6 +539,21 @@ toast{display:none}
   <div class="mf">
     <button class="btn" onclick="closeModal('distModal')">取消</button>
     <button class="btn primary" onclick="saveDist()">保存</button>
+  </div>
+</div></div>
+
+<!-- 合并分销商弹窗：同一客户多个付款账户，几行并成一行 -->
+<div class="backdrop" id="distMergeModal"><div class="modal sm">
+  <div class="mh"><h2>合并为同一个客户</h2><button class="btn" onclick="closeModal('distMergeModal')">✕</button></div>
+  <div class="mb">
+    <p style="margin:0 0 8px;font-size:13px;color:#5b6472">同一个客户从多个账户付款时，会把几行客户并成一行。请选<b>保留哪个客户</b>：</p>
+    <div id="distMergeList" class="merge-list"></div>
+    <p style="margin:8px 0 0;font-size:12.5px;color:#8a93a3">合并内容：其余行的<b>订单、经销商专属价</b>移到保留客户名下；其余行的<b>客户名和付款账户</b>汇进保留客户的「付款账户」里；然后删除其余行。<b style="color:#c0392b">不可撤销。</b></p>
+    <div class="err" id="distMergeErr"></div>
+  </div>
+  <div class="mf">
+    <button class="btn" onclick="closeModal('distMergeModal')">取消</button>
+    <button class="btn danger" onclick="doDistMerge()">确认合并</button>
   </div>
 </div></div>
 
@@ -625,6 +653,8 @@ toast{display:none}
 "use strict";
 const state = { distributors: [], products: [], orders: [], overview: null, tab: "distributors",
   distEditId: null, prodEditId: null, orderEditId: null,
+  // 分销商列表勾选：勾两行以上出现「合并所选」（同一客户多个付款账户的合并场景）
+  distPick: new Set(),
   prices: [], statement: null, priceCache: {},
   // maintenance = 后端算好的待维护汇总（缺标价/缺分销价/成本待核对）
   // need = 当前筛选中的缺项代码，空串表示不筛选
@@ -665,6 +695,9 @@ async function loadAll(){
       api("/api/fx/overview"), api("/api/fx/distributors" + bq), api("/api/fx/products" + bq),
       api("/api/fx/brands")]);   // 品牌清单不按当前品牌过滤：分销商授权要能看到所有品牌
     state.overview = ov; state.distributors = dist.distributors; state.products = prod.products;
+    // 勾选里已不存在的（被合并删掉的行）清掉
+    const alive = new Set(state.distributors.map(d => d.id));
+    [...state.distPick].forEach(id => { if (!alive.has(id)) state.distPick.delete(id); });
     state.allBrands = (br.brands || []).map(b => b.brand).filter(Boolean);
     state.maintenance = prod.maintenance || null;
     await loadOrders();
@@ -924,18 +957,89 @@ function renderDistributors(){
   const kw = ($("distSearch").value || "").toLowerCase();
   const body = $("distBody"), empty = $("distEmpty");
   const rows = state.distributors.filter(d => !kw
-    || (d.code + (d.tax_no || "") + d.name + d.contact + d.phone + (d.brands || []).join(" ")).toLowerCase().includes(kw));
+    || (d.code + (d.tax_no || "") + d.name + d.contact + d.phone + (d.brands || []).join(" ") + (d.pay_accounts || []).join(" ")).toLowerCase().includes(kw));
   empty.style.display = rows.length ? "none" : "";
-  body.innerHTML = rows.map(d => `<tr>
+  body.innerHTML = rows.map(d => {
+    const picked = state.distPick.has(d.id);
+    return `<tr class="${picked ? "pick-on" : ""}">
+    <td class="cell-pick"><input type="checkbox" ${picked ? "checked" : ""} onchange="distPick(${d.id}, this.checked)"></td>
     <td><b>${esc(d.code)}</b></td><td title="${esc(d.tax_no || "")}">${esc(d.tax_no) || "-"}</td><td>${esc(d.name)}</td>
+    <td title="${esc((d.pay_accounts || []).join("、"))}">${(d.pay_accounts || []).length
+      ? d.pay_accounts.map(a => `<span class="tag mini-tag" style="background:#eef4ff;color:#1d4ed8">${esc(a)}</span>`).join(" ")
+      : "<span style=\"color:#c3cad6\">-</span>"}</td>
     <td>${(d.brands || []).length ? (d.brands).map(b => `<span class="tag mini-tag">${esc(b)}</span>`).join(" ") : "<span style=\"color:#c3cad6\">未授权</span>"}</td><td>${esc(d.contact) || "-"}</td>
     <td>${esc(d.phone) || "-"}</td>
     <td><span class="tag ${d.active ? "on" : "off"}">${d.active ? "启用" : "停用"}</span></td>
     <td class="ops">
       <button class="btn mini" onclick='openDistModal(${d.id})'>编辑</button>
       <button class="btn mini ${d.active ? "danger" : ""}" onclick="toggleDist(${d.id})">${d.active ? "停用" : "启用"}</button>
-    </td></tr>`).join("");
+    </td></tr>`;
+  }).join("");
   applyColOrder(tableOf("dist"));
+  pinPickFirst(tableOf("dist"));
+  syncDistMergeBtn();
+}
+
+/* 勾选列：applyColOrder 会把用户新存的列序里没有的「pick」排到末尾，这里钉回最前面 */
+function pinPickFirst(table){
+  if (!table) return;
+  const tr = table.querySelector("thead tr"); if (!tr) return;
+  const ths = [...tr.children];
+  const i = ths.findIndex(t => t.dataset && t.dataset.col === "pick");
+  if (i > 0) {
+    tr.insertBefore(ths[i], ths[0]);
+    const cg = table.querySelector("colgroup"), cols = cg ? [...cg.children] : [];
+    if (cols.length === ths.length) cg.insertBefore(cols[i], cols[0]);
+    table.querySelectorAll("tbody tr").forEach(t => {
+      const tds = [...t.children];
+      if (tds.length === ths.length) t.insertBefore(tds[i], tds[0]);
+    });
+  }
+}
+
+/* ---------- 分销商勾选与合并（同一客户多个付款账户 → 并成一个客户） ---------- */
+function distPick(id, on){
+  if (on) state.distPick.add(id); else state.distPick.delete(id);
+  renderDistributors();
+}
+function distPickAll(on){
+  const kw = ($("distSearch").value || "").toLowerCase();
+  state.distributors.filter(d => !kw
+    || (d.code + d.name + (d.pay_accounts || []).join(" ")).toLowerCase().includes(kw))
+    .forEach(d => { if (on) state.distPick.add(d.id); else state.distPick.delete(d.id); });
+  renderDistributors();
+}
+function syncDistMergeBtn(){
+  const btn = $("distMergeBtn"); if (!btn) return;
+  const n = state.distPick.size;
+  btn.style.display = n >= 2 ? "" : "none";
+  btn.textContent = `⇄ 合并所选（${n}）`;
+}
+function openDistMergeModal(){
+  const ids = [...state.distPick];
+  if (ids.length < 2) { toast("先勾选两行以上"); return; }
+  const rows = ids.map(id => state.distributors.find(d => d.id === id)).filter(Boolean);
+  const box = $("distMergeList");
+  box.innerHTML = rows.map((d, i) => `<label class="merge-opt">
+    <input type="radio" name="mergeTarget" value="${d.id}" ${i === 0 ? "checked" : ""}>
+    <span><b>${esc(d.name)}</b>（${esc(d.code)}）${(d.pay_accounts || []).length ? " · 付款账户：" + esc(d.pay_accounts.join("、")) : ""}</span>
+  </label>`).join("");
+  $("distMergeErr").textContent = "";
+  openModal("distMergeModal");
+}
+async function doDistMerge(){
+  const targetId = parseInt((document.querySelector('input[name="mergeTarget"]:checked') || {}).value, 10);
+  if (!targetId) { $("distMergeErr").textContent = "先选一个保留的客户"; return; }
+  const sources = [...state.distPick].filter(i => i !== targetId);
+  const target = state.distributors.find(d => d.id === targetId);
+  if (!confirm(`确定合并吗？\n\n保留客户：${target.name}\n其余 ${sources.length} 行的订单、专属价、付款账户全部并入它，然后删除那几行。\n此操作不可撤销，建议先确认名称选对了。`)) return;
+  try {
+    const r = await api("/api/fx/distributors/merge", { method: "POST", body: JSON.stringify({ target_id: targetId, source_ids: sources }) });
+    closeModal("distMergeModal");
+    state.distPick.clear();
+    toast(`已合并：${r.moved_orders} 笔订单、${r.moved_prices} 条专属价并入「${target.name}」`);
+    loadAll();
+  } catch (e) { $("distMergeErr").textContent = e.message; }
 }
 
 function fillDistBrandChecks(selected){
@@ -955,10 +1059,11 @@ function openDistModal(id){
   state.distEditId = id || null;
   const d = id ? state.distributors.find(x => x.id === id) : null;
   $("distModalTitle").textContent = d ? "编辑分销商 · " + d.name : "新建分销商";
-  ["dCode","dTaxNo","dName","dContact","dPhone","dEmail","dNote"].forEach(k => $(k).value = "");
+  ["dCode","dTaxNo","dName","dContact","dPhone","dEmail","dNote","dPayAccounts"].forEach(k => $(k).value = "");
   fillDistBrandChecks(d ? (d.brands || []) : []);
   if (d) { $("dCode").value = d.code; $("dTaxNo").value = d.tax_no || ""; $("dName").value = d.name; $("dContact").value = d.contact;
-    $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dNote").value = d.note; }
+    $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dNote").value = d.note;
+    $("dPayAccounts").value = (d.pay_accounts || []).join(","); }
   showError("distErr", ""); openModal("distModal");
   setTimeout(() => $("dName").focus(), 50);
 }
@@ -966,7 +1071,9 @@ function openDistModal(id){
 async function saveDist(){
   const body = { code: $("dCode").value.trim(), tax_no: $("dTaxNo").value.trim(), name: $("dName").value.trim(),
     contact: $("dContact").value.trim(), phone: $("dPhone").value.trim(),
-    email: $("dEmail").value.trim(), brands: collectDistBrands(), note: $("dNote").value.trim() };
+    email: $("dEmail").value.trim(), brands: collectDistBrands(),
+    pay_accounts: ($("dPayAccounts").value || "").split(/[,，、]/).map(s => s.trim()).filter(Boolean),
+    note: $("dNote").value.trim() };
   try {
     if (state.distEditId) await api("/api/fx/distributors/" + state.distEditId, { method: "PUT", body: JSON.stringify(body) });
     else await api("/api/fx/distributors", { method: "POST", body: JSON.stringify(body) });

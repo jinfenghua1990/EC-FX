@@ -94,6 +94,10 @@ class FxDistributor(Base):
     # 空 = 还没录授权品牌：顶部选了具体品牌时它不出现（只在「全部品牌」下可见），
     # 绝不默认成「全品牌通吃」，免得给它看到别的品牌的货。
     brands: Mapped[str] = mapped_column(String(500), default="")
+    # pay_accounts：付款账户（付款方公司/个人名），逗号分隔存。
+    # 一个客户可能从多个账户付款（自己付/关联公司代付/个人卡付），都记在这里；
+    # 合并分销商时，被并入那几行的名称和付款账户也会汇进来。
+    pay_accounts: Mapped[str] = mapped_column(String(800), default="")
     # region（区域）已停用：2026-10-28 起页面不再显示也不再录入，旧数据保留在库里不删
     region: Mapped[str] = mapped_column(String(120), default="")
     note: Mapped[str] = mapped_column(String(1000), default="")

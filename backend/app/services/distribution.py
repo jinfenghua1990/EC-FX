@@ -17,7 +17,7 @@ import io
 from datetime import datetime
 from decimal import Decimal, ROUND_HALF_UP
 
-from sqlalchemy import func, or_, select
+from sqlalchemy import delete, func, or_, select, update
 from sqlalchemy.orm import Session, selectinload
 
 from ..config import settings
@@ -204,11 +204,23 @@ def _distributor_view(row: FxDistributor) -> dict:
         "email": row.email,
         "tax_no": row.tax_no or "",
         "brands": brand_list_of(row),
+        "pay_accounts": _text_to_list(getattr(row, "pay_accounts", "") or ""),
         "region": row.region,
         "note": row.note,
         "active": bool(row.active),
         "created_at": row.created_at.strftime("%Y-%m-%d %H:%M") if row.created_at else "",
     }
+
+
+def _text_to_list(value: str) -> list[str]:
+    """逗号/顿号/中文逗号分隔的串 -> 去重列表。"""
+    import re as _re
+    out: list[str] = []
+    for item in _re.split(r"[,，、]", str(value or "")):
+        item = item.strip()
+        if item and item not in out:
+            out.append(item)
+    return out
 
 
 def _brands_to_text(value) -> str:
@@ -249,6 +261,7 @@ def create_distributor(db: Session, data: dict) -> dict:
         email=(data.get("email") or "").strip(),
         tax_no=(data.get("tax_no") or "").strip(),
         brands=_brands_to_text(data.get("brands")),
+        pay_accounts=_brands_to_text(data.get("pay_accounts")),
         note=(data.get("note") or "").strip(),
         active=1,
     )
@@ -272,6 +285,8 @@ def update_distributor(db: Session, distributor_id: int, data: dict) -> dict:
             setattr(row, field, str(data[field]).strip())
     if "brands" in data and data["brands"] is not None:
         row.brands = _brands_to_text(data["brands"])
+    if "pay_accounts" in data and data["pay_accounts"] is not None:
+        row.pay_accounts = _brands_to_text(data["pay_accounts"])
     if "name" in data and not (data.get("name") or "").strip():
         raise ValueError("分销商名称不能为空")
     db.commit()
@@ -285,6 +300,62 @@ def toggle_distributor(db: Session, distributor_id: int) -> dict:
     row.active = 0 if row.active else 1
     db.commit()
     return _distributor_view(row)
+
+
+def merge_distributors(db: Session, target_id: int, source_ids: list[int]) -> dict:
+    """把几个分销商行并成一个客户（同一客户多个付款公司的场景）。
+
+    - 订单、经销商专属价全部移到目标客户名下（专属价冲突时保留目标客户的价）；
+    - 被并行的「名称」和「付款账户」都汇进目标客户的付款账户列表，对账时不丢线索；
+    - 被并行删除（引用已全部转移，不留死数据）。
+    """
+    target = db.get(FxDistributor, target_id)
+    if not target:
+        raise ValueError("目标客户不存在")
+    ids = [i for i in dict.fromkeys(int(s) for s in (source_ids or [])) if i != target_id]
+    if not ids:
+        raise ValueError("请勾选至少一个要并入的客户（不能和目标相同）")
+    sources = [db.get(FxDistributor, i) for i in ids]
+    if any(s is None for s in sources):
+        raise ValueError("有要并入的客户不存在")
+
+    moved_orders = moved_prices = dropped_prices = 0
+    accounts: list[str] = _text_to_list(target.pay_accounts or "")
+    for src in sources:
+        # 1) 订单全部改挂到目标
+        r = db.execute(
+            update(FxOrder).where(FxOrder.distributor_id == src.id).values(distributor_id=target.id)
+        )
+        moved_orders += r.rowcount or 0
+        # 2) 经销商专属价：目标没有同商品的覆盖价就搬过去，有就丢弃（保留目标价）
+        src_prices = db.scalars(select(FxPrice).where(FxPrice.distributor_id == src.id)).all()
+        for sp in src_prices:
+            dup = db.scalar(
+                select(FxPrice).where(FxPrice.distributor_id == target.id, FxPrice.product_id == sp.product_id)
+            )
+            if dup:
+                db.delete(sp)
+                dropped_prices += 1
+            else:
+                sp.distributor_id = target.id
+                moved_prices += 1
+        # 3) 名称+付款账户并入目标账户列表
+        for acc in [src.name, *( _text_to_list(src.pay_accounts or "") )]:
+            if acc and acc not in accounts:
+                accounts.append(acc)
+    target.pay_accounts = ",".join(accounts)
+    merged_names = "、".join(s.name for s in sources)
+    target.note = (f"{target.note or ''}｜合并入档：{merged_names}（{datetime.utcnow():%Y-%m-%d}）").strip("｜")
+    # 4) 删除被并行（订单/专属价已转移）
+    db.execute(delete(FxDistributor).where(FxDistributor.id.in_(ids)))
+    db.commit()
+    return {
+        "distributor": _distributor_view(target),
+        "moved_orders": moved_orders,
+        "moved_prices": moved_prices,
+        "dropped_prices": dropped_prices,
+        "merged_names": merged_names,
+    }
 
 
 # ---------------------------------------------------------------- 商品
