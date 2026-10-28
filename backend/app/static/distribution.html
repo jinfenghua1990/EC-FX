@@ -224,6 +224,21 @@ tr.dirty .topcat-in{border-color:#e8a33a;background:#fffaef}
 .brand-checks label{display:flex;align-items:center;gap:5px;font-size:13px;color:#3c4759;cursor:pointer}
 .brand-checks input{width:14px;height:14px;accent-color:#2463eb;cursor:pointer}
 .brand-checks .none-tip{color:#98a2b3;font-size:12px}
+.entry-orders{margin-top:14px;border:1px solid #e3e8f0;border-radius:9px;background:#fbfcfe;overflow:hidden}
+.eo-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none;font-size:13px;color:#3c4759}
+.eo-head:hover{background:#f2f6fc}
+.eo-arrow{font-size:10px;color:#8a94a6;transition:transform .15s}
+.eo-arrow.open{transform:rotate(90deg)}
+.eo-count{padding:1px 7px;border-radius:9px;background:#eef4ff;color:#2463eb;font-size:11.5px;font-weight:700}
+.eo-tip{color:#98a2b3;font-size:11.5px}
+.eo-body{padding:0 12px 10px}
+.eo-tbl{width:100%;border-collapse:collapse;font-size:12.5px}
+.eo-tbl th{text-align:left;color:#8a94a6;font-weight:600;padding:6px 8px;border-bottom:1px solid #e8edf5;white-space:nowrap}
+.eo-tbl td{padding:6px 8px;border-bottom:1px solid #f0f3f8;color:#3c4759;white-space:nowrap}
+.eo-tbl tbody tr{cursor:pointer}
+.eo-tbl tbody tr:hover{background:#eef4ff}
+.eo-tbl .num{text-align:right}
+.eo-empty{padding:10px 2px;color:#98a2b3;font-size:12.5px}
 .scope-tag{margin-left:10px;padding:2px 8px;border-radius:10px;background:#eef4ff;color:#2463eb;font-size:11.5px;font-weight:600;display:none}
 .scope-tag.show{display:inline-block}
 /* 订单明细编辑 */
@@ -365,6 +380,26 @@ toast{display:none}
           <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="price" class="num">单价(含税)</th><th data-col="stock" class="num" title="最新库存快照数量；未同步显示 —">现货</th><th data-col="pack">箱规</th><th data-col="qty">下单数量</th><th data-col="amount" class="num">小计</th>
         </tr></thead><tbody id="entryBody"></tbody></table>
         <div class="empty" id="entryEmpty" style="display:none">没有可下单的商品：先在「商品」页签同步/启用商品，再回到这里下单。</div>
+      </div>
+
+      <!-- 该分销商的近期订单：点一下或双击就弹订单明细，不用跳到「分销订单」页 -->
+      <div class="entry-orders" id="entryOrdersBox">
+        <div class="eo-head" onclick="toggleEntryOrders()" title="点击展开 / 收起">
+          <span class="eo-arrow" id="eoArrow">▸</span>
+          <b>该分销商的近期订单</b>
+          <span class="eo-count" id="entryOrdersCount">0</span>
+          <span class="eo-tip">（点一下或双击任意一行看订单明细）</span>
+        </div>
+        <div class="eo-body" id="entryOrdersBody" style="display:none">
+          <table class="eo-tbl">
+            <thead><tr>
+              <th>订单号</th><th>下单时间</th><th class="num">金额</th><th class="num">明细</th>
+              <th>状态</th><th>推送旺店通</th>
+            </tr></thead>
+            <tbody id="entryOrdersRows"></tbody>
+          </table>
+          <div class="eo-empty" id="entryOrdersEmpty" style="display:none">这个分销商还没有订单</div>
+        </div>
       </div>
     </div>
 
@@ -560,7 +595,9 @@ const state = { distributors: [], products: [], orders: [], overview: null, tab:
   // 旺店通店铺列表（下单页选推送店铺）
   wdtShops: [],
   // 全部品牌（不受顶栏当前品牌过滤，用于分销商「分销品牌」勾选项）
-  allBrands: [] };
+  allBrands: [],
+  // 下单页：当前分销商的近期订单（点/双击弹明细用）
+  entryOrders: [] };
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -589,7 +626,7 @@ async function loadAll(){
     state.maintenance = prod.maintenance || null;
     await loadOrders();
     renderDistributors(); renderProducts(); renderOrders(); fillOrderSelects();
-    fillEntrySelects(); loadStockOverview(); loadWdtShops();
+    fillEntrySelects(); loadStockOverview(); loadWdtShops(); loadEntryOrders();
     loadInventoryBadge(); loadTopCatOptions();
     $("topVersion").textContent = await api("/healthz").then(r => r.version).catch(() => "--");
     // 顶部常驻提示：让用户随时知道「现在是在哪个品牌下操作」，含订单/价格/对账全站
@@ -609,7 +646,7 @@ function switchTab(name){
   });
   const names = { distributors: "分销商", products: "商品", entry: "分销下单", orders: "分销订单", prices: "经销商价格", statements: "对账单" };
   $("crumbTab").textContent = names[name];
-  if (name === "entry") renderEntry();
+  if (name === "entry") { renderEntry(); loadEntryOrders(); }
   if (name === "orders") loadOrders();
   if (name === "prices") loadPrices();
   if (name === "statements") loadStatements();
@@ -686,6 +723,53 @@ async function onEntryDistChange(){
   const distId = $("entryDist").value;
   if (distId) { try { await loadDistPrices(distId); } catch (e) { /* 服务端兜底 */ } }
   renderEntry();
+  loadEntryOrders();
+}
+
+/* ---------- 下单页：该分销商的近期订单（点/双击看明细） ---------- */
+async function loadEntryOrders(){
+  const box = $("entryOrdersBox");
+  if (!box) return;
+  const distId = $("entryDist").value;
+  let list = [];
+  if (distId) {
+    try {
+      const params = new URLSearchParams({ distributor_id: distId, limit: "10" });
+      if (state.brand) params.set("brand", state.brand);
+      const d = await api("/api/fx/orders?" + params.toString());
+      list = d.orders || [];
+    } catch (e) { list = []; }
+  }
+  state.entryOrders = list;
+  renderEntryOrders();
+}
+
+function renderEntryOrders(){
+  const rows = $("entryOrdersRows"), empty = $("entryOrdersEmpty"), cnt = $("entryOrdersCount");
+  if (!rows) return;
+  const list = state.entryOrders || [];
+  cnt.textContent = list.length;
+  empty.style.display = list.length ? "none" : "";
+  rows.innerHTML = list.map(o => {
+    const push = o.push_status === "sent"
+      ? `<span class="tag on">已推送${o.pushed_at ? " · " + esc(o.pushed_at) : ""}</span>`
+      : o.push_status === "failed"
+        ? `<span class="tag off" title="${esc(o.push_message || "")}">推送失败</span>`
+        : `<span style="color:#98a2b3">未推送</span>`;
+    return `<tr onclick="viewOrder(${o.id})" ondblclick="viewOrder(${o.id})" title="点击 / 双击查看订单明细">
+      <td><b>${esc(o.order_no)}</b></td><td>${esc(o.order_date)}</td>
+      <td class="num"><b>${money(o.total_amount)}</b></td><td class="num">${o.line_count} 行</td>
+      <td><span class="tag ${esc(o.status)}">${esc(o.status_label)}</span></td><td>${push}</td>
+    </tr>`;
+  }).join("");
+}
+
+function toggleEntryOrders(){
+  const body = $("entryOrdersBody"), arrow = $("eoArrow");
+  if (!body) return;
+  const open = body.style.display === "none";
+  body.style.display = open ? "" : "none";
+  arrow.classList.toggle("open", open);
 }
 
 /* 这个分销商这次能下哪些品牌的货：
@@ -784,6 +868,9 @@ async function submitEntryOrder(){
       toast(`订单 ${r.order.order_no} 已保存（已审核），但推送失败：${r.push_error || "未知原因"}。可到「分销订单」页重推`);
     }
     await loadOrders(); renderOrders();
+    await loadEntryOrders();
+    // 刚下的这张单当场弹出来给你核对（不用跑到「分销订单」页去找）
+    if (r.order && r.order.id) { try { await viewOrder(r.order.id); } catch (e) { /* 弹窗失败不影响下单结果 */ } }
   } catch (e) { toast("下单失败: " + e.message); }
   finally { btn.disabled = false; btn.textContent = "提交订单并推送旺店通"; }
 }
