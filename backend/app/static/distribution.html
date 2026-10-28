@@ -3,6 +3,18 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>分销管理 · 红盒子供销平台</title>
+<script>
+/* 直接打开本页（未被主壳 iframe 嵌入）时，同一个标签内跳回主壳对应标签，
+   避免又出现一份"平台"页面。主壳通过 ?embed=1 嵌入，iframe 内不会触发。 */
+(function(){
+  if (window.self !== window.top) return;
+  var q = new URLSearchParams(location.search);
+  var map = { distributors:'dist-archive', products:'prod-archive', entry:'order-entry',
+              orders:'order-all', ostatus:'order-status', prices:'dist-price', statements:'dist-statement' };
+  var key = map[q.get('tab') || ''] || 'dist-archive';
+  location.replace('/?open=' + encodeURIComponent(key));
+})();
+</script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0}
 :root{
@@ -120,6 +132,9 @@ table.cols td.col-last{background:#fff;box-shadow:inset 1px 0 0 var(--line)}
 table.cols th.col-last{background:#f7f9fc;box-shadow:inset 1px 0 0 var(--line),inset 0 -1px 0 var(--line)}
 table.cols tbody tr:hover td.col-last{background:#fafbfe}
 table.cols tbody tr.dirty td.col-last{background:#fff8e7}
+/* 隐藏列不能直接用 display:none：表头少一格后，后面的 th/td 会与 colgroup 错位，
+   表现为“品牌”列消失、操作列被挤成 0 宽。保留单元格但压成 0 宽，列映射才不会乱。 */
+table.cols th.col-off,table.cols td.col-off{display:table-cell!important;width:0!important;min-width:0!important;max-width:0!important;padding:0!important;border:0!important;overflow:hidden!important;visibility:hidden;white-space:nowrap}
 /* 列设置面板：显示/隐藏 + 上下移动 */
 .colset-row{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed #eef1f6}
 .colset-row:last-child{border-bottom:0}
@@ -132,6 +147,11 @@ table.cols tbody tr.dirty td.col-last{background:#fff8e7}
 .colset-row input{width:15px;height:15px;accent-color:#2463eb;cursor:pointer}
 .tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
 .mini-tag{padding:1px 6px;font-size:10px;background:#eef4ff;color:#2463eb;margin-left:4px;vertical-align:1px}
+/* 分销商列表的付款账户摘要：第一个账户 + 账户数，详情放 title 里 */
+.pay-cell{display:flex;align-items:center;gap:5px;min-width:0;max-width:220px}
+.pay-main{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;color:#344054}
+.pay-more{flex-shrink:0;font-size:10.5px;font-weight:700;color:#1d4ed8;background:#eef4ff;border-radius:999px;padding:1px 6px}
+.pay-sub{font-size:10.5px;color:#98a2b3;margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:220px}
 .tag.draft{background:#eef1f6;color:#5b6778}
 .tag.submitted{background:#fdf1dc;color:#b45309}
 .tag.approved{background:#e5f6ee;color:var(--green)}
@@ -163,6 +183,43 @@ tr.row-pending:hover td{background:#ffe6e6}
 .ff-line .nm{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .ff-line .qt{color:#7b8798;font-variant-numeric:tabular-nums}
 .ff-line .rt{font-weight:700;font-variant-numeric:tabular-nums}
+/* 订单详情弹窗：宽松排版、分区清晰，覆盖全局表格的 nowrap/ellipsis 紧凑样式 */
+#detailModal .modal{width:min(1060px,97vw)}
+#detailModal .mb{padding:22px 28px}
+#detailModal .sec{margin-top:24px}
+#detailModal .sec:first-child{margin-top:0}
+#detailModal .sec-t{display:flex;align-items:center;gap:8px;flex-wrap:wrap;font-size:13px;font-weight:700;color:#4a5568;margin:0 0 12px}
+#detailModal .sec-t::before{content:"";width:3px;height:14px;border-radius:2px;background:var(--blue)}
+#detailModal .sec-t .sub{font-weight:400;color:var(--muted);font-size:12px}
+#detailModal .dl{display:grid;grid-template-columns:1fr 1fr;gap:14px 32px}
+#detailModal .dl .row{display:flex;align-items:baseline;gap:10px;font-size:13.5px;min-width:0}
+#detailModal .dl .row.span{grid-column:1/-1}
+#detailModal .dl .k{color:var(--muted);flex:0 0 78px}
+#detailModal .dl .v{color:var(--text);font-weight:500;min-width:0;word-break:break-word;line-height:1.55}
+#detailModal table{font-size:13.5px}
+#detailModal th{position:static;background:#f4f7fc;padding:12px 14px;white-space:normal}
+#detailModal td{padding:12px 14px;white-space:normal;overflow:visible}
+#detailModal .num{text-align:right}
+#detailModal .ff-banner{margin:0 0 12px;padding:14px 18px;font-size:15px;gap:12px}
+#detailModal .ff-banner .big{font-size:18px}
+#detailModal .ff-list{border:1px solid var(--line);border-radius:12px;padding:2px 18px;background:#fff}
+#detailModal .ff-line{padding:13px 0;gap:10px 14px;flex-wrap:wrap;font-size:13.5px}
+#detailModal .ff-line .nm{flex:1 1 220px;white-space:normal}
+#detailModal .ff-line .qt{flex:1 1 240px;color:#6b7686}
+#detailModal .ff-line .rt{margin-left:auto}
+#detailModal .line-total{margin-top:20px;padding:18px 2px 0;border-top:2px solid var(--line);font-size:15px;align-items:baseline}
+#detailModal .line-total b{font-size:24px;color:var(--blue)}
+#detailModal .order-lines td{padding:13px 14px;vertical-align:middle}
+#detailModal .order-lines .stock{font-weight:700;font-variant-numeric:tabular-nums}
+#detailModal .order-lines .stock .sub{display:block;font-size:11px;font-weight:400;color:var(--muted);margin-top:2px;white-space:nowrap}
+#detailModal .order-lines .rate{font-weight:700;font-variant-numeric:tabular-nums}
+#detailModal .order-lines .rate.ok{color:var(--green)}
+#detailModal .order-lines .rate.arriving{color:#b26a00}
+#detailModal .order-lines .rate.short{color:var(--red)}
+#detailModal .order-lines .muted{color:#a3adbb}
+#detailModal .order-lines tr.ok td:first-child{box-shadow:inset 3px 0 0 var(--green)}
+#detailModal .order-lines tr.arriving td:first-child{box-shadow:inset 3px 0 0 var(--orange)}
+#detailModal .order-lines tr.short td:first-child{box-shadow:inset 3px 0 0 var(--red)}
 .lp-ref{color:#a8b2c2;border-bottom:1px dashed #cfd6e0;cursor:help}
 .empty{padding:40px 0;text-align:center;color:var(--muted);font-size:13px}
 .hint{padding:9px 12px;margin:0 0 10px;border-radius:8px;background:#f7f9fc;border:1px solid var(--line);color:#5b6778;font-size:12.5px;line-height:1.5;word-break:break-all;flex-shrink:0}
@@ -235,6 +292,95 @@ tr.pick-on td{background:#f2f7ff}
 .brand-checks input{width:17px;height:17px;accent-color:#2463eb;cursor:pointer;flex-shrink:0;margin:0}
 .brand-checks label:has(input:checked){border-color:#2463eb;background:#eef4ff;color:#1d4ed8}
 .brand-checks .none-tip{color:#98a2b3;font-size:13px}
+/* 分销商编辑弹窗 3.0：客户信息一行、付款账户一付款公司一行 */
+.modal.dist{width:min(1240px,96vw);max-height:92vh;display:flex;flex-direction:column;overflow:hidden;border-radius:14px}
+.modal.dist .mh{padding:12px 18px;background:#fff;border-bottom:1px solid var(--line);flex-shrink:0;display:flex;align-items:center;gap:14px}
+.modal.dist .mh h2{font-size:16.5px;font-weight:750;letter-spacing:-.2px;margin:0}
+.modal.dist .mh .mh-left{min-width:0}
+.modal.dist .mh .mh-side{margin-left:auto;display:flex;align-items:center;gap:8px;flex-shrink:0}
+.dist-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:5px}
+.dist-tag{font-size:11px;font-weight:600;color:#5b6778;background:#f2f5fa;border:1px solid #e4e9f2;border-radius:6px;padding:1px 7px;font-variant-numeric:tabular-nums}
+.dist-tag b{color:#344054;font-weight:750}
+.modal.dist .mb{padding:14px 18px 16px;overflow:auto;background:#f5f7fb;flex:1;min-height:0}
+.modal.dist .mf{padding:10px 18px;background:#fff;border-top:1px solid var(--line);align-items:center;flex-shrink:0;justify-content:flex-end}
+.modal.dist .mf .mf-actions{display:flex;gap:8px}
+.dist-sec{background:#fff;border:1px solid #e4e9f2;border-radius:12px;margin-bottom:12px;overflow:hidden}
+.dist-sec:last-of-type{margin-bottom:0}
+.dist-sec-head{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid #eef1f6;background:#fbfcfe}
+.dist-sec-head .sec-t{display:flex;align-items:center;gap:7px;font-size:12.5px;font-weight:750;color:#344054;margin:0}
+.dist-sec-head .sec-t::before{content:"";width:3px;height:13px;border-radius:2px;background:var(--blue)}
+.dist-sec-head .sec-side{margin-left:auto;display:flex;align-items:center;gap:8px}
+.dist-sec-body{padding:12px 14px 13px}
+.payacc-count{font-size:11px;color:#4b5b76;font-weight:700;background:#eef4ff;border-radius:999px;padding:1px 8px}
+.dist-grid{display:grid;grid-template-columns:116px minmax(190px,1.6fr) 146px 96px 126px 166px;gap:10px}
+.dist-field{min-width:0}
+.dist-field.full{grid-column:1/-1}
+.dist-field>label{display:block;font-size:11.5px;color:#667085;font-weight:600;margin:0 0 4px}
+.dist-field>label .req{color:var(--red);margin-left:2px}
+.dist-field input{width:100%;height:33px;border:1px solid #dce2ec;border-radius:7px;padding:0 9px;font-size:13px;font-family:inherit;background:#fff;transition:border-color .12s,box-shadow .12s}
+.dist-field input:focus{outline:0;border-color:var(--blue);box-shadow:0 0 0 3px rgba(36,99,235,.12)}
+.dist-field input::placeholder{color:#b9c3d1}
+/* 付款账户：一家付款公司占一行 */
+.pay-wrap{overflow-x:auto}
+.pay-tbl{width:100%;min-width:1124px;table-layout:fixed;border-collapse:separate;border-spacing:0}
+.pay-tbl th{font-size:11px;font-weight:700;color:#8a94a6;text-align:left;padding:0 5px 6px;white-space:nowrap}
+.pay-tbl th .req{color:var(--red)}
+.pay-tbl td{padding:3px 5px;border-top:1px solid #f0f3f8;vertical-align:middle}
+.pay-tbl tbody tr:hover td{background:#f8fbff}
+.pay-tbl tbody tr:focus-within td{background:#f4f9ff}
+.pay-tbl .c-name{width:178px}
+.pay-tbl .c-tax{width:118px}
+.pay-tbl .c-type{width:70px}
+.pay-tbl .c-bank{width:122px}
+.pay-tbl .c-sub{width:100px}
+.pay-tbl .c-acc{width:126px}
+.pay-tbl .c-holder{width:104px}
+.pay-tbl .c-cnote{width:132px}
+.pay-tbl .c-note{width:112px}
+.pay-tbl .c-def{width:42px}
+.pay-tbl .c-op{width:32px}
+.pcell{width:100%;height:29px;border:1px solid transparent;background:transparent;border-radius:6px;padding:0 7px;font-size:12.5px;font-family:inherit;color:#3c4759;transition:border-color .12s,box-shadow .12s,background .12s}
+.pcell::placeholder{color:#c3ccd9}
+.pcell:hover{border-color:#e2e8f2;background:#fff}
+.pcell:focus{outline:0;border-color:var(--blue);background:#fff;box-shadow:0 0 0 3px rgba(36,99,235,.10)}
+select.pcell{cursor:pointer;padding:0 4px}
+.pcell.num{font-variant-numeric:tabular-nums}
+.pay-star{border:0;background:transparent;color:#d3dbe6;font-size:15px;line-height:1;cursor:pointer;padding:3px 5px;border-radius:6px}
+.pay-star:hover{color:#f5a623;background:#fff5e6}
+.pay-star.on{color:#f5a623}
+.pay-del{border:0;background:transparent;color:#b6c0cf;font-size:13px;cursor:pointer;padding:4px 6px;border-radius:6px}
+.pay-del:hover{color:var(--red);background:#fdeaea}
+.pay-empty{border:1px dashed #cfd8e6;border-radius:9px;background:#fafcff;padding:14px;text-align:center;color:#8a94a6;font-size:12.5px}
+.brand-toolbar{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-bottom:9px}
+.brand-toolbar .brand-search{flex:1;min-width:180px;max-width:320px;min-height:33px;border:1px solid #d8dee9;border-radius:8px;padding:5px 10px;font-size:12.5px;font-family:inherit;background:#fff}
+.brand-toolbar .btn{white-space:nowrap}
+.brand-toolbar .brand-picked{margin-left:auto;font-size:11.5px;color:#667085;font-weight:600}
+.brand-picker{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:7px;max-height:220px;overflow:auto;padding:2px}
+.brand-chip{display:flex;align-items:center;gap:8px;min-width:0;padding:8px 10px;background:#fff;border:1px solid #e0e6ef;border-radius:8px;font-size:12.5px;font-weight:600;color:#475467;cursor:pointer;transition:border-color .12s,background .12s,color .12s}
+.brand-chip:hover{border-color:#9db4e8;background:#f8fbff}
+.brand-chip input{width:15px;height:15px;accent-color:var(--blue);flex-shrink:0;margin:0;cursor:pointer}
+.brand-chip .bn{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.brand-chip .off{font-size:10px;color:#b54708;background:#fff4e5;border-radius:5px;padding:1px 4px;flex-shrink:0}
+.brand-chip:has(input:checked){border-color:#9bb8f5;background:#eef4ff;color:#1d4ed8}
+.brand-chip.is-off{opacity:.65;background:#f8fafc}
+.brand-empty{padding:16px;text-align:center;color:#98a2b3;font-size:12.5px;border:1px dashed #d8e0eb;border-radius:9px;background:#fafcff}
+.brand-link{border:0;background:#eef4ff;color:#1d4ed8;border-radius:7px;padding:5px 9px;font-size:11.5px;font-weight:700;cursor:pointer;font-family:inherit}
+.brand-link:hover{background:#dfeaff}
+@media(max-width:1280px){
+  .dist-grid{grid-template-columns:116px minmax(170px,1.4fr) 140px 96px 126px}
+}
+@media(max-width:1080px){
+  .dist-grid{grid-template-columns:116px minmax(160px,1.4fr) 140px 96px}
+}
+@media(max-width:820px){
+  .modal.dist .mb{padding:12px}
+  .dist-grid{grid-template-columns:1fr 1fr}
+  .modal.dist .mf{padding:10px 12px}
+}
+@media(max-width:560px){
+  .dist-grid{grid-template-columns:1fr}
+  .brand-toolbar .brand-picked{margin-left:0}
+}
 .entry-orders{margin-top:14px;border:1px solid #e3e8f0;border-radius:9px;background:#fbfcfe;overflow:hidden}
 .eo-head{display:flex;align-items:center;gap:8px;padding:9px 12px;cursor:pointer;user-select:none;font-size:13px;color:#3c4759}
 .eo-head:hover{background:#f2f6fc}
@@ -441,11 +587,12 @@ toast{display:none}
         <select id="orderDist" style="width:180px" onchange="renderOrders()"></select>
         <span id="invBadge" class="inv-badge" title="库存快照：满足率提示的「昨天库存」基线">库存快照：未同步</span>
         <button class="btn" onclick="syncInventory()">⟳ 同步库存</button>
+        <button class="btn" onclick="detectPushStatus()" title="按旺店通单号 / 销售出库单自动核对：已经在旺店通里的单标为已推送，不再出现在待推送里">⟳ 核对旺店通状态</button>
         <button class="btn primary" onclick="openOrderModal()">＋ 新建订单</button>
       </div>
       <div class="tbl">
         <table class="cols" data-ckey="order">
-          <colgroup><col style="width:170px"><col style="width:240px"><col style="width:90px"><col style="width:110px"><col style="width:70px"><col style="width:150px"><col style="width:190px"></colgroup>
+          <colgroup><col style="width:170px"><col style="width:240px"><col style="width:150px"><col style="width:110px"><col style="width:70px"><col style="width:150px"><col style="width:190px"></colgroup>
           <thead><tr>
           <th data-col="tid">订单号</th><th data-col="dist">分销商</th><th data-col="status">状态</th><th data-col="amount" class="num">金额</th><th data-col="lines" class="num">明细</th><th data-col="date">下单时间</th><th data-col="ops">操作</th>
         </tr></thead><tbody id="orderBody"></tbody></table>
@@ -517,28 +664,66 @@ toast{display:none}
   </div>
 </div>
 
-<!-- 分销商弹窗 -->
-<div class="backdrop" id="distModal"><div class="modal sm">
-  <div class="mh"><h2 id="distModalTitle">新建分销商</h2><button class="btn" onclick="closeModal('distModal')">✕</button></div>
-  <div class="mb">
-    <div class="form-grid">
-      <div><label>编码</label><input id="dCode" placeholder="留空自动生成 D001"></div>
-      <div><label>税号</label><input id="dTaxNo" placeholder="纳税人识别号，开票用"></div>
-      <div><label>名称 *</label><input id="dName"></div>
-      <div><label>联系人</label><input id="dContact"></div>
-      <div><label>电话</label><input id="dPhone"></div>
-      <div><label>邮箱</label><input id="dEmail"></div>
+<!-- 分销商弹窗 3.0 -->
+<div class="backdrop" id="distModal"><div class="modal dist">
+  <div class="mh">
+    <div class="mh-left">
+      <h2 id="distModalTitle">新建分销商</h2>
+      <div class="dist-meta" id="distMeta"></div>
     </div>
-    <label>付款账户（可多个，逗号/顿号隔开：这个客户付款的公司名或个人名，对账时按任一账户都能对到它）</label>
-    <input id="dPayAccounts" placeholder="如：上海优华贸易有限公司,钟军">
-    <label>分销品牌（可多选，勾了才能下这些品牌的货）</label>
-    <div id="dBrands" class="brand-checks"></div>
-    <label>备注</label><textarea id="dNote"></textarea>
+    <div class="mh-side">
+      <button class="btn" type="button" onclick="closeModal('distModal')">✕</button>
+    </div>
+  </div>
+  <div class="mb">
+    <div class="dist-sec">
+      <div class="dist-sec-head"><div class="sec-t">基本信息</div></div>
+      <div class="dist-sec-body">
+        <div class="dist-grid">
+          <div class="dist-field"><label>客户编码</label><input id="dCode" placeholder="留空自动生成" oninput="updateDistMeta()"></div>
+          <div class="dist-field"><label>客户名称 <span class="req">*</span></label><input id="dName" placeholder="公司全称 / 经销商名称"></div>
+          <div class="dist-field"><label>主税号</label><input id="dTaxNo" placeholder="开票用纳税人识别号" title="客户主档税号，默认开票用；各付款账户可另填自己的税号"></div>
+          <div class="dist-field"><label>联系人</label><input id="dContact" placeholder="选填"></div>
+          <div class="dist-field"><label>电话</label><input id="dPhone" placeholder="选填"></div>
+          <div class="dist-field"><label>邮箱</label><input id="dEmail" type="email" placeholder="选填"></div>
+          <div class="dist-field full"><label>备注</label><input id="dNote" placeholder="选填，例如开票要求、合作说明"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="dist-sec">
+      <div class="dist-sec-head">
+        <div class="sec-t">付款账户</div>
+        <div class="sec-side"><button class="btn mini primary" type="button" onclick="addPayAcc()">＋ 添加付款账户</button></div>
+      </div>
+      <div class="dist-sec-body">
+        <div id="dPayAccBox"></div>
+      </div>
+    </div>
+
+    <div class="dist-sec">
+      <div class="dist-sec-head">
+        <div class="sec-t">分销品牌</div>
+        <div class="sec-side"><button class="brand-link" type="button" onclick="openBrandManagement()">⚙ 管理品牌</button></div>
+      </div>
+      <div class="dist-sec-body">
+        <div class="brand-toolbar">
+          <input class="brand-search" id="dBrandSearch" placeholder="搜索品牌…" oninput="renderDistBrands()">
+          <button class="btn mini" type="button" onclick="selectAllBrands(true)">全选</button>
+          <button class="btn mini" type="button" onclick="selectAllBrands(false)">清空</button>
+          <span class="brand-picked" id="dBrandPicked"></span>
+        </div>
+        <div id="dBrands" class="brand-picker"></div>
+      </div>
+    </div>
+
     <div class="err" id="distErr"></div>
   </div>
   <div class="mf">
-    <button class="btn" onclick="closeModal('distModal')">取消</button>
-    <button class="btn primary" onclick="saveDist()">保存</button>
+    <div class="mf-actions">
+      <button class="btn" type="button" onclick="closeModal('distModal')">取消</button>
+      <button class="btn primary" type="button" onclick="saveDist()">保存分销商</button>
+    </div>
   </div>
 </div></div>
 
@@ -667,10 +852,15 @@ const state = { distributors: [], products: [], orders: [], overview: null, tab:
   wdtShops: [],
   // 全部品牌（不受顶栏当前品牌过滤，用于分销商「分销品牌」勾选项）
   allBrands: [],
+  // 分销商弹窗里当前勾选的品牌 + 正在编辑的付款账户明细
+  distBrandSelected: new Set(),
+  payAcc: [],
   // 下单页：当前分销商的近期订单（点/双击弹明细用）
   entryOrders: [],
   // 订单状态处理页：全量订单（本地按状态切）+ 当前状态筛选 + 已勾选 id
-  ostatus: [], ostFilter: "submitted", ostSel: new Set() };
+  ostatus: [], ostFilter: "submitted", ostSel: new Set(),
+  // 本会话是否已经自动核对过旺店通状态（每个会话只自动跑一次）
+  pushAutoChecked: false };
 
 const $ = id => document.getElementById(id);
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
@@ -829,10 +1019,12 @@ function renderEntryOrders(){
   empty.style.display = list.length ? "none" : "";
   rows.innerHTML = list.map(o => {
     const push = o.push_status === "sent"
-      ? `<span class="tag on">已推送${o.pushed_at ? " · " + esc(o.pushed_at) : ""}</span>`
+      ? `<span class="tag on" title="${esc(o.push_message || "")}">已推送${o.pushed_at ? " · " + esc(o.pushed_at) : ""}</span>`
       : o.push_status === "failed"
         ? `<span class="tag off" title="${esc(o.push_message || "")}">推送失败</span>`
-        : `<span style="color:#98a2b3">未推送</span>`;
+        : o.push_status === "history"
+          ? `<span class="tag" style="background:#f0f3f7;color:#637087" title="${esc(o.push_message || "")}">历史单</span>`
+          : `<span style="color:#98a2b3">未推送</span>`;
     return `<tr onclick="viewOrder(${o.id})" ondblclick="viewOrder(${o.id})" title="点击 / 双击查看订单明细">
       <td><b>${esc(o.order_no)}</b></td><td>${esc(o.order_date)}</td>
       <td class="num"><b>${money(o.total_amount)}</b></td><td class="num">${o.line_count} 行</td>
@@ -953,20 +1145,45 @@ async function submitEntryOrder(){
 }
 
 /* ---------- 分销商 ---------- */
+function paymentAccountsOf(d){
+  const details = Array.isArray(d && d.payment_accounts)
+    ? d.payment_accounts.filter(a => a && (a.account_name || a.tax_no || a.bank_name || a.bank_account))
+    : [];
+  if (details.length) return details;
+  return ((d && d.pay_accounts) || []).map(name => ({
+    account_name: name, tax_no: "", bank_name: "", bank_branch: "", bank_account: "",
+    account_holder: "", account_type: "company", collection_note: "", is_default: false, note: "",
+  }));
+}
+function payAccName(acc){ return (acc && acc.account_name) || ""; }
+function maskBankAccount(value){
+  const s = String(value || "").replace(/\s+/g, "");
+  return s.length <= 8 ? s : s.slice(0, 4) + "…" + s.slice(-4);
+}
+function paySearchText(d){
+  return paymentAccountsOf(d).map(a => [a.account_name, a.tax_no, a.bank_name, a.bank_branch, a.bank_account, a.account_holder, a.collection_note].join(" ")).join(" ");
+}
+
 function renderDistributors(){
   const kw = ($("distSearch").value || "").toLowerCase();
   const body = $("distBody"), empty = $("distEmpty");
   const rows = state.distributors.filter(d => !kw
-    || (d.code + (d.tax_no || "") + d.name + d.contact + d.phone + (d.brands || []).join(" ") + (d.pay_accounts || []).join(" ")).toLowerCase().includes(kw));
+    || (d.code + (d.tax_no || "") + d.name + d.contact + d.phone + (d.brands || []).join(" ") + paySearchText(d)).toLowerCase().includes(kw));
   empty.style.display = rows.length ? "none" : "";
   body.innerHTML = rows.map(d => {
     const picked = state.distPick.has(d.id);
-    return `<tr class="${picked ? "pick-on" : ""}">
+    const accounts = paymentAccountsOf(d);
+    const tax = d.tax_no || (accounts.find(a => a.tax_no) || {}).tax_no || "";
+    const first = accounts[0];
+    const payTitle = accounts.map(a => [a.account_name, a.tax_no ? "税号 " + a.tax_no : "", a.bank_name, a.bank_account, a.collection_note].filter(Boolean).join(" · ")).join("\n");
+    const payCell = first
+      ? `<div class="pay-cell" title="${esc(payTitle)}"><span class="pay-main">${esc(first.account_name)}</span>${accounts.length > 1 ? `<span class="pay-more">+${accounts.length - 1}</span>` : ""}</div>
+         ${first.bank_account ? `<div class="pay-sub">${esc(first.bank_name || "银行")} ${esc(maskBankAccount(first.bank_account))}</div>` : ""}`
+      : `<span style="color:#c3cad6">-</span>`;
+    return `<tr class="${picked ? "pick-on" : ""}" data-id="${d.id}">
     <td class="cell-pick"><input type="checkbox" ${picked ? "checked" : ""} onchange="distPick(${d.id}, this.checked)"></td>
-    <td><b>${esc(d.code)}</b></td><td title="${esc(d.tax_no || "")}">${esc(d.tax_no) || "-"}</td><td>${esc(d.name)}</td>
-    <td title="${esc((d.pay_accounts || []).join("、"))}">${(d.pay_accounts || []).length
-      ? d.pay_accounts.map(a => `<span class="tag mini-tag" style="background:#eef4ff;color:#1d4ed8">${esc(a)}</span>`).join(" ")
-      : "<span style=\"color:#c3cad6\">-</span>"}</td>
+    <td><b>${esc(d.code)}</b></td><td title="${esc(tax)}">${esc(tax) || "-"}</td><td>${esc(d.name)}</td>
+    <td>${payCell}</td>
     <td>${(d.brands || []).length ? (d.brands).map(b => `<span class="tag mini-tag">${esc(b)}</span>`).join(" ") : "<span style=\"color:#c3cad6\">未授权</span>"}</td><td>${esc(d.contact) || "-"}</td>
     <td>${esc(d.phone) || "-"}</td>
     <td><span class="tag ${d.active ? "on" : "off"}">${d.active ? "启用" : "停用"}</span></td>
@@ -1005,7 +1222,7 @@ function distPick(id, on){
 function distPickAll(on){
   const kw = ($("distSearch").value || "").toLowerCase();
   state.distributors.filter(d => !kw
-    || (d.code + d.name + (d.pay_accounts || []).join(" ")).toLowerCase().includes(kw))
+    || (d.code + d.name + paySearchText(d)).toLowerCase().includes(kw))
     .forEach(d => { if (on) state.distPick.add(d.id); else state.distPick.delete(d.id); });
   renderDistributors();
 }
@@ -1020,10 +1237,14 @@ function openDistMergeModal(){
   if (ids.length < 2) { toast("先勾选两行以上"); return; }
   const rows = ids.map(id => state.distributors.find(d => d.id === id)).filter(Boolean);
   const box = $("distMergeList");
-  box.innerHTML = rows.map((d, i) => `<label class="merge-opt">
+  box.innerHTML = rows.map((d, i) => {
+    const names = paymentAccountsOf(d).map(a => a.account_name).filter(Boolean);
+    const more = names.length > 3 ? names.slice(0, 3).join("、") + ` 等 ${names.length} 个` : names.join("、");
+    return `<label class="merge-opt">
     <input type="radio" name="mergeTarget" value="${d.id}" ${i === 0 ? "checked" : ""}>
-    <span><b>${esc(d.name)}</b>（${esc(d.code)}）${(d.pay_accounts || []).length ? " · 付款账户：" + esc(d.pay_accounts.join("、")) : ""}</span>
-  </label>`).join("");
+    <span><b>${esc(d.name)}</b>（${esc(d.code)}）${more ? " · 付款账户：" + esc(more) : ""}</span>
+  </label>`;
+  }).join("");
   $("distMergeErr").textContent = "";
   openModal("distMergeModal");
 }
@@ -1042,38 +1263,211 @@ async function doDistMerge(){
   } catch (e) { $("distMergeErr").textContent = e.message; }
 }
 
+/* ---------- 品牌授权：搜索 + 多选；品牌清单由「品牌管理」统一维护 ---------- */
+function shortBrandName(name){
+  const s = String(name || "");
+  return s.includes("/") ? s.split("/", 1)[0] : s;
+}
+
+function renderDistBrands(){
+  const box = $("dBrands"); if (!box) return;
+  const q = ($("dBrandSearch")?.value || "").trim().toLowerCase();
+  const selected = state.distBrandSelected || new Set();
+  const active = state.allBrands || [];
+  // 已授权但后来被停用的品牌仍显示出来，方便人工决定是否保留；不静默吞掉。
+  const extras = [...selected].filter(b => !active.includes(b));
+  const list = [...active, ...extras].filter(b => !q || b.toLowerCase().includes(q) || shortBrandName(b).toLowerCase().includes(q));
+  box.innerHTML = list.length ? list.map(b => {
+    const checked = selected.has(b);
+    const off = !active.includes(b);
+    return `<label class="brand-chip${checked ? " is-on" : ""}${off ? " is-off" : ""}" title="${esc(b)}${off ? "（品牌管理里已停用）" : ""}">
+      <input type="checkbox" value="${esc(b)}"${checked ? " checked" : ""} onchange="toggleDistBrand(this.value, this.checked)">
+      <span class="bn">${esc(shortBrandName(b))}</span>${off ? '<span class="off">已停用</span>' : ""}
+    </label>`;
+  }).join("") : `<div class="brand-empty">还没有品牌，请先到 <button type="button" class="brand-link" onclick="openBrandManagement()">品牌管理</button> 新增。</div>`;
+  const picked = $("dBrandPicked");
+  if (picked) picked.textContent = selected.size ? `已选 ${selected.size} 个品牌` : "尚未选择品牌";
+  updateDistMeta();
+}
+
+function toggleDistBrand(name, on){
+  if (!state.distBrandSelected) state.distBrandSelected = new Set();
+  if (on) state.distBrandSelected.add(name); else state.distBrandSelected.delete(name);
+  renderDistBrands();
+}
+
+function selectAllBrands(on){
+  if (!state.distBrandSelected) state.distBrandSelected = new Set();
+  if (on) (state.allBrands || []).forEach(b => state.distBrandSelected.add(b));
+  else state.distBrandSelected.clear();
+  renderDistBrands();
+}
+
 function fillDistBrandChecks(selected){
-  const box = $("dBrands"), list = state.allBrands || [];
-  if (!box) return;
-  box.innerHTML = list.length
-    ? list.map(b => `<label><input type="checkbox" value="${esc(b)}"${selected.includes(b) ? " checked" : ""}>${esc(b)}</label>`).join("")
-    : `<span class="none-tip">还没有品牌：先在「商品」页同步商品，品牌会自动带出来</span>`;
+  state.distBrandSelected = new Set(selected || []);
+  const search = $("dBrandSearch");
+  if (search) search.value = "";
+  renderDistBrands();
 }
 
 function collectDistBrands(){
-  const box = $("dBrands");
-  return box ? [...box.querySelectorAll("input:checked")].map(i => i.value) : [];
+  return [...(state.distBrandSelected || new Set())];
+}
+
+function openBrandManagement(){
+  const url = "/brand-management?embed=1";
+  if (typeof window.fxNav === "function") window.fxNav(url);
+  else location.href = url;
+}
+
+/* ---------- 付款账户明细：一个客户多个账户，每条独立税号/银行/收款信息 ---------- */
+function emptyPayAcc(isDefault = false){
+  return {
+    account_name: "", tax_no: "", bank_name: "", bank_branch: "", bank_account: "",
+    account_holder: "", account_type: "company", collection_note: "", is_default: !!isDefault, note: "",
+  };
+}
+
+function normalizePayAcc(a){
+  const base = emptyPayAcc(false);
+  return Object.assign(base, a || {}, { account_type: a?.account_type === "personal" ? "personal" : "company" });
+}
+
+function renderPayAcc(){
+  const box = $("dPayAccBox"); if (!box) return;
+  const arr = state.payAcc || [];
+  if (!arr.length) {
+    box.innerHTML = `<div class="pay-empty">还没有付款账户 · 点右上角「＋ 添加付款账户」录入一家付款公司</div>`;
+  } else {
+    box.innerHTML = `<div class="pay-wrap"><table class="pay-tbl">
+      <thead><tr>
+        <th class="c-name">付款方名称 <span class="req">*</span></th>
+        <th class="c-tax">税号</th>
+        <th class="c-type">类型</th>
+        <th class="c-bank">开户行</th>
+        <th class="c-sub">支行</th>
+        <th class="c-acc">账号</th>
+        <th class="c-holder">户名</th>
+        <th class="c-cnote">收款备注</th>
+        <th class="c-note">备注</th>
+        <th class="c-def">默认</th>
+        <th class="c-op"></th>
+      </tr></thead>
+      <tbody>${arr.map((a, i) => `<tr data-pay-index="${i}">
+        <td><input class="pcell" data-pay-field="account_name" value="${esc(a.account_name)}" placeholder="公司全称或个人姓名" oninput="updatePayAcc(${i}, 'account_name', this.value)"></td>
+        <td><input class="pcell num" data-pay-field="tax_no" value="${esc(a.tax_no)}" placeholder="付款方税号" oninput="updatePayAcc(${i}, 'tax_no', this.value)"></td>
+        <td><select class="pcell" data-pay-field="account_type" onchange="updatePayAcc(${i}, 'account_type', this.value)">
+          <option value="company"${a.account_type !== "personal" ? " selected" : ""}>对公</option>
+          <option value="personal"${a.account_type === "personal" ? " selected" : ""}>对私</option>
+        </select></td>
+        <td><input class="pcell" data-pay-field="bank_name" value="${esc(a.bank_name)}" placeholder="如 工商银行" oninput="updatePayAcc(${i}, 'bank_name', this.value)"></td>
+        <td><input class="pcell" data-pay-field="bank_branch" value="${esc(a.bank_branch)}" placeholder="选填" oninput="updatePayAcc(${i}, 'bank_branch', this.value)"></td>
+        <td><input class="pcell num" data-pay-field="bank_account" value="${esc(a.bank_account)}" placeholder="选填" oninput="updatePayAcc(${i}, 'bank_account', this.value)"></td>
+        <td><input class="pcell" data-pay-field="account_holder" value="${esc(a.account_holder)}" placeholder="银行户名" oninput="updatePayAcc(${i}, 'account_holder', this.value)"></td>
+        <td><input class="pcell" data-pay-field="collection_note" value="${esc(a.collection_note)}" placeholder="货款 / 预付款 / 代付" oninput="updatePayAcc(${i}, 'collection_note', this.value)"></td>
+        <td><input class="pcell" data-pay-field="note" value="${esc(a.note)}" placeholder="选填" oninput="updatePayAcc(${i}, 'note', this.value)"></td>
+        <td class="c-def"><button class="pay-star${a.is_default ? " on" : ""}" type="button" title="设为默认付款账户" onclick="setDefaultPayAcc(${i})">★</button></td>
+        <td class="c-op"><button class="pay-del" type="button" title="删除该付款账户" onclick="removePayAcc(${i})">✕</button></td>
+      </tr>`).join("")}</tbody>
+    </table></div>`;
+  }
+  updateDistMeta();
+}
+
+/* 弹窗头部的摘要条：编码 / 付款账户数 / 品牌数，随输入实时更新 */
+function updateDistMeta(){
+  const box = $("distMeta"); if (!box) return;
+  const code = ($("dCode")?.value || "").trim();
+  const acc = (state.payAcc || []).length;
+  const brands = (state.distBrandSelected || new Set()).size;
+  box.innerHTML = [
+    `<span class="dist-tag">编码 <b>${code ? esc(code) : "自动生成"}</b></span>`,
+    `<span class="dist-tag">付款账户 <b>${acc}</b> 个</span>`,
+    `<span class="dist-tag">分销品牌 <b>${brands}</b> 个</span>`,
+  ].join("");
+}
+
+function updatePayAcc(index, field, value){
+  if (!state.payAcc?.[index]) return;
+  state.payAcc[index][field] = value;
+}
+
+function setDefaultPayAcc(index){
+  (state.payAcc || []).forEach((a, i) => { a.is_default = i === index; });
+  renderPayAcc();
+}
+
+function addPayAcc(){
+  if (!state.payAcc) state.payAcc = [];
+  state.payAcc.push(emptyPayAcc(!state.payAcc.length));
+  renderPayAcc();
+  const last = state.payAcc.length - 1;
+  setTimeout(() => {
+    const input = document.querySelector(`.pay-tbl tr[data-pay-index="${last}"] input[data-pay-field="account_name"]`);
+    if (input) input.focus();
+  }, 30);
+}
+
+function removePayAcc(index){
+  if (!state.payAcc) return;
+  state.payAcc.splice(index, 1);
+  if (state.payAcc.length && !state.payAcc.some(a => a.is_default)) state.payAcc[0].is_default = true;
+  renderPayAcc();
+}
+
+function collectPayAccDetails(){
+  const fields = ["account_name", "tax_no", "bank_name", "bank_branch", "bank_account", "account_holder", "collection_note", "note"];
+  const out = (state.payAcc || []).map(a => {
+    const copy = normalizePayAcc(a);
+    fields.forEach(k => { copy[k] = String(copy[k] || "").trim(); });
+    return copy;
+  }).filter(a => fields.some(k => a[k]));
+  if (out.length && !out.some(a => a.is_default)) out[0].is_default = true;
+  return out;
+}
+
+function collectPayAcc(){
+  return collectPayAccDetails().map(a => a.account_name).filter(Boolean);
 }
 
 function openDistModal(id){
   state.distEditId = id || null;
   const d = id ? state.distributors.find(x => x.id === id) : null;
   $("distModalTitle").textContent = d ? "编辑分销商 · " + d.name : "新建分销商";
-  ["dCode","dTaxNo","dName","dContact","dPhone","dEmail","dNote","dPayAccounts"].forEach(k => $(k).value = "");
+  ["dCode","dTaxNo","dName","dContact","dPhone","dEmail","dNote"].forEach(k => $(k).value = "");
+  const accounts = d ? paymentAccountsOf(d) : [];
+  state.payAcc = accounts.length ? accounts.map(normalizePayAcc) : [emptyPayAcc(true)];
+  if (!state.payAcc.some(a => a.is_default)) state.payAcc[0].is_default = true;
+  renderPayAcc();
   fillDistBrandChecks(d ? (d.brands || []) : []);
-  if (d) { $("dCode").value = d.code; $("dTaxNo").value = d.tax_no || ""; $("dName").value = d.name; $("dContact").value = d.contact;
+  if (d) {
+    $("dCode").value = d.code; $("dTaxNo").value = d.tax_no || ""; $("dName").value = d.name; $("dContact").value = d.contact;
     $("dPhone").value = d.phone; $("dEmail").value = d.email; $("dNote").value = d.note;
-    $("dPayAccounts").value = (d.pay_accounts || []).join(","); }
+  }
+  updateDistMeta();
   showError("distErr", ""); openModal("distModal");
   setTimeout(() => $("dName").focus(), 50);
 }
 
 async function saveDist(){
-  const body = { code: $("dCode").value.trim(), tax_no: $("dTaxNo").value.trim(), name: $("dName").value.trim(),
+  const name = $("dName").value.trim();
+  if (!name) { showError("distErr", "客户名称必填"); $("dName").focus(); return; }
+  const details = collectPayAccDetails();
+  const incomplete = details.findIndex(a => !a.account_name && (a.tax_no || a.bank_name || a.bank_branch || a.bank_account || a.account_holder || a.collection_note || a.note));
+  if (incomplete >= 0) {
+    showError("distErr", `第 ${incomplete + 1} 个付款账户还没有填「付款方名称」`);
+    return;
+  }
+  const cleanDetails = details.filter(a => a.account_name);
+  const body = {
+    code: $("dCode").value.trim(), tax_no: $("dTaxNo").value.trim(), name,
     contact: $("dContact").value.trim(), phone: $("dPhone").value.trim(),
     email: $("dEmail").value.trim(), brands: collectDistBrands(),
-    pay_accounts: ($("dPayAccounts").value || "").split(/[,，、]/).map(s => s.trim()).filter(Boolean),
-    note: $("dNote").value.trim() };
+    // 新字段给详细账户；pay_accounts 同步账户名，兼容旧接口/旧页面
+    payment_accounts: cleanDetails,
+    pay_accounts: cleanDetails.map(a => a.account_name),
+    note: $("dNote").value.trim(),
+  };
   try {
     if (state.distEditId) await api("/api/fx/distributors/" + state.distEditId, { method: "PUT", body: JSON.stringify(body) });
     else await api("/api/fx/distributors", { method: "POST", body: JSON.stringify(body) });
@@ -1767,6 +2161,21 @@ async function toggleProd(id){
 }
 
 /* ---------- 订单 ---------- */
+/* 旺店通推送状态：历史团单（原表「出库-旺店通销售」已经记了出库单号）本来就在
+   旺店通里，绝不能再给一个「推送旺店通」按钮 —— 点下去会在旺店通造重复单。
+   所以能不能推由 canPushWdt 统一判断，展示由 pushTag 统一渲染。 */
+const canPushWdt = o => o.status === "approved" && o.push_status !== "sent" && o.push_status !== "history";
+function pushTag(o, compact){
+  const msg = o.push_message || "";
+  if (o.push_status === "sent")
+    return `<span class="tag on" title="${esc(msg || "已推送旺店通")}">${compact ? "已推WDT" : "已推送"}</span>`;
+  if (o.push_status === "failed")
+    return `<span class="tag cancelled" title="推送失败：${esc(msg || "未知")}">推失败</span>`;
+  if (o.push_status === "history")
+    return `<span class="tag" style="background:#f0f3f7;color:#637087" title="${esc(msg || "历史团单，原表未记录旺店通单号")}">历史单</span>`;
+  return `<span style="color:#98a2b3">未推送</span>`;
+}
+
 async function loadOrders(){
   try {
     const params = new URLSearchParams();
@@ -1776,6 +2185,16 @@ async function loadOrders(){
     state.orders = data.orders;
   } catch (e) { state.orders = []; toast("订单加载失败: " + e.message); }
   renderOrders();
+  /* 首次进订单页自动核对一次旺店通状态：历史团单原表就带出库单号，
+     不该让用户看到「推送旺店通」。每个会话只跑一次，且接口本身幂等
+     （没有变化时返回 0，不会重复刷新）。 */
+  if (!state.pushAutoChecked) {
+    state.pushAutoChecked = true;
+    try {
+      const r = await api("/api/fx/orders/detect-push", { method: "POST", body: "{}" });
+      if ((r.shipped || 0) + (r.pushed || 0) + (r.history || 0) > 0) await loadOrders();
+    } catch (e) { /* 核对失败不打断列表 */ }
+  }
 }
 
 function fillOrderSelects(){
@@ -1807,10 +2226,10 @@ function renderOrders(){
     else if (o.status === "submitted") ops.push(`<button class="btn mini" onclick="action(${o.id},'approve')">审核通过</button>`,
       `<button class="btn mini" onclick="action(${o.id},'reject')">驳回</button>`,
       `<button class="btn mini danger" onclick="action(${o.id},'cancel')">取消</button>`);
-    else if (o.status === "approved" && o.push_status !== "sent") ops.push(`<button class="btn mini primary" onclick="pushOrder(${o.id})">推送旺店通</button>`);
+    else if (canPushWdt(o)) ops.push(`<button class="btn mini primary" onclick="pushOrder(${o.id})">推送旺店通</button>`);
     ops.splice(0, 0, `<button class="btn mini" onclick="viewOrder(${o.id})">查看</button>`);
-    const pushed = o.push_status === "sent" ? '<span class="tag on" title="已推送旺店通">已推WDT</span> ' : (o.push_status === "failed" ? '<span class="tag cancelled" title="旺店通推送失败，详情见订单详情">推失败</span> ' : "");
-    return `<tr>
+    const pushed = pushTag(o, true) + " ";
+    return `<tr data-id="${o.id}" data-status="${esc(o.status)}">
       <td><b>${esc(o.order_no)}</b></td><td>${esc(o.distributor_name)}</td>
       <td>${pushed}<span class="tag ${o.status}">${esc(o.status_label)}</span></td>
       <td class="num"><b>${money(o.total_amount)}</b></td>
@@ -1871,13 +2290,9 @@ function renderOstatus(){
     else if (o.status === "submitted") ops.push(`<button class="btn mini primary" onclick="action(${o.id},'approve')">审核通过</button>`,
       `<button class="btn mini" onclick="action(${o.id},'reject')">驳回</button>`,
       `<button class="btn mini danger" onclick="action(${o.id},'cancel')">取消</button>`);
-    if (o.status === "approved" && o.push_status !== "sent") ops.push(`<button class="btn mini" onclick="pushOrder(${o.id})">推送WDT</button>`);
+    if (canPushWdt(o)) ops.push(`<button class="btn mini" onclick="pushOrder(${o.id})">推送WDT</button>`);
     ops.splice(0, 0, `<button class="btn mini" onclick="viewOrder(${o.id})">查看</button>`);
-    const push = o.push_status === "sent"
-      ? `<span class="tag on" title="${esc(o.pushed_at)}">已推送</span>`
-      : (o.push_status === "failed"
-        ? `<span class="tag warn" title="失败原因：${esc(o.push_message || "未知")}\n可勾上后点「重推旺店通」">推送失败</span>`
-        : `<span class="tag off">未推送</span>`);
+    const push = pushTag(o);
     return `<tr onclick="viewOrder(${o.id})" ondblclick="viewOrder(${o.id})" title="点击 / 双击查看订单明细">
       <td onclick="event.stopPropagation()"><input type="checkbox" class="ost-ck" ${state.ostSel.has(o.id) ? "checked" : ""} onchange="ostCheck(${o.id}, this.checked)"></td>
       <td><b>${esc(o.order_no)}</b></td><td>${esc(o.distributor_name)}</td>
@@ -2071,6 +2486,26 @@ async function pushOrder(id){
   } catch (e) { toast(e.message); }
 }
 
+/* 自动核对：历史团单在旺店通里早就出库了，原表也记着出库单号，
+   不该再让人一张张点「推送旺店通」。这里一次性按证据把状态判对。 */
+async function detectPushStatus(){
+  const btn = window.event && window.event.target ? window.event.target : null;
+  if (btn) { btn.disabled = true; btn.textContent = "核对中…"; }
+  try {
+    const r = await api("/api/fx/orders/detect-push", { method: "POST", body: "{}" });
+    const parts = [];
+    if (r.shipped) parts.push(`出库单已核对 ${r.shipped}`);
+    if (r.pushed) parts.push(`单据已含旺店通单号 ${r.pushed}`);
+    if (r.history) parts.push(`历史单 ${r.history}`);
+    toast(parts.length ? `核对完成：${parts.join("、")}` : `核对完成：${r.checked} 张单都不需要改`);
+    await loadAll();
+  } catch (e) {
+    toast("核对失败：" + e.message);
+  } finally {
+    if (btn) { btn.disabled = false; btn.textContent = "⟳ 核对旺店通状态"; }
+  }
+}
+
 async function viewOrder(id){
   try {
     const d = await api("/api/fx/orders/" + id);
@@ -2078,28 +2513,54 @@ async function viewOrder(id){
     let fulfill = null;
     try { fulfill = await api("/api/fx/inventory/fulfillment?order_id=" + id); } catch (e) { fulfill = null; }
     $("detailTitle").textContent = "订单详情 · " + d.order_no;
+    const pushHtml = d.push_status === "sent"
+      ? `已推送${d.pushed_at ? " · " + esc(d.pushed_at) : ""}${d.push_message ? ` <span style="color:#8a94a6">（${esc(d.push_message)}）</span>` : ""}`
+      : d.push_status === "failed"
+        ? `<span style="color:#e5484d">失败：${esc(d.push_message) || "（无报错详情）"}</span>`
+        : d.push_status === "history"
+          ? `<span style="color:#8a94a6">历史单 · ${esc(d.push_message || "原表未记录旺店通单号")}</span>`
+          : "未推送";
     $("detailBody").innerHTML = `
-      <table>
-        <tr><th style="width:110px">分销商</th><td>${esc(d.distributor_name)}（${esc(d.distributor_code)}）</td></tr>
-        <tr><th>状态</th><td><span class="tag ${d.status}">${esc(d.status_label)}</span></td></tr>
-        <tr><th>下单时间</th><td>${esc(d.order_date)}</td></tr>
-        <tr><th>备注</th><td>${esc(d.remark) || "-"}</td></tr>
-        <tr><th>旺店通单号</th><td>${esc(d.wdt_tid) || "（未推送）"}</td></tr>
-        <tr><th>推送店铺</th><td>${esc(d.wdt_shop_no) || "（系统默认）"}</td></tr>
-        <tr><th>推送状态</th><td>${d.push_status === "sent"
-          ? `已推送${d.pushed_at ? " · " + esc(d.pushed_at) : ""}`
-          : d.push_status === "failed"
-            ? `<span style="color:#e5484d">失败：${esc(d.push_message) || "（无报错详情）"}</span>`
-            : "未推送"}</td></tr>
-      </table>
-      ${renderFulfillment(fulfill)}
-      <table style="margin-top:12px"><thead><tr><th>商品</th><th>编号</th><th class="num">数量</th>
-        <th class="num">单价</th><th class="num">小计</th></tr></thead>
-        <tbody>${d.lines.map(l => `<tr><td>${esc(l.goods_name)} ${l.spec_name ? "(" + esc(l.spec_name) + ")" : ""}</td>
-          <td>${esc(l.goods_no)}</td><td class="num">${l.quantity}</td>
-          <td class="num">${money(l.unit_price)}</td><td class="num"><b>${money(l.subtotal)}</b></td></tr>`).join("")}
-        </tbody></table>
-      <div class="line-total">订单合计：<b style="font-size:17px">${money(d.total_amount)}</b></div>`;
+      <div class="sec">
+        <div class="sec-t">订单信息</div>
+        <div class="dl">
+          <div class="row"><span class="k">分销商</span><span class="v">${esc(d.distributor_name)}（${esc(d.distributor_code)}）</span></div>
+          <div class="row"><span class="k">状态</span><span class="v"><span class="tag ${d.status}">${esc(d.status_label)}</span></span></div>
+          <div class="row"><span class="k">下单时间</span><span class="v">${esc(d.order_date)}</span></div>
+          <div class="row"><span class="k">旺店通单号</span><span class="v">${esc(d.wdt_tid) || "（未推送）"}</span></div>
+          <div class="row"><span class="k">推送店铺</span><span class="v">${esc(d.wdt_shop_no) || "（系统默认）"}</span></div>
+          <div class="row"><span class="k">推送状态</span><span class="v">${pushHtml}</span></div>
+          <div class="row span"><span class="k">备注</span><span class="v">${esc(d.remark) || "-"}</span></div>
+        </div>
+      </div>
+      <div class="sec">
+        <div class="sec-t">商品明细 <span class="sub">共 ${d.lines.length} 项 · 实际可用 = 昨天库存 + 今日已入库</span></div>
+        ${renderFulfillment(fulfill)}
+        <table class="order-lines"><thead><tr><th>商品</th><th>编号</th><th class="num">数量</th>
+          <th class="num">单价</th><th class="num">小计</th><th class="num">实际可用</th>
+          <th class="num">满足率</th><th>库存状态</th></tr></thead>
+          <tbody>${(() => {
+            const fl = (fulfill && fulfill.lines) || [];
+            return d.lines.map((l, i) => {
+              let f = fl[i] || null;
+              if (f && l.spec_no && f.spec_no && f.spec_no !== l.spec_no) f = fl.find(x => x.spec_no === l.spec_no) || f;
+              const c = f ? (f.state === "满足库存" ? "ok" : f.state === "到仓待入库" ? "arriving" : "short") : "";
+              const q = Number(l.quantity);
+              return `<tr class="pline ${c}">
+                <td>${esc(l.goods_name)} ${l.spec_name ? "(" + esc(l.spec_name) + ")" : ""}</td>
+                <td>${esc(l.goods_no)}</td>
+                <td class="num">${Number.isFinite(q) ? q : esc(l.quantity)}</td>
+                <td class="num">${money(l.unit_price)}</td>
+                <td class="num"><b>${money(l.subtotal)}</b></td>
+                <td class="num stock">${f ? esc(f.actual) : "—"}${f ? `<span class="sub">昨${esc(f.yesterday_stock)} + 今入${esc(f.today_stockin)}${Number(f.today_pending) > 0 ? " · 待入" + esc(f.today_pending) : ""}</span>` : ""}</td>
+                <td class="num rate ${c}">${f ? esc(f.fulfill_rate) + "%" : "—"}</td>
+                <td>${f ? `<span class="ff-tag ${c}">${esc(f.state)}</span>` : `<span class="muted">未同步</span>`}</td>
+              </tr>`;
+            }).join("");
+          })()}
+          </tbody></table>
+        <div class="line-total">订单合计：<b>${money(d.total_amount)}</b></div>
+      </div>`;
     openModal("detailModal");
   } catch (e) { toast(e.message); }
 }
@@ -2109,20 +2570,11 @@ function renderFulfillment(f){
   if (!f) return `<div class="ff-banner warn" style="background:#fff8e6;border:1px solid #f0dca8;color:#9a5b00">⚠️ 库存快照未同步，满足率暂不可用。请先点上方「同步库存」。</div>`;
   const cls = f.overall_state === "满足库存" ? "ok" : f.overall_state === "到仓待入库" ? "arriving" : "short";
   const icon = cls === "ok" ? "✅" : cls === "arriving" ? "🚚" : "⛔";
-  const rows = f.lines.map(l => {
-    const c = l.state === "满足库存" ? "ok" : l.state === "到仓待入库" ? "arriving" : "short";
-    return `<div class="ff-line">
-      <span class="ff-tag ${c}">${esc(l.state)}</span>
-      <span class="nm">${esc(l.goods_name)} ${l.spec_name ? "(" + esc(l.spec_name) + ")" : ""}</span>
-      <span class="qt">需求 ${l.demand} · 实际可用 ${l.actual}（昨${l.yesterday_stock}+今入${l.today_stockin}${l.today_pending > 0 ? "·待入" + l.today_pending : ""}）</span>
-      <span class="rt">满足率 ${l.fulfill_rate}%</span>
-    </div>`;
-  }).join("");
   return `<div class="ff-banner ${cls}">
       <span style="font-size:20px">${icon}</span>
       <span class="big">整单：${esc(f.overall_state)}</span>
       <span>实际可用 = 昨天库存 + 今日已入库（截至 ${esc(f.as_of)}）</span>
-    </div>${rows}`;
+    </div>`;
 }
 
 async function syncInventory(){
@@ -2354,7 +2806,9 @@ const tableOf = ckey => document.querySelector(`table.cols[data-ckey="${ckey}"]`
 function domKeys(table){ return thEls(table).map(keyOf); }
 function hiddenSet(table){
   const ckey = ckeyOf(table), saved = colHideStore[ckey];
-  return new Set(Array.isArray(saved) ? saved : (DEFAULT_HIDE[ckey] || []));
+  const set = new Set(Array.isArray(saved) ? saved : (DEFAULT_HIDE[ckey] || []));
+  set.delete("ops"); // 操作列必须始终可见，否则用户改不了价格/状态
+  return set;
 }
 
 /* 按记住的顺序重排：表头、colgroup、每一行的数据格必须一起动，否则列就错位了 */
@@ -2390,11 +2844,15 @@ function applyColVis(table){
   const ths = thEls(table), cols = colEls(table), hide = hiddenSet(table);
   ths.forEach((th, i) => {
     const off = hide.has(keyOf(th, i));
-    th.style.display = off ? "none" : "";
+    th.classList.toggle("col-off", off);
+    th.style.display = "";
     if (cols[i]) cols[i].style.width = off ? "0px" : (cols[i].dataset.w || cols[i].style.width || "");
   });
   table.querySelectorAll("tbody tr").forEach(tr => {
-    [...tr.children].forEach((td, i) => { td.style.display = hide.has(keyOf(ths[i], i)) ? "none" : ""; });
+    [...tr.children].forEach((td, i) => {
+      td.classList.toggle("col-off", hide.has(keyOf(ths[i], i)));
+      td.style.display = "";
+    });
   });
   markLastCol(table);
   applySavedWidths(table);
@@ -2524,13 +2982,13 @@ function renderColModal(){
   const hide = hiddenSet(table), keys = domKeys(table);
   $("colModalBody").innerHTML = keys.map((k, i) => {
     const th = thEls(table)[i];
-    const on = !hide.has(k);
+    const on = !hide.has(k), locked = k === "ops";
     // ↑↓ 只在可见列之间跳，隐藏的列不参与排队
     const vis = keys.filter(x => !hide.has(x));
     const pi = vis.indexOf(k);
     const upOff = !on || pi <= 0, dnOff = !on || pi < 0 || pi >= vis.length - 1;
     return `<div class="colset-row">
-      <input type="checkbox" ${on ? "checked" : ""} onchange="toggleCol('${k}',this.checked)">
+      <input type="checkbox" ${on || locked ? "checked" : ""} ${locked ? 'disabled title="操作列必须始终显示"' : ""} onchange="toggleCol('${k}',this.checked)">
       <span class="nm${on ? "" : " off"}">${esc(colName(th, i))}</span>
       <span class="mv">
         <button ${upOff ? "disabled" : ""} onclick="moveColStep('${k}',-1)" title="上移">↑</button>
@@ -2541,6 +2999,7 @@ function renderColModal(){
 }
 function toggleCol(k, on){
   const table = tableOf(colModalFor); if (!table) return;
+  if (k === "ops" && !on) return; // 操作列不允许隐藏
   const set = new Set(hiddenSet(table));
   if (on) set.delete(k); else set.add(k);
   colHideStore[colModalFor] = [...set]; saveColHide();
@@ -2612,6 +3071,34 @@ if (__tab === "orders" && __status) $("orderStatus").value = __status;
 loadAll();
 
 if (__tab && ["distributors", "products", "entry", "orders", "ostatus", "prices", "statements"].indexOf(__tab) >= 0) switchTab(__tab);
+
+/* ---------- 双击增强：表头排序 + 双击行直接进编辑 ----------
+   商品表里一级价、大类是内联输入框，双击那些格子不会弹窗（embed.js 里已排除）。 */
+(function initFxTable(){
+  if (!window.fxTable) return;
+  // 商品目录：双击表头排序，双击行打开商品编辑
+  const prodTable = document.querySelector("#panel-products table");
+  fxTable.sort(prodTable);
+  fxTable.rowEdit($("prodBody"), tr => {
+    const ck = tr.querySelector(".prod-ck");
+    if (ck && ck.dataset.id) openProdModal(Number(ck.dataset.id));
+  });
+  // 分销商档案：双击行编辑
+  fxTable.sort(document.querySelector("#panel-distributors table"));
+  fxTable.rowEdit($("distBody"), tr => {
+    if (tr.dataset.id) openDistModal(Number(tr.dataset.id));
+  });
+  // 分销订单：双击行 → 草稿单进编辑、其它状态进详情（订单状态是流程驱动的，非草稿不允许改）
+  fxTable.sort(document.querySelector("#panel-orders table"));
+  fxTable.rowEdit($("orderBody"), tr => {
+    const id = Number(tr.dataset.id || 0);
+    if (!id) return;
+    if (tr.dataset.status === "draft") editOrder(id); else viewOrder(id);
+  });
+  // 价格表 / 对账单也支持排序（只读，双击行不弹编辑）
+  fxTable.sort(document.querySelector("#panel-prices table"));
+  fxTable.sort(document.querySelector("#panel-statements table"));
+})();
 </script>
 </body>
 </html>
