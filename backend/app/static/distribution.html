@@ -136,15 +136,16 @@ table.cols tbody tr.dirty td.col-last{background:#fff8e7}
    表现为“品牌”列消失、操作列被挤成 0 宽。保留单元格但压成 0 宽，列映射才不会乱。 */
 table.cols th.col-off,table.cols td.col-off{display:table-cell!important;width:0!important;min-width:0!important;max-width:0!important;padding:0!important;border:0!important;overflow:hidden!important;visibility:hidden;white-space:nowrap}
 /* 列设置面板：显示/隐藏 + 上下移动 */
-.colset-row{display:flex;align-items:center;gap:8px;padding:7px 2px;border-bottom:1px dashed #eef1f6}
-.colset-row:last-child{border-bottom:0}
-.colset-row .nm{flex:1;font-size:13px}
+.colset-row{display:flex;align-items:center;gap:10px;padding:6px 8px;border-radius:7px}
+.colset-row:hover{background:#f6f9fe}
+.colset-row .nm{flex:1;min-width:0;font-size:13px;color:#344054;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .colset-row .nm.off{color:#b6bfcc;text-decoration:line-through}
-.colset-row .mv{display:inline-flex;gap:4px}
-.colset-row button{width:28px;min-height:26px;padding:0;border:1px solid #d8dee9;border-radius:6px;background:#fff;color:#5b6778;font-size:12px;cursor:pointer}
+.colset-row .lock{font-size:11px;color:#98a2b3;background:#f1f4f9;border-radius:5px;padding:1px 6px}
+.colset-row .mv{display:inline-flex;gap:4px;flex-shrink:0}
+.colset-row button{width:26px;min-height:25px;padding:0;border:1px solid #d8dee9;border-radius:6px;background:#fff;color:#5b6778;font-size:12px;cursor:pointer}
 .colset-row button:hover{border-color:#2463eb;color:#2463eb}
-.colset-row button:disabled{opacity:.3;cursor:default;border-color:#e6eaf1;color:#b6bfcc}
-.colset-row input{width:15px;height:15px;accent-color:#2463eb;cursor:pointer}
+.colset-row button:disabled{opacity:.28;cursor:default;border-color:#e6eaf1;color:#b6bfcc}
+.colset-row input{width:15px;height:15px;min-height:0;padding:0;border:0;flex-shrink:0;accent-color:#2463eb;cursor:pointer}
 .tag{display:inline-flex;padding:3px 9px;border-radius:999px;font-size:11.5px;font-weight:600}
 .mini-tag{padding:1px 6px;font-size:10px;background:#eef4ff;color:#2463eb;margin-left:4px;vertical-align:1px}
 /* 分销商列表的付款账户摘要：第一个账户 + 账户数，详情放 title 里 */
@@ -274,7 +275,7 @@ tr.dirty .topcat-in{border-color:#e8a33a;background:#fffaef}
 .modal .mf{display:flex;gap:8px;justify-content:flex-end;padding:6px 20px 18px}
 .modal label{display:block;font-size:12.5px;color:var(--muted);margin:10px 0 5px}
 .modal label:first-child{margin-top:0}
-.modal input,.modal select,.modal textarea{width:100%;min-height:36px;border:1px solid #d8dee9;border-radius:8px;padding:7px 10px;font-size:13.5px;font-family:inherit}
+.modal input:not([type=checkbox]):not([type=radio]),.modal select,.modal textarea{width:100%;min-height:36px;border:1px solid #d8dee9;border-radius:8px;padding:7px 10px;font-size:13.5px;font-family:inherit}
 .modal textarea{min-height:64px;resize:vertical}
 .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 14px}
 .brand-checks{display:flex;flex-wrap:wrap;gap:10px;margin:6px 0 10px;padding:12px;border:1px solid #e3e8f0;border-radius:10px;background:#f8fafc}
@@ -823,7 +824,7 @@ toast{display:none}
 <div class="backdrop" id="colModal"><div class="modal sm">
   <div class="mh"><h2>调整列 · <span id="colModalTitle"></span></h2><button class="btn" onclick="closeModal('colModal')">✕</button></div>
   <div class="mb">
-    <div class="hint">勾选 = 显示这一列；↑↓ = 挪位置。也可以直接<b>按住表头左右拖动</b>换位置。设置记在这台电脑上，下次打开还在。</div>
+    <div class="hint">勾选 = 显示 · ↑↓ = 挪位置 · 也可拖表头换位（记在本机）</div>
     <div id="colModalBody"></div>
   </div>
   <div class="mf">
@@ -2973,7 +2974,7 @@ function openColModal(ckey){
 }
 function colName(th, i){
   const k = th.dataset.col || "";
-  if (k === "ck") return "勾选框";
+  if (k === "ck" || k === "pick") return "勾选框";
   const t = (th.textContent || "").trim();
   return t || "（空列）";
 }
@@ -2987,7 +2988,7 @@ function renderColModal(){
     const vis = keys.filter(x => !hide.has(x));
     const pi = vis.indexOf(k);
     const upOff = !on || pi <= 0, dnOff = !on || pi < 0 || pi >= vis.length - 1;
-    return `<div class="colset-row">
+    return `<div class="colset-row${on ? "" : " is-off"}">
       <input type="checkbox" ${on || locked ? "checked" : ""} ${locked ? 'disabled title="操作列必须始终显示"' : ""} onchange="toggleCol('${k}',this.checked)">
       <span class="nm${on ? "" : " off"}">${esc(colName(th, i))}</span>
       <span class="mv">
@@ -3033,6 +3034,7 @@ function initColumnResize(){
     table.dataset.order0 = domKeys(table).join(",");  // 记下出厂顺序，「恢复默认」时用它
     applyColOrder(table);
     thEls(table).forEach(th => {
+      ${locked ? '<span class="lock">固定</span>' : ""}
       th.classList.add("col-drag");
       const grip = document.createElement("div");
       grip.className = "colgrip";
