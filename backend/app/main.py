@@ -1298,3 +1298,14 @@ def static_asset(filename: str):
     if not target.is_file():
         raise HTTPException(404, "not found")
     return FileResponse(target)
+
+
+@app.get("/static/brand-logos/{filename}")
+def brand_logo_asset(filename: str):
+    """品牌 LOGO（brand-logos/ 目录，均为官网抓取的 PNG）。同样禁止路径穿越。"""
+    if not filename or "/" in filename or "\\" in filename or filename.startswith("."):
+        raise HTTPException(404, "not found")
+    target = STATIC_DIR / "brand-logos" / filename
+    if not target.is_file():
+        raise HTTPException(404, "not found")
+    return FileResponse(target, media_type="image/png")

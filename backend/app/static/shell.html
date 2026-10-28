@@ -23,6 +23,8 @@ body{font-family:Inter,"PingFang SC","Microsoft YaHei",system-ui,sans-serif;colo
 .brandpick:hover{background:rgba(255,255,255,.16)}
 .brandpick.on{background:rgba(36,99,235,.6);border-color:rgba(96,140,250,.9)}
 .bp-logo{width:23px;height:23px;border-radius:7px;display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:800;color:#fff;line-height:1;flex-shrink:0;background:transparent;box-shadow:0 1px 4px rgba(0,0,0,.18)}
+.bp-logo.has-img{width:auto;min-width:0;height:auto;box-shadow:none}
+.bp-logo.has-img img{height:26px;width:auto;display:block;border-radius:6px}
 .brandpick select{background:transparent;border:0;color:#fff;font-size:13.5px;font-family:inherit;font-weight:700;max-width:150px;outline:none;cursor:pointer;padding:0;appearance:none;-webkit-appearance:none}
 .brandpick select option{color:#1c2740;background:#fff;font-weight:500}
 .brandpick .bp-arrow{font-size:10px;color:#a9b7ca;line-height:1;pointer-events:none}
@@ -251,6 +253,11 @@ const BRAND_COLORS = {
   '乐事': '#e0a400', '三养': '#d94f2b', '海兴': '#0e9488', '奇多': '#f26f21',
   '乐多飞': '#7c5cbf', '爱思得': '#2b7de9', '特百惠': '#e0468c', '伯纳天纯': '#3f9142',
 };
+// 官网抓取的真 LOGO（brand-logos/ 目录）；没抓到的品牌回落到首字徽标
+const BRAND_LOGOS = {
+  '格力高': 'glico.png', '桂格': 'quaker.png', '乐事': 'lays.png',
+  '瑞士莲': 'lindt.png', '三养': 'samyang.png', '伯纳天纯': 'purenatural.png',
+};
 function brandMark(brand) {
   const s = shortBrand(brand);
   return { ch: (s || '?')[0], c: BRAND_COLORS[s] || '#5b6b84' };
@@ -265,11 +272,21 @@ function renderBrandSelect() {
     const sel0 = b.brand === cur ? ' selected' : '';
     return `<option value="${esc(b.brand)}"${sel0}>${name}（${b.count}）</option>`;
   }).join('');
-  // 顶栏品牌 LOGO 徽标：选中品牌显示品牌色+首字，全部品牌显示 🏷
+  // 顶栏品牌 LOGO 徽标：有真 LOGO 用图片，否则品牌色+首字，全部品牌显示 🏷
   const lg = $('bpLogo');
   if (lg) {
-    if (cur) { const m = brandMark(cur); lg.textContent = m.ch; lg.style.background = m.c; }
-    else { lg.textContent = '🏷'; lg.style.background = 'transparent'; lg.style.boxShadow = 'none'; }
+    const short = cur ? shortBrand(cur) : '';
+    const logoFile = short ? BRAND_LOGOS[short] : '';
+    if (logoFile) {
+      lg.classList.add('has-img');
+      lg.innerHTML = `<img src="/static/brand-logos/${logoFile}" alt="${esc(short)}">`;
+      lg.style.background = 'transparent'; lg.style.boxShadow = 'none';
+    } else {
+      lg.classList.remove('has-img');
+      lg.innerHTML = '';
+      if (cur) { const m = brandMark(cur); lg.textContent = m.ch; lg.style.background = m.c; }
+      else { lg.textContent = '🏷'; lg.style.background = 'transparent'; lg.style.boxShadow = 'none'; }
+    }
   }
   // 选中的品牌如果已不在列表里（商品改名/停用），回落到「全部品牌」
   if (cur && !brandList.some(b => b.brand === cur)) {
