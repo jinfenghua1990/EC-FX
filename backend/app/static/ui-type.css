@@ -1,0 +1,75 @@
+/* ============================================================
+   全站字体阶梯 · 唯一口径（2026-10-28 按用户要求统一）
+   ------------------------------------------------------------
+     T1  页面主标题                 20px    h1.page
+     T2  弹窗标题                   16px    .mh h2
+     T3  卡片 / 分区标题            14px    .card h3 / .head h3
+     L1  一级菜单（顶部）           14px    shell .pitem
+     L2  二级菜单（左侧）           13px    shell .sitem
+     L3  标签页 / 分段切换          12.5px  shell .tab / .tabs .tab / .seg button
+     L4  正文·表格·按钮·表单        12.5px
+     L5  辅助说明·字段标签          11.5px
+
+   规则：一级 > 二级 > 页面正文；正文与标签页同级。
+
+   接入方式：在页面自己的 <style> 之后 <link> 本文件。同名同权重时
+   后加载者生效，所以页面里已有的字号声明不必逐条改，这里只负责
+   把同一维度的字号拉到同一个值。
+   ============================================================ */
+:root {
+  --fs-title: 20px;
+  --fs-dialog: 16px;
+  --fs-card: 14px;
+  --fs-nav1: 14px;
+  --fs-nav2: 13px;
+  --fs-tab: 12.5px;
+  --fs-body: 12.5px;
+  --fs-aux: 11.5px;
+}
+
+/* L4 基线：没单独写字号的地方一律按正文 */
+body { font-size: var(--fs-body); }
+button, input, select, textarea { font-size: var(--fs-body); }
+
+/* T1 页面主标题 */
+h1, h1.page { font-size: var(--fs-title); }
+
+/* T2 弹窗标题 */
+.mh h2, .modal .mh h2, .modal.dist .mh h2 { font-size: var(--fs-dialog); }
+
+/* T3 卡片 / 分区标题 */
+.card h3, .card .head h3, .card > .head h3, .head h3 { font-size: var(--fs-card); }
+
+/* 副标题 / 导语跟随正文 */
+.subtitle, .lead, .path { font-size: var(--fs-body); }
+
+/* L4 表格：表头不单独设字号，一律继承表格字号 */
+table { font-size: var(--fs-body); }
+#detailModal table { font-size: var(--fs-body); }
+
+/* L4 表单控件：卡片筛选条、弹窗表单同字号 */
+.card input, .card select, .card textarea,
+.filterbar input, .filterbar select,
+.search input,
+.field input, .field select, .field textarea,
+.modal input:not([type=checkbox]):not([type=radio]),
+.modal select, .modal textarea,
+.modal.md input, .modal.md select, .modal.md textarea { font-size: var(--fs-body); }
+
+/* L4 按钮 */
+.btn { font-size: var(--fs-body); }
+.btn.mini { font-size: var(--fs-aux); }
+
+/* L3 标签页 / 分段切换 */
+.tab, .tabs .tab, .seg button { font-size: var(--fs-tab); }
+
+/* L4 空态 / 提示条 */
+.empty, .hint { font-size: var(--fs-body); }
+
+/* L5 字段标签与字段下的说明 */
+.field label, .modal label, .modal.md label { font-size: var(--fs-aux); }
+.field .hint { font-size: var(--fs-aux); }
+
+/* 指标卡：名目跟随正文，脚注跟随辅助字号；大数字是数据，保持各页原样 */
+.stat .k { font-size: var(--fs-body); }
+.stat .s { font-size: var(--fs-aux); }
