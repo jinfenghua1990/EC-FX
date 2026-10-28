@@ -1270,6 +1270,12 @@ def sales_outbound_page():
     return FileResponse(STATIC_DIR / "sales-outbound.html")
 
 
+@app.get("/purchase")
+def purchase_page():
+    # 红盒子供销平台：采购单订单情况（数据来自旺店通采购单）
+    return FileResponse(STATIC_DIR / "purchase.html")
+
+
 @app.get("/distribution")
 def distribution_page():
     # 红盒子供销平台：分销管理主模块

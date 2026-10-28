@@ -180,11 +180,7 @@ const MENUS = [
     { key: 'order-search', label: '订单查询', icon: '🔎', url: '/distribution?embed=1&tab=orders', badge: '页内' },
   ]},
   { key: 'purchase', label: '采购与到货', icon: '🚛', children: [
-    { key: 'purchase-demand', label: '采购需求', icon: '📝', url: ph('采购需求', '采购与到货', 'P6'), planned: true, phase: 'P6' },
-    { key: 'purchase-link', label: '采购订单关联', icon: '🔗', url: ph('采购订单关联', '采购与到货', 'P6'), planned: true, phase: 'P6' },
-    { key: 'purchase-arrival', label: '到货登记', icon: '📥', url: ph('到货登记', '采购与到货', 'P6'), planned: true, phase: 'P6' },
-    { key: 'purchase-match', label: '到货匹配', icon: '🧩', url: ph('到货匹配', '采购与到货', 'P6'), planned: true, phase: 'P6' },
-    { key: 'purchase-abnormal', label: '到货异常', icon: '⚠️', url: ph('到货异常', '采购与到货', 'P6'), planned: true, phase: 'P6' },
+    { key: 'purchase-orders', label: '采购单订单情况', icon: '🧾', url: '/purchase?embed=1' },
   ]},
   { key: 'ship', label: '发货管理', icon: '📮', children: [
     { key: 'ship-todo', label: '待发货任务', icon: '⏳', url: ph('待发货任务', '发货管理', 'P6'), planned: true, phase: 'P6' },
