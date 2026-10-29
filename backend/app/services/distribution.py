@@ -1559,7 +1559,10 @@ def update_order_fulfillment(db: Session, order_id: int, data: dict) -> dict:
     if "wdt_shop_no" in data:
         row.wdt_shop_no = str(data.get("wdt_shop_no") or "").strip()[:40]
     if "wdt_warehouse_no" in data:
-        row.wdt_warehouse_no = str(data.get("wdt_warehouse_no") or "").strip()[:40]
+        new_warehouse = str(data.get("wdt_warehouse_no") or "").strip()[:40]
+        if row.push_status == "sent" and new_warehouse != (row.wdt_warehouse_no or "").strip():
+            raise ValueError("订单已推送旺店通，不能只修改本地仓库编码；请先核对旺店通实际发货仓库")
+        row.wdt_warehouse_no = new_warehouse
     if "order_channel" in data:
         row.order_channel = str(data.get("order_channel") or "").strip()[:32]
     if "ship_warehouse" in data:
@@ -2316,7 +2319,8 @@ def create_and_push_order(
     try:
         push_order_to_wangdian(db, order.id)
         pushed = True
-    except ValueError as exc:
+    except (ValueError, RuntimeError) as exc:
+        # 第二次实时核验失败时，订单已保存但未推送；不能让接口 500 导致重复下单。
         push_error = str(exc)
     db.refresh(order)
     return {"order": _order_view(order), "pushed": pushed, "push_error": push_error}

@@ -1413,6 +1413,8 @@ def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
         return {"ok": True, "order": row, "pushed": False, "push_error": ""}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, f"旺店通实时库存核验失败：{exc}") from exc
 
 
 @app.put("/api/fx/orders/{order_id}")
