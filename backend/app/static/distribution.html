@@ -1289,7 +1289,7 @@ function entryFormSaved(){
 function saveEntryForm(){
   if (!$("entryDist")) return;
   const data = {
-    // 仓库存编号（HHZ-Glico），显示名由旺店通仓库列表带出；店铺存编号，和 entryShop 共用记忆。
+    // 仓库存旺店通 warehouse_no，显示名从实时仓库档案带出；店铺同理。
     warehouse: ($("entryWarehouse").value || "").trim(),
     delivery: entryDeliveryValue(),
     scratch: $("entryScratch").checked ? 1 : 0,
@@ -1583,7 +1583,7 @@ function entryPriceOf(p){
   return { v: parseFloat(p.base_price) || 0, tag: "" };
 }
 
-async function onEntryDistChange(){
+async async function onEntryDistChange(){
   const distId = $("entryDist").value;
   if (distId) { try { await loadDistPrices(distId); } catch (e) { /* 服务端兜底 */ } }
   renderEntry();
@@ -1764,6 +1764,8 @@ function entryQtyInput(el){
     }
   }
   entryRecalc();
+  // 有用户新填数量时优先刷新该 SKU 的实时可发库存。
+  scheduleEntryStockRefresh();
 }
 
 function entryRecalc(){

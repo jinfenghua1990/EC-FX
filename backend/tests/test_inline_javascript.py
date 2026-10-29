@@ -8,12 +8,12 @@ import pytest
 
 
 def test_distribution_inline_javascript_is_syntactically_valid(tmp_path):
-    if shutil.which("node") is None:
-        pytest.skip("Node.js not installed")
+    assert shutil.which("node") is not None, "CI must install Node.js for JavaScript syntax tests"
     file = Path(__file__).resolve().parents[1] / "app" / "static" / "distribution.html"
     html = file.read_text(encoding="utf-8")
     scripts = re.findall(r"<script(?:\\s[^>]*)?>(.*?)</script>", html, re.DOTALL)
     assert scripts
+    assert "async function onEntryDistChange()" in html
     for index, script in enumerate(scripts):
         if not script.strip():
             continue
