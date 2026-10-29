@@ -197,3 +197,28 @@ def test_manual_product_order_codes_fall_back_to_sku(seeded):
     assert view["lines"][0]["goods_no"] == "SKU-1"
     assert view["lines"][0]["spec_no"] == "SKU-1"
     assert view["lines"][0]["spec_name"] == "盒"
+
+
+def test_push_payload_does_not_invent_payment(seeded):
+    """下单时默认未收款，不得按已付款全额推送旺店通。"""
+    db, distributor, product, _ = seeded
+    view = dist.create_order(db, distributor.id, [{"product_id": product.id, "quantity": 2}])
+    from app.models import FxOrder
+    order = db.get(FxOrder, view["id"])
+    payload = dist._build_sales_trade(order, distributor, "SHOP-TEST")["trade_list"][0]
+    assert payload["trade_status"] == 10
+    assert payload["pay_status"] == 0
+    assert payload["paid"] == "0"
+    assert payload["pay_time"] == "0000-00-00 00:00:00"
+    order.paid_amount = Decimal("5")
+    order.payment_status = "partial"
+    payload = dist._build_sales_trade(order, distributor, "SHOP-TEST")["trade_list"][0]
+    assert payload["trade_status"] == 20
+    assert payload["pay_status"] == 1
+    assert payload["paid"] == "5"
+    order.paid_amount = Decimal("20")
+    order.payment_status = "received"
+    payload = dist._build_sales_trade(order, distributor, "SHOP-TEST")["trade_list"][0]
+    assert payload["trade_status"] == 30
+    assert payload["pay_status"] == 2
+    assert payload["paid"] == "20"

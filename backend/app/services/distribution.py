@@ -1611,6 +1611,16 @@ def update_order_fulfillment(db: Session, order_id: int, data: dict) -> dict:
     if "payment_status" in data and row.payment_status == "received" and total_now > 0 and paid_now <= 0:
         raise ValueError("已收到时，已收金额必须大于 0")
 
+    if "payment_status" in data or "paid_amount" in data:
+        # 订单详情允许手动记录无凭证收款，但不能把已确认凭证的金额冲掉。
+        from ..models import FxPaymentVoucher
+        applied_total = db.scalar(
+            select(func.coalesce(func.sum(FxPaymentVoucher.amount), 0))
+            .where(FxPaymentVoucher.order_id == row.id, FxPaymentVoucher.applied == 1)
+        )
+        if paid_now < _money(Decimal(applied_total or 0)):
+            raise ValueError("已收金额不能低于已入账凭证合计，请先撤销相应凭证")
+
     if "shipping_status" in data:
         status = str(data.get("shipping_status") or "").strip()
         if status not in SHIPPING_STATUSES:
@@ -1862,7 +1872,7 @@ def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str)
     其中：
     - 店铺/仓库由下单页选择，仓库只允许 HHZ-Glico（红盒子-格力高磐石仓）；
     - 收货人/手机/地址取自分销商档案（下单页会显示，缺项会提示）；
-    - 金额取本系统订单总额，当前业务默认已付款、款到发货；
+    - 实收金额与支付状态取本系统已确认收款，不得默认全额已付；发货条件仍是款到发货；
     - 货品明细按官方 order_list 结构生成，而不是旧的 goods_list。
     """
     address = (distributor.delivery_address or "").strip()
@@ -1906,15 +1916,29 @@ def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str)
         "客户要求刮码" if int(order.scratch_code or 0) else "",
     ) if x)[:1024]
 
+    total_amount = _money(Decimal(order.total_amount or 0))
+    paid_amount = _money(Decimal(order.paid_amount or 0))
+    if paid_amount < 0 or paid_amount > total_amount:
+        raise ValueError("订单已收金额与订单总额不一致，请核对后再推送旺店通")
+    if order.payment_status == "refunded":
+        raise ValueError("退款订单须核对退款明细，不能按普通订单推送旺店通")
+    # 旺店通 trade_push.php：10待支付 / 20待尾款 / 30已支付；
+    # pay_status 0未付款 / 1部分付款 / 2已付款。不得把未收款订单谎报成全额已付。
+    pay_status = 0 if paid_amount == 0 else 2 if paid_amount >= total_amount else 1
+    trade_status = {0: 10, 1: 20, 2: 30}[pay_status]
+    pay_time = (
+        order.payment_date.strftime("%Y-%m-%d %H:%M:%S")
+        if paid_amount > 0 and order.payment_date else "0000-00-00 00:00:00"
+    )
+
     trade = {
         "tid": order.order_no,  # 原始单号用分销订单号，便于两边互查
-        "trade_status": 30,     # 已支付待发货
-        "pay_status": 2,        # 已付款
-        "delivery_term": 1,     # 款到发货
+        "trade_status": trade_status,
+        "pay_status": pay_status,
+        "delivery_term": 1,     # 款到发货；未付款单先入 ERP，等待收款后放行
         "fenxiao_type": 2,      # 经销
         "trade_time": order.order_date.strftime("%Y-%m-%d %H:%M:%S") if order.order_date else "",
-        "pay_time": (order.payment_date or order.order_date).strftime("%Y-%m-%d %H:%M:%S")
-        if (order.payment_date or order.order_date) else "",
+        "pay_time": pay_time,
         "buyer_nick": buyer_nick,
         "buyer_message": (order.remark or "")[:1024],
         "seller_memo": seller_memo,
@@ -1929,7 +1953,7 @@ def _build_sales_trade(order: FxOrder, distributor: FxDistributor, shop_no: str)
         "cod_amount": "0",
         "ext_cod_fee": "0",
         "other_amount": "0",
-        "paid": _plain(_money(Decimal(order.total_amount or 0))),
+        "paid": _plain(paid_amount),
         "warehouse_no": warehouse_no,
         "order_list": lines,
     }
@@ -2044,7 +2068,8 @@ def reconcile_orders_stockout(db: Session) -> dict:
         so_qty[k] = so_qty.get(k, Decimal("0")) + (it.goods_count or 0)
         so_name.setdefault(spec, it.goods_name or "")
 
-    products = {p.spec_no: p for p in db.scalars(select(FxProduct)).all()}
+    products = {p.spec_no: p for p in db.scalars(select(FxProduct)).all() if p.spec_no}
+    known_specs = set(products) | {spec for (_, spec) in so_qty}
     orders = db.scalars(select(FxOrder).order_by(FxOrder.order_no)).all()
 
     # 旺店通单号被哪些分销订单占用：>1 就是重复单（同一批出库被认领两次）
@@ -2070,7 +2095,16 @@ def reconcile_orders_stockout(db: Session) -> dict:
         o_qty: dict[str, Decimal] = {}
         o_name: dict[str, str] = {}
         for line in o.lines:
-            spec = (line.goods_no or "").strip()
+            snapshot_spec = (line.spec_no or "").strip()
+            snapshot_goods = (line.goods_no or "").strip()
+            # 新单 spec_no 是旺店通规格编码；历史旧单曾误把规格名称放在 spec_no，
+            # 将实际 SKU 放进 goods_no。仅在能匹配到已知规格时回退，绝不拿货品编码
+            # 去覆盖新单的真实规格编码。
+            spec = (
+                snapshot_spec if snapshot_spec in known_specs
+                else snapshot_goods if snapshot_goods in known_specs
+                else snapshot_spec or snapshot_goods
+            )
             if not spec:
                 continue
             o_qty[spec] = o_qty.get(spec, Decimal("0")) + (line.quantity or 0)

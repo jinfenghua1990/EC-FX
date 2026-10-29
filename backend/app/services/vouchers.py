@@ -112,7 +112,7 @@ def file_path(stored_path: str) -> Path:
         raise ValueError("凭证路径非法")
     target = (VOUCHER_ROOT / stored_path).resolve()
     root = VOUCHER_ROOT.resolve()
-    if not str(target).startswith(str(root)) or not target.is_file():
+    if not target.is_relative_to(root) or not target.is_file():
         raise ValueError("凭证文件不存在")
     return target
 
@@ -347,6 +347,8 @@ def add_voucher(
     if order_id and not order:
         raise ValueError("订单不存在")
     dist_id = int(distributor_id or (order.distributor_id if order else 0) or 0)
+    if order and dist_id != order.distributor_id:
+        raise ValueError("收款凭证的客户与所选订单客户不一致")
     if not dist_id:
         raise ValueError("要么给订单，要么给分销商")
     if not db.get(FxDistributor, dist_id):
@@ -432,6 +434,10 @@ def update_voucher(db: Session, voucher_id: int, data: dict) -> dict:
     row = db.get(FxPaymentVoucher, int(voucher_id))
     if not row:
         raise ValueError("凭证不存在")
+    # 已确认入账的金额/归属是财务流水，必须先撤销入账再修改。
+    # 否则后续撤销会扣错金额，或把 A 单的钱直接挂到 B 单。
+    if row.applied and ("amount" in data or "order_id" in data):
+        raise ValueError("凭证已经入账，请先撤销入账，再修改金额或关联订单")
     if "amount" in data:
         raw = data["amount"]
         if raw in (None, ""):
@@ -492,7 +498,7 @@ def apply_voucher(db: Session, voucher_id: int, *, amount: str | None = None,
     """把凭证金额计入订单收款。
 
     mode="add"：累加到已收（一笔订单分几次打款的常规情况）；
-    mode="set"：直接覆盖已收（客户一次付清、之前录错要改）。
+    mode="set"：仅允许订单尚无任何已收款时使用，不覆盖已有入账凭证。
     """
     row = db.get(FxPaymentVoucher, int(voucher_id))
     if not row:
@@ -512,10 +518,23 @@ def apply_voucher(db: Session, voucher_id: int, *, amount: str | None = None,
     if value is None:
         raise ValueError(f"金额格式不对: {raw}")
 
+    if mode not in {"add", "set"}:
+        raise ValueError(f"未知入账模式: {mode}")
+    current_paid = Decimal(order.paid_amount or 0).quantize(Decimal("0.01"))
     if mode == "set":
-        paid = value
-    else:
-        paid = (Decimal(order.paid_amount or 0) + value).quantize(Decimal("0.01"))
+        # 覆盖已有已收金额会让此前已入账的凭证与订单余额不一致；
+        # 只有全新、尚未收款的订单允许等价的 set/add。
+        any_applied = db.scalar(
+            select(FxPaymentVoucher.id)
+            .where(FxPaymentVoucher.order_id == order.id, FxPaymentVoucher.applied == 1)
+            .limit(1)
+        )
+        if current_paid != 0 or any_applied:
+            raise ValueError("订单已有收款记录，不能覆盖已收金额；请用累加入账或先撤销对应凭证")
+    paid = (current_paid + value).quantize(Decimal("0.01"))
+    total = Decimal(order.total_amount or 0).quantize(Decimal("0.01"))
+    if paid > total:
+        raise ValueError(f"入账后金额 {paid:.2f} 超过订单金额 {total:.2f}，请核对凭证及订单")
     order.paid_amount = paid
     order.payment_status = _payment_status(Decimal(order.total_amount or 0), paid)
     if row.paid_at:
@@ -560,7 +579,7 @@ def unapply_voucher(db: Session, voucher_id: int) -> dict:
     if order:
         paid = (Decimal(order.paid_amount or 0) - Decimal(row.amount or 0)).quantize(Decimal("0.01"))
         if paid < 0:
-            paid = Decimal("0.00")
+            raise ValueError("订单已收金额小于这张凭证的入账金额，账面数据不一致；已停止撤销，请先核对")
         order.paid_amount = paid
         order.payment_status = _payment_status(Decimal(order.total_amount or 0), paid)
         order.updated_at = datetime.utcnow()
