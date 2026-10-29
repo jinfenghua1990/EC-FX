@@ -110,8 +110,8 @@ class WangdianClient:
     def warehouses(self, page_size: int = 100) -> list[dict[str, Any]]:
         """拉取旺店通仓库档案（warehouse_query.php，只读）。
 
-        下单页只允许选红盒子-格力高磐石仓，但仓库编号必须以旺店通档案为准，
-        不能在代码里写死显示名；拉取失败时页面保留一个安全的 Glico 兜底。
+        下单页列出旺店通全部启用仓库，按真实 warehouse_no 选仓。
+        拉取失败不得提供硬编码仓库，防止推错仓。
         """
         rows: list[dict[str, Any]] = []
         page_no = 0
@@ -205,6 +205,37 @@ class WangdianClient:
                 break
         return rows
 
+    def stock_by_spec_warehouse(self, warehouse_no: str, spec_no: str) -> list[dict[str, Any]]:
+        """企业版按「仓库编号 + 规格编码」实时查可发库存。
+
+        旺店通 stock_query.php：传 spec_no 时不校验时间；
+        只传 warehouse_no 不传时间会默认查最近一小时的修改记录，不能当全量。
+        因此必须同时传仓库编号和规格编号。返回节点是 stocks。
+        """
+        warehouse_no = (warehouse_no or "").strip()
+        spec_no = (spec_no or "").strip()
+        if not warehouse_no or not spec_no:
+            raise ValueError("实时库存查询必须指定仓库编码和规格编码")
+        rows: list[dict[str, Any]] = []
+        page_no = 0
+        page_size = 100
+        while True:
+            payload = self._request(
+                "stock_query.php",
+                {"warehouse_no": warehouse_no, "spec_no": spec_no,
+                 "page_size": page_size, "page_no": page_no},
+            )
+            if not isinstance(payload.get("stocks"), list):
+                raise RuntimeError("旺店通库存接口未返回 stocks 列表，不能当成零库存")
+            page_rows = payload["stocks"]
+            rows.extend(page_rows)
+            if len(page_rows) < page_size:
+                break
+            page_no += 1
+            if page_no >= 100:
+                raise RuntimeError("旺店通实时库存分页超出限制，结果不完整")
+        return rows
+
     def stock_query(
         self,
         start: datetime,
@@ -236,7 +267,7 @@ class WangdianClient:
                     "page_size": page_size,
                 },
             )
-            page_rows = payload.get("stock_list") or []
+            page_rows = payload.get("stocks") or payload.get("stock_list") or []
             rows.extend(page_rows)
             if not page_rows or len(page_rows) < page_size:
                 break

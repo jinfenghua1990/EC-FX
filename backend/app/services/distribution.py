@@ -2224,6 +2224,11 @@ def push_order_to_wangdian(db: Session, order_id: int) -> dict:
     if not shop_no:
         raise ValueError("未选择推送店铺：下单时请选择店铺，或在 .env 配置 WDT_SHOP_NO")
 
+    # 只有新流程已经指定真实仓库时才启用严格库存验证；
+    # 旧版历史单未选仓库，保留原行为以避免悄悄改写历史推送结果。
+    if (order.wdt_warehouse_no or "").strip():
+        from .live_inventory import verify_order_for_push
+        verify_order_for_push(db, order, client)
     trade = _build_sales_trade(order, distributor, shop_no)
     try:
         result = client.sales_trade_push(trade)
@@ -2275,6 +2280,20 @@ def create_and_push_order(
     推送失败不回滚订单（单据已落库、状态为已审核），把报错带给前端，
     用户在「分销订单」页修正后可重推。
     """
+    if (wdt_warehouse_no or "").strip():
+        # 创建订单前核验，不因选错仓/该仓无库存产生一张无法推送的幽灵订单。
+        from .live_inventory import preview_live_inventory
+        check = preview_live_inventory(
+            db, wdt_warehouse_no,
+            [{"product_id": l.get("product_id"), "quantity": l.get("quantity", 0)}
+             for l in lines],
+        )
+        if not check["enough"]:
+            problems = [
+                f"{item['spec_no']} 需{item['demand_total']}、可发{item['available']}"
+                for item in check["items"] if not item["enough"]
+            ]
+            raise ValueError("所选仓库库存不足，未创建订单：" + "；".join(dict.fromkeys(problems)))
     view = create_order(
         db,
         distributor_id,
