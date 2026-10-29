@@ -1468,7 +1468,11 @@ function onEntryWarehouseChange(){
   state.stockQty = {}; state.stockDate = ""; state.stockWarehouse = "";
   state.stockRequestToken++;
   saveEntryForm();
-  renderEntry();
+  // 只清空库存格，不重建商品行：切换仓库不能把已填的数量/箱价清掉。
+  $("entryBody")?.querySelectorAll(".entry-stock").forEach(td => {
+    td.textContent = "—"; td.style.color = "";
+  });
+  scheduleEntryStockRefresh();
 }
 async function loadStockOverview(showAll=false){
   const wh = ($("entryWarehouse")?.value || "").trim();
