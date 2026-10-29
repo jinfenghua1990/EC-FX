@@ -1583,7 +1583,7 @@ function entryPriceOf(p){
   return { v: parseFloat(p.base_price) || 0, tag: "" };
 }
 
-async async function onEntryDistChange(){
+async function onEntryDistChange(){
   const distId = $("entryDist").value;
   if (distId) { try { await loadDistPrices(distId); } catch (e) { /* 服务端兜底 */ } }
   renderEntry();
