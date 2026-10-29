@@ -223,6 +223,7 @@ class WangdianClient:
             payload = self._request(
                 "stock_query.php",
                 {"warehouse_no": warehouse_no, "spec_no": spec_no,
+                 "is_deleted": 1, "spec_is_deleted": 0,
                  "page_size": page_size, "page_no": page_no},
             )
             if not isinstance(payload.get("stocks"), list):
