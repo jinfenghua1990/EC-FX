@@ -116,3 +116,15 @@ def test_unpaid_cannot_keep_old_paid_amount(seeded):
     update_order_fulfillment(db, order.id, {"payment_status": "received"})
     with pytest.raises(ValueError):
         update_order_fulfillment(db, order.id, {"payment_status": "unpaid", "paid_amount": "100"})
+
+
+def test_sent_order_warehouse_cannot_change_silently(seeded):
+    db, order = seeded
+    order.wdt_warehouse_no = "WH-ORIGINAL"
+    order.push_status = "sent"
+    db.commit()
+    with pytest.raises(ValueError, match="已推送旺店通"):
+        update_order_fulfillment(db, order.id, {"wdt_warehouse_no": "WH-OTHER"})
+    db.rollback()
+    db.refresh(order)
+    assert order.wdt_warehouse_no == "WH-ORIGINAL"

@@ -220,3 +220,75 @@ def test_unclaimed_vouchers_surface_in_receivables(db, order):
 def test_receivables_filter_by_status(db, order):
     assert v.receivables(db, status="received")["items"] == []
     assert len(v.receivables(db, status="unpaid")["items"]) == 1
+
+
+def test_applied_voucher_cannot_change_amount_or_move_order(db, order):
+    receipt = v.add_voucher(db, content=PNG, filename="a.png", mime="image/png",
+                            order_id=order.id, run_ocr_now=False)
+    v.update_voucher(db, receipt["id"], {"amount": "300.00"})
+    v.apply_voucher(db, receipt["id"])
+    another = FxOrder(order_no="OTHER", distributor_id=order.distributor_id,
+                      total_amount=Decimal("500.00"))
+    db.add(another)
+    db.commit()
+    with pytest.raises(ValueError, match="先撤销入账"):
+        v.update_voucher(db, receipt["id"], {"amount": "500.00"})
+    with pytest.raises(ValueError, match="先撤销入账"):
+        v.update_voucher(db, receipt["id"], {"order_id": another.id})
+    db.refresh(order)
+    assert order.paid_amount == Decimal("300.00")
+    saved = db.get(v.FxPaymentVoucher, receipt["id"])
+    assert saved.order_id == order.id and saved.amount == Decimal("300.00")
+
+
+def test_set_mode_does_not_overwrite_another_applied_receipt(db, order):
+    a = v.add_voucher(db, content=PNG, filename="a.png", mime="image/png",
+                      order_id=order.id, run_ocr_now=False)
+    b = v.add_voucher(db, content=PNG, filename="b.png", mime="image/png",
+                      order_id=order.id, run_ocr_now=False)
+    v.apply_voucher(db, a["id"], amount="200")
+    with pytest.raises(ValueError, match="不能覆盖"):
+        v.apply_voucher(db, b["id"], amount="800", mode="set")
+    assert db.get(v.FxPaymentVoucher, b["id"]).applied == 0
+    assert db.get(FxOrder, order.id).paid_amount == Decimal("200.00")
+    v.unapply_voucher(db, a["id"])
+    assert db.get(FxOrder, order.id).paid_amount == Decimal("0.00")
+
+
+def test_cannot_apply_over_order_total(db, order):
+    a = v.add_voucher(db, content=PNG, filename="a.png", mime="image/png",
+                      order_id=order.id, run_ocr_now=False)
+    with pytest.raises(ValueError, match="超过订单金额"):
+        v.apply_voucher(db, a["id"], amount="1001")
+    assert db.get(FxOrder, order.id).paid_amount == Decimal("0.00")
+
+
+def test_unapply_refuses_to_hide_inconsistent_balance(db, order):
+    a = v.add_voucher(db, content=PNG, filename="a.png", mime="image/png",
+                      order_id=order.id, run_ocr_now=False)
+    v.apply_voucher(db, a["id"], amount="300")
+    order.paid_amount = Decimal("50")
+    db.commit()
+    with pytest.raises(ValueError, match="账面数据不一致"):
+        v.unapply_voucher(db, a["id"])
+    assert db.get(v.FxPaymentVoucher, a["id"]).applied == 1
+    assert db.get(FxOrder, order.id).paid_amount == Decimal("50.00")
+
+
+def test_order_manual_status_cannot_erase_applied_receipt(db, order):
+    from app.services.distribution import update_order_fulfillment
+    a = v.add_voucher(db, content=PNG, filename="a.png", mime="image/png",
+                      order_id=order.id, run_ocr_now=False)
+    v.apply_voucher(db, a["id"], amount="200")
+    with pytest.raises(ValueError, match="不能低于已入账凭证"):
+        update_order_fulfillment(db, order.id, {"paid_amount": "0", "payment_status": "unpaid"})
+    db.rollback()
+
+
+def test_voucher_order_customer_must_match(db, order):
+    other = FxDistributor(code="D-OTHER", name="其他客户")
+    db.add(other)
+    db.commit()
+    with pytest.raises(ValueError, match="客户不一致"):
+        v.add_voucher(db, content=PNG, filename="a.png", mime="image/png",
+                      order_id=order.id, distributor_id=other.id, run_ocr_now=False)

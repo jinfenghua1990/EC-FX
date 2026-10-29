@@ -102,8 +102,16 @@ def sync_stock_snapshot(
             spec = _s(r.get("spec_no"))
             if not spec:
                 continue
-            qty = _d(r.get("stock_num") or r.get("available_num") or r.get("num"))
-            agg[spec] = qty  # 当前库存，多窗出现取最后一次即可
+            # 0 是有效库存，不得用 "or" 回退成其他字段中的非零值。
+            qty_raw = next(
+                (r[key] for key in ("stock_num", "available_num", "num")
+                 if r.get(key) is not None and str(r[key]).strip() != ""),
+                None,
+            )
+            if qty_raw is None:
+                continue
+            # 窗口按从新到旧查询，较早窗口不能盖掉最近的库存结果。
+            agg.setdefault(spec, _d(qty_raw))
 
     # spec_no → sku 反查（便于页面反查商品）
     sku_map: dict[str, str] = {}

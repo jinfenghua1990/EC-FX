@@ -712,7 +712,7 @@ toast{display:none}
           <label class="eh-f"><span>下单渠道 / 推送店铺 <i>*</i></span>
             <select id="entryShop" onchange="onEntryShopChange()" title="下单渠道就是旺店通店铺；选择会记住，下次默认用它"></select></label>
           <label class="eh-f"><span>发货仓库 <i>*</i></span>
-            <select id="entryWarehouse" onchange="saveEntryForm()" title="只允许红盒子-格力高磐石仓（HHZ-Glico），与旺店通仓库档案对齐"></select></label>
+            <select id="entryWarehouse" onchange="onEntryWarehouseChange()" title="选择旺店通仓库档案中实际存在的启用仓库；库存只读取这个仓库"></select></label>
 
           <div class="eh-f"><span>配送方式 <i>*</i></span>
             <div class="eh-seg" id="entryDelivery">
@@ -754,14 +754,15 @@ toast{display:none}
         <select id="entryBrand" style="width:150px" onchange="renderEntry()"></select>
         <span id="entryBrandTip" style="font-size:12px;color:#8a94a6;white-space:nowrap"></span>
         <span style="font-size:12px;color:#c2410c;white-space:nowrap" title="商品档案里标记为热销且在售的商品才会出现在这里">🔥 仅显示热销商品</span>
-        <span id="entryStockBadge" class="inv-badge" title="现货 = 最新库存快照；未同步时点「分销订单」页的同步按钮" style="margin-left:auto">现货：加载中</span>
+        <span id="entryStockBadge" class="inv-badge" title="当前选中仓库的旺店通实时可发库存；按仓库编号+规格编码查询" style="margin-left:auto">可发库存：选择仓库</span>
+        <button class="btn mini" type="button" onclick="loadStockOverview(true)" title="查询当前筛选商品的实时库存（最多 40 个 SKU）">⟳ 刷新此仓实时库存</button>
       </div>
       <div class="hint" title="「件」= 商品的基本单位（盒/袋/包，见商品资料的「单位」列）；箱规 = 一件装多少，见「箱规」列。下单数量(件)、下单数量(箱)、箱价 三个格子随便填哪个，另外两个都会自动换算出来；箱价改了就是改这单的成交价（单价 = 箱价 ÷ 箱规），小计永远 = 件数 × 单价。订单号自动生成并作为旺店通单号；推送失败时订单仍保留（已审核），到「分销订单」页可重推。">价格自动取 <b>经销商专属价 &gt; 一级分销价 &gt; 基础价</b>；<b>下单数量(件) ⇄ 下单数量(箱) ⇄ 箱价</b> 三向自动换算，填哪个都行，另外两个立刻跟着变；推送店铺会记住上次选择，推送失败的单可在「分销订单」页重推。</div>
       <div class="tbl">
         <table class="cols" data-ckey="entry-v2">
           <colgroup><col style="width:130px"><col style="width:230px"><col style="width:100px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:90px"><col style="width:110px"><col style="width:90px"><col style="width:80px"><col style="width:110px"><col style="width:110px"><col style="width:110px"></colgroup>
           <thead><tr>
-          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="price" class="num" title="每件（基本单位，盒/袋）的含税单价">单价(元/件·含税)</th><th data-col="disc" class="num" title="品牌折扣率 = 单价 ÷ 品牌标价。用来一眼看出这单给客户打了多少折（标价为空时显示 —）">品牌折扣率</th><th data-col="boxprice" class="num" title="箱价 = 单价 × 箱规，自动带出；也可以直接改箱价，单价会按「箱价 ÷ 箱规」反算，小计跟着变">箱价(含税)</th><th data-col="stock" class="num" title="最新库存快照数量；未同步显示 —">现货</th><th data-col="pack">箱规</th><th data-col="qty" title="按件（基本单位）填，不是箱数；填了会自动换算右边的箱数">下单数量(件)</th><th data-col="caseqty" title="按箱填；填了会自动换算左边的件数（件 = 箱 × 箱规）">下单数量(箱)</th><th data-col="amount" class="num">小计</th>
+          <th data-col="sku">SKU</th><th data-col="name">名称</th><th data-col="spec">规格</th><th data-col="brand">品牌</th><th data-col="category">分类</th><th data-col="price" class="num" title="每件（基本单位，盒/袋）的含税单价">单价(元/件·含税)</th><th data-col="disc" class="num" title="品牌折扣率 = 单价 ÷ 品牌标价。用来一眼看出这单给客户打了多少折（标价为空时显示 —）">品牌折扣率</th><th data-col="boxprice" class="num" title="箱价 = 单价 × 箱规，自动带出；也可以直接改箱价，单价会按「箱价 ÷ 箱规」反算，小计跟着变">箱价(含税)</th><th data-col="stock" class="num" title="所选旺店通仓库的实时可发库存（已减ERP占用），未查询显示 —">可发库存(件)</th><th data-col="pack">箱规</th><th data-col="qty" title="按件（基本单位）填，不是箱数；填了会自动换算右边的箱数">下单数量(件)</th><th data-col="caseqty" title="按箱填；填了会自动换算左边的件数（件 = 箱 × 箱规）">下单数量(箱)</th><th data-col="amount" class="num">小计</th>
         </tr></thead><tbody id="entryBody"></tbody></table>
         <div class="empty" id="entryEmpty" style="display:none">请先在右上角选择分销商，商品和价格会按它的授权品牌与专属价自动带出。</div>
       </div>
@@ -814,8 +815,8 @@ toast{display:none}
           <option value="returned">已退回</option>
         </select>
         <input id="orderSearch" placeholder="查询：内部单号 / 原始单号 / 分销商 / 物流" oninput="renderOrders()" style="width:230px">
-        <span id="invBadge" class="inv-badge" title="库存快照：满足率提示的「昨天库存」基线">库存快照：未同步</span>
-        <button class="btn" onclick="syncInventory()">⟳ 同步库存</button>
+        <span id="invBadge" class="inv-badge" title="历史库存快照仅用于资料参考，不用于新订单实时可发判断">历史库存快照（非下单依据）</span>
+        <button class="btn" onclick="syncInventory()" title="历史快照备份，不参与实时可发库存判断">⟳ 保存历史库存快照</button>
         <button class="btn" onclick="detectPushStatus()" title="按旺店通单号 / 销售出库单自动核对：已经在旺店通里的单标为已推送，不再出现在待推送里">⟳ 核对旺店通状态</button>
         <button class="btn" id="btnQtyCheck" onclick="runQtyCheck()" title="按单号关联旺店通出库单，逐行比对订单件数和出库件数，揪出错记单位（箱记成件）的单">⇄ 件数核对</button>
         <button class="btn primary" onclick="openOrderModal()">＋ 新建订单</button>
@@ -1168,8 +1169,8 @@ const state = { distributors: [], products: [], orders: [], overview: null, tab:
   maintenance: null, need: "",
   // 品牌维度：由外壳顶栏的品牌切换器通过 iframe 地址传入，空值表示「全部品牌」
   brand: new URLSearchParams(location.search).get("brand") || "",
-  // 下单页：最新快照现货（spec_no → qty）与快照日期
-  stockQty: {}, stockDate: "",
+  // 下单页：只保留当前选中仓库的旺店通实时可发库存；仓库切换即失效
+  stockQty: {}, stockDate: "", stockWarehouse: "", stockRequestToken: 0,
   // 旺店通店铺列表（下单页选推送店铺）
   wdtShops: [],
   // 全部品牌（不受顶栏当前品牌过滤，用于分销商「分销品牌」勾选项）
@@ -1288,7 +1289,7 @@ function entryFormSaved(){
 function saveEntryForm(){
   if (!$("entryDist")) return;
   const data = {
-    // 仓库存编号（HHZ-Glico），显示名由旺店通仓库列表带出；店铺存编号，和 entryShop 共用记忆。
+    // 仓库存旺店通 warehouse_no，显示名从实时仓库档案带出；店铺同理。
     warehouse: ($("entryWarehouse").value || "").trim(),
     delivery: entryDeliveryValue(),
     scratch: $("entryScratch").checked ? 1 : 0,
@@ -1456,15 +1457,70 @@ async function applyLastOrder(orderId){
   } catch (e) { toast("带出上次订单失败: " + e.message); }
 }
 
-async function loadStockOverview(){
-  try {
-    const d = await api("/api/fx/inventory/stock-list");
-    state.stockQty = d.qty || {}; state.stockDate = d.snap_date || "";
-  } catch (e) { state.stockQty = {}; state.stockDate = ""; }
+let stockRefreshTimer = null;
+function scheduleEntryStockRefresh(){
+  clearTimeout(stockRefreshTimer);
+  stockRefreshTimer = setTimeout(() => loadStockOverview(), 450);
+}
+function onEntryWarehouseChange(){
+  const wh = ($("entryWarehouse").value || "").trim();
+  if (wh) localStorage.setItem("entryWarehouse", wh);
+  state.stockQty = {}; state.stockDate = ""; state.stockWarehouse = "";
+  state.stockRequestToken++;
+  saveEntryForm();
+  // 只清空库存格，不重建商品行：切换仓库不能把已填的数量/箱价清掉。
+  $("entryBody")?.querySelectorAll(".entry-stock").forEach(td => {
+    td.textContent = "—"; td.style.color = "";
+  });
+  scheduleEntryStockRefresh();
+}
+async function loadStockOverview(showAll=false){
+  const wh = ($("entryWarehouse")?.value || "").trim();
   const badge = $("entryStockBadge");
   if (!badge) return;
-  badge.textContent = state.stockDate ? `现货：快照 ${state.stockDate}` : "现货：未同步库存";
-  badge.classList.toggle("ok", !!state.stockDate);
+  const token = ++state.stockRequestToken;
+  state.stockQty = {}; state.stockDate = ""; state.stockWarehouse = "";
+  if (!wh) {
+    badge.textContent = "可发库存：未选择有效仓库";
+    badge.className = "inv-badge warn";
+    $("entryBody")?.querySelectorAll(".entry-stock").forEach(td => { td.textContent = "—"; });
+    return;
+  }
+  const inputs = [...($("entryBody")?.querySelectorAll(".eq-qty") || [])];
+  // 填了数量的商品优先，普通浏览自动查询前 12 个，避免每次搜索数百次调用旺店通。
+  const picked = inputs.filter(i => Number(i.value) > 0);
+  const others = inputs.filter(i => !(Number(i.value) > 0));
+  const chosen = [...picked, ...others].slice(0, showAll ? 40 : 12);
+  if (!chosen.length) { badge.textContent = "可发库存：没有可查询的商品"; return; }
+  badge.textContent = `查询旺店通仓库 ${wh} 实时库存…`;
+  badge.className = "inv-badge";
+  try {
+    const d = await api("/api/fx/inventory/live", {
+      method: "POST",
+      body: JSON.stringify({
+        warehouse_no: wh,
+        lines: chosen.map(i => ({product_id: Number(i.dataset.id), quantity: 0}))
+      })
+    });
+    if (token !== state.stockRequestToken || wh !== $("entryWarehouse").value) return;
+    state.stockWarehouse = wh;
+    state.stockDate = d.checked_at || "";
+    state.stockQty = Object.fromEntries((d.items || []).map(i => [i.spec_no, Number(i.available)]));
+    $("entryBody").querySelectorAll(".entry-stock").forEach(td => {
+      const val = state.stockQty[td.dataset.spec];
+      td.textContent = val == null ? "—" : String(Math.round(val * 100) / 100);
+      td.style.color = val != null && val <= 0 ? "#e5484d" : "";
+      td.title = val == null ? "未查询此 SKU，可点击刷新" : `旺店通仓库 ${wh} 实时可发库存；查询于 ${state.stockDate}`;
+    });
+    badge.textContent = `实时可发：${d.warehouse_name}（${wh}），已查 ${d.checked_skus} 个 SKU · ${state.stockDate}`;
+    badge.className = "inv-badge ok";
+  } catch (e) {
+    if (token !== state.stockRequestToken) return;
+    state.stockQty = {}; state.stockDate = ""; state.stockWarehouse = "";
+    $("entryBody")?.querySelectorAll(".entry-stock").forEach(td => { td.textContent = "—"; });
+    badge.textContent = "旺店通实时库存查询失败：" + e.message;
+    badge.className = "inv-badge warn";
+  }
 }
 
 /* 推送店铺：从旺店通实时拉店铺列表，默认记住上次选择（localStorage） */
@@ -1492,28 +1548,28 @@ function onEntryShopChange(){
   if (v) localStorage.setItem("entryShop", v);
 }
 
-/* 发货仓库：只允许红盒子-格力高磐石仓（HHZ-Glico，排除次品仓）。
-   仓库编号必须来自旺店通档案；接口失败时用同一个编号兜底，提交时仍会校验。 */
+/* 仓库编号只来自旺店通 warehouse_query.php 的启用仓库。不能写死或假造兜底。 */
 async function loadWdtWarehouses(){
-  let rows = [], defaultNo = "";
+  let list = [], defaultNo = "";
   try {
     const d = await api("/api/fx/wdt/warehouses");
-    rows = d.warehouses || []; defaultNo = d.default_warehouse_no || "";
-  } catch (e) { /* 网络失败不拦下单：下面用 HHZ-Glico 兜底 */ }
-  const glico = rows.filter(w =>
-    /格力高/.test(w.warehouse_name || "") && !/次品/.test(w.warehouse_name || ""));
-  const list = glico.length ? glico : [{
-    warehouse_no: "HHZ-Glico", warehouse_name: "红盒子-格力高磐石仓", warehouse_type: "",
-  }];
+    if (d.ok) { list = d.warehouses || []; defaultNo = d.default_warehouse_no || ""; }
+  } catch (e) { /* 下拉显示错误，不冒充有效仓库 */ }
   state.wdtWarehouses = list;
   const sel = $("entryWarehouse");
   if (!sel) return;
+  if (!list.length) {
+    sel.innerHTML = '<option value="">（旺店通仓库未加载，无法核验库存）</option>';
+    onEntryWarehouseChange();
+    return;
+  }
   const saved = localStorage.getItem("entryWarehouse") || defaultNo;
   const has = list.some(w => w.warehouse_no === saved);
   sel.innerHTML = list.map(w =>
-    `<option value="${esc(w.warehouse_no)}">${esc(w.warehouse_name)}</option>`).join("");
+    `<option value="${esc(w.warehouse_no)}">${esc(w.warehouse_name)}（${esc(w.warehouse_no)}）</option>`).join("");
   sel.value = has ? saved : list[0].warehouse_no;
   localStorage.setItem("entryWarehouse", sel.value);
+  onEntryWarehouseChange();
 }
 
 function entryWarehouseLabel(){
@@ -1634,9 +1690,10 @@ function renderEntry(){
   }
   $("entryBody").innerHTML = rows.map(p => {
     const pr = entryPriceOf(p);
-    const sq = state.stockQty[p.spec_no];
-    const stockText = state.stockDate ? (sq == null ? "—" : String(Math.round(sq * 100) / 100)) : "—";
-    const low = state.stockDate && sq != null && sq <= 0;
+    const sq = state.stockQty[p.spec_no || p.sku];
+    const current = state.stockWarehouse === ($("entryWarehouse")?.value || "");
+    const stockText = current && sq != null ? String(Math.round(sq * 100) / 100) : "—";
+    const low = current && sq != null && sq <= 0;
     // 箱规：>0 才能换算件⇄箱，也才有箱价
     const pack = p.pack_qty > 0 ? p.pack_qty : 0;
     const boxPrice = pack && pr.v > 0 ? pr.v * pack : 0;
@@ -1651,7 +1708,7 @@ function renderEntry(){
     <td class="num eq-pricetd"><span class="eq-pricev">${pr.v > 0 ? pr.v.toFixed(2) : "—"}</span>${pr.tag ? ` <span class="tag mini-tag eq-pricetag" title="${pr.tag === "专属" ? "经销商专属价" : "一级分销价"}">${pr.tag}</span>` : ""}<span class="tag mini-tag eq-pricemod" style="display:none" title="这单按箱价反算的成交单价（箱价 ÷ 箱规），提交时按此价下单">改</span></td>
     <td class="num disc-rate eq-disctd" title="${lp > 0 ? `品牌标价 ${lp.toFixed(2)}，单价 ${pr.v.toFixed(2)} ÷ 标价 = ${(pr.v / lp * 10).toFixed(2)} 折` : "这个商品没有品牌标价，算不出折扣率"}">${discText(pr.v, lp)}</td>
     <td class="num"><input type="number" class="eq-boxprice" min="0" step="0.01" data-id="${p.id}" data-pack="${pack}" data-name="${esc(p.sku)}" oninput="entryQtyInput(this)" placeholder="${boxPrice > 0 ? boxPrice.toFixed(2) : "—"}" style="width:96px" ${pack && pr.v > 0 ? "" : "disabled"} title="${pack && pr.v > 0 ? `箱价 = 单价 ${pr.v.toFixed(2)} × 箱规 ${pack} = ${boxPrice.toFixed(2)}；直接填箱价会反算单价` : "没有箱规或没定价，算不出箱价"}"></td>
-    <td class="num" style="${low ? "color:#e5484d;font-weight:600" : ""}">${stockText}</td>
+    <td class="num entry-stock" data-spec="${esc(p.spec_no || p.sku)}" style="${low ? "color:#e5484d;font-weight:600" : ""}">${stockText}</td>
     <td>${pack ? pack + "/" + esc(p.pack_unit || "箱") : "-"}</td>
     <td><input type="number" class="eq-qty" min="0" step="1" data-id="${p.id}" data-pack="${pack}" data-name="${esc(p.sku)}" oninput="entryQtyInput(this)" placeholder="0" style="width:90px" title="按件（基本单位）填"></td>
     <td><input type="number" class="eq-case" min="0" step="0.001" data-id="${p.id}" data-pack="${pack}" data-name="${esc(p.sku)}" oninput="entryQtyInput(this)" placeholder="0" style="width:90px" ${pack ? "" : "disabled"} title="${pack ? "按箱填，件数自动 = 箱数 × " + pack : "这个商品没有箱规，只能按件下单"}"></td>
@@ -1660,6 +1717,7 @@ function renderEntry(){
   }).join("");
   syncCols("entry-v2");   // 行重建了：先归位表头，再套记住的列顺序
   entryRecalc();
+  scheduleEntryStockRefresh();
 }
 
 /* 品牌折扣率文案：单价 ÷ 品牌标价，如 6.8 折。标价为 0 时不编造，直接给 — */
@@ -1710,6 +1768,8 @@ function entryQtyInput(el){
     }
   }
   entryRecalc();
+  // 有用户新填数量时优先刷新该 SKU 的实时可发库存。
+  scheduleEntryStockRefresh();
 }
 
 function entryRecalc(){
@@ -1769,7 +1829,22 @@ async function submitEntryOrder(){
   const whNo = ($("entryWarehouse").value || "").trim();
   const whName = entryWarehouseLabel();
   if (!shopNo) { toast("请选择下单渠道 / 推送店铺"); return; }
-  if (!whNo) { toast("请选择发货仓库"); return; }
+  if (!whNo || !state.wdtWarehouses.some(w => w.warehouse_no === whNo)) {
+    toast("请先从旺店通实时仓库列表选择有效仓库"); return;
+  }
+  // 创建订单前实时核对该仓所有选中 SKU 的可发量；失败或缺货均不创建订单。
+  let liveCheck;
+  try {
+    liveCheck = await api("/api/fx/inventory/live", {method: "POST",
+      body: JSON.stringify({warehouse_no: whNo,
+        lines: picked.map(r => ({product_id: r.product_id, quantity: r.quantity}))})});
+  } catch (e) { toast("仓库实时库存核验失败，未下单：" + e.message); return; }
+  if (!liveCheck.enough) {
+    const shorts = liveCheck.items.filter(i => !i.enough)
+      .map(i => `${i.sku} 需要${i.demand_total}件，可发${i.available}件`);
+    alert(`所选旺店通仓库 ${whNo} 库存不足，未创建订单：\n${[...new Set(shorts)].join("\n")}`);
+    return;
+  }
   const head = {
     order_channel: shopName,
     ship_warehouse: whName,
@@ -1784,7 +1859,7 @@ async function submitEntryOrder(){
     `客户：${$("entryDist").selectedOptions[0] ? $("entryDist").selectedOptions[0].textContent : distId}`,
     `配送：${head.delivery_type === "pickup" ? "自提" : "送货"}`,
     `渠道 / 店铺：${shopName}`,
-    `仓库：${whName}（${whNo}）`,
+    `仓库：${whName}（${whNo}） · 旺店通可发量核验于 ${liveCheck.checked_at}`,
     head.scratch_code ? "特殊情况：需要刮码" : "",
     head.ship_note ? `发货要求：${head.ship_note}` : "",
     `共 ${lines.length} 行，合计 ${$("entryTotal").textContent}`,
@@ -3539,9 +3614,10 @@ async function viewOrder(id){
     // 已发货的订单不再做库存满足率判断：库存快照是「当前时点」的数，
     // 拿它套已经出完货的历史单只会误报「库存不足」。
     const shipped = d.shipping_status === "shipped" || !!d.shipped_at;
-    let fulfill = null;
+    let fulfill = null, fulfillError = "";
     if (!shipped) {
-      try { fulfill = await api("/api/fx/inventory/fulfillment?order_id=" + id); } catch (e) { fulfill = null; }
+      try { fulfill = await api("/api/fx/inventory/fulfillment?order_id=" + id); }
+      catch (e) { fulfillError = e.message; }
     }
     const pushHtml = d.push_status === "sent"
       ? `已推送${d.pushed_at ? " · " + esc(d.pushed_at) : ""}${d.push_message ? ` <span style="color:#8a94a6">（${esc(d.push_message)}）</span>` : ""}`
@@ -3594,10 +3670,10 @@ async function viewOrder(id){
         </div>
       </div>
       <div class="sec">
-        <div class="sec-t">商品明细 <span class="sub">共 ${d.lines.length} 项 · 数量按箱计，单价为元/箱（小字为件数换算）${shipped ? " · 已发货单不做库存判断" : " · 实际可用 = 昨天库存 + 今日已入库（件）"}</span></div>
+        <div class="sec-t">商品明细 <span class="sub">共 ${d.lines.length} 项 · 数量按箱计，单价为元/箱（小字为件数换算）${shipped ? " · 已发货单不做库存判断" : " · 旺店通所选仓库实时可发库存（件）"}</span></div>
         ${shipped
-          ? `<div class="ff-banner" style="background:#f4f6fa;border:1px solid #dbe2ee;color:#64708a"><span style="font-size:18px">📦</span><span class="big">订单已发货</span><span>库存满足率仅对未发货订单计算（库存快照是当前时点，不代表发货时的库存）。</span></div>`
-          : renderFulfillment(fulfill)}
+          ? `<div class="ff-banner" style="background:#f4f6fa;border:1px solid #dbe2ee;color:#64708a"><span style="font-size:18px">📦</span><span class="big">订单已发货</span><span>已发货历史订单不再以当前实时库存判断当时是否有货。</span></div>`
+          : renderFulfillment(fulfill, fulfillError)}
         <table class="order-lines"><thead><tr><th>编号</th><th>商品</th><th class="num">数量(箱)</th>
           <th class="num">单价(元/箱)</th><th class="num">小计</th>${shipped ? "" : `<th class="num">实际可用(件)</th>
           <th class="num">满足率</th><th>库存状态</th>`}</tr></thead>
@@ -3616,7 +3692,7 @@ async function viewOrder(id){
               const priceTxt = pq && Number.isFinite(q) ? money(l.unit_price * pq) : money(l.unit_price);
               const subTxt = pq ? `${Number.isFinite(q) ? q : esc(l.quantity)} 件（${pq}件/${unit}）` : "件（商品档案未设箱规）";
               const stockTds = shipped ? "" : `
-                <td class="num stock">${f ? esc(f.actual) : "—"}${f ? `<span class="sub">昨${esc(f.yesterday_stock)} + 今入${esc(f.today_stockin)}${Number(f.today_pending) > 0 ? " · 待入" + esc(f.today_pending) : ""}</span>` : ""}</td>
+                <td class="num stock">${f ? esc(f.available) : "—"}${f ? `<span class="sub">仓 ${esc(fulfill.warehouse_no)} · 实时可发</span>` : ""}</td>
                 <td class="num rate ${c}">${f ? esc(f.fulfill_rate) + "%" : "—"}</td>
                 <td>${f ? `<span class="ff-tag ${c}">${esc(f.state)}</span>` : `<span class="muted">未同步</span>`}</td>`;
               return `<tr class="pline ${c}">
@@ -3728,15 +3804,15 @@ async function saveOrderHead(id){
   } catch (e) { toast("保存失败: " + e.message); }
 }
 
-/* 满足率三态提示：满足库存(绿) / 到仓待入库(橙) / 库存不足(红) */
-function renderFulfillment(f){
-  if (!f) return `<div class="ff-banner warn" style="background:#fff8e6;border:1px solid #f0dca8;color:#9a5b00">⚠️ 库存快照未同步，满足率暂不可用。请先点上方「同步库存」。</div>`;
-  const cls = f.overall_state === "满足库存" ? "ok" : f.overall_state === "到仓待入库" ? "arriving" : "short";
-  const icon = cls === "ok" ? "✅" : cls === "arriving" ? "🚚" : "⛔";
+/* 旺店通实时可发库存：只按本单 warehouse_no + 商品 spec_no 核验。 */
+function renderFulfillment(f, error=""){
+  if (!f) return `<div class="ff-banner warn" style="background:#fff8e6;border:1px solid #f0dca8;color:#9a5b00">⚠️ 旺店通实时库存不可用：${esc(error || "请检查仓库和接口连接")}。不能当作库存充足。</div>`;
+  const cls = f.overall_state === "满足库存" ? "ok" : "short";
+  const icon = cls === "ok" ? "✅" : "⛔";
   return `<div class="ff-banner ${cls}">
       <span style="font-size:20px">${icon}</span>
       <span class="big">整单：${esc(f.overall_state)}</span>
-      <span>实际可用 = 昨天库存 + 今日已入库（截至 ${esc(f.as_of)}）</span>
+      <span>${esc(f.warehouse_name)}（${esc(f.warehouse_no)}）实时可发库存 · ${esc(f.checked_at)}（不代表已锁库）</span>
     </div>`;
 }
 

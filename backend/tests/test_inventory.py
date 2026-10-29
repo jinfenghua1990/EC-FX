@@ -167,3 +167,29 @@ def test_sync_stock_snapshot_aggregates_and_stores():
         select(func.count()).select_from(FxStockSnapshot).where(FxStockSnapshot.snap_date == today)
     )
     assert again == 2, again
+
+
+def test_snapshot_zero_is_real_and_recent_window_wins():
+    db = _db()
+    class WindowClient:
+        configured = True
+        def __init__(self):
+            self.calls = 0
+        def stock_query(self, start, end, page_size=100):
+            self.calls += 1
+            if self.calls == 1:
+                return [
+                    {"spec_no": "SP1", "stock_num": 0, "available_num": 88},
+                    {"spec_no": "SP2", "available_num": 7},
+                    {"spec_no": "SP3"},
+                ]
+            return [
+                {"spec_no": "SP1", "stock_num": 120},
+                {"spec_no": "SP2", "available_num": 12},
+            ]
+
+    result = inventory.sync_stock_snapshot(
+        db, client=WindowClient(), lookback_days=65, dry_run=True
+    )
+    assert result["skus"] == 2
+    assert result["total_qty"] == "7"

@@ -21,6 +21,9 @@ from .db import get_db
 from .models import ManualAdjustment, StockoutItem, StockoutOrder
 from .services.importers import read_tabular
 from .services.wangdian import WangdianClient, upsert_stockouts
+from .services.live_inventory import (
+    LiveInventoryError, preview_live_inventory, fulfillment_live_for_order,
+)
 from .services.sales_outbound import sales_outbound_detail, sales_outbound_facets, sales_outbound_orders, sales_outbound_overview
 from .services.diy_export import distinct_values, export_detail, export_fields_catalog, export_order_level, export_summary, filter_options, summary_result, sync_goods_class_cache
 from .services.system_update import (get_update_status, queue_action, stage_update_zip, github_check, github_download_update, set_update_status, read_auto_config, write_auto_config)
@@ -177,6 +180,16 @@ class FxOrderLinePayload(BaseModel):
     product_id: int
     quantity: Decimal
     unit_price: Decimal | None = None
+
+
+class FxLiveStockLinePayload(BaseModel):
+    product_id: int
+    quantity: Decimal = Decimal("0")
+
+
+class FxLiveStockPayload(BaseModel):
+    warehouse_no: str
+    lines: list[FxLiveStockLinePayload] = Field(default_factory=list)
 
 
 class FxOrderPayload(BaseModel):
@@ -1206,15 +1219,14 @@ def fx_wdt_shops():
 def fx_wdt_warehouses():
     """旺店通仓库列表（warehouse_query.php 只读），给下单页选发货仓库。
 
-    当前分销业务只从红盒子-格力高磐石仓（HHZ-Glico）发货，前端会把选项
-    收窄到这一个；接口仍返回全部启用仓，避免写死档案导致仓库改名后失效。
+    下单仓库直接取旺店通启用仓库档案。不能硬编码 Glico 或在接口失败时伪造仓库。
     """
     client = WangdianClient()
     if not client.configured:
         return {"ok": False, "warehouses": [], "message": "旺店通密钥未配置"}
     try:
         rows = client.warehouses()
-    except Exception as exc:  # 网络失败不阻断下单，前端用 HHZ-Glico 兜底
+    except Exception as exc:  # 不能用虚构的仓库记录兜底；页面明确标记查询失败
         return {"ok": False, "warehouses": [], "message": str(exc)[:200]}
     warehouses = [
         {
@@ -1230,7 +1242,7 @@ def fx_wdt_warehouses():
     return {
         "ok": True,
         "warehouses": warehouses,
-        "default_warehouse_no": settings.wdt_warehouse_no or "HHZ-Glico",
+        "default_warehouse_no": settings.wdt_warehouse_no or "",
     }
 
 
@@ -1259,18 +1271,28 @@ def fx_inventory_sync(
         raise HTTPException(502, f"旺店通库存同步失败：{exc}") from exc
 
 
+@app.post("/api/fx/inventory/live")
+def fx_inventory_live(payload: FxLiveStockPayload, db: Session = Depends(get_db)):
+    """订单页所选旺店通仓库的 SKU 实时可发库存，不使用本地快照。"""
+    try:
+        return preview_live_inventory(
+            db, payload.warehouse_no, [line.model_dump() for line in payload.lines]
+        )
+    except LiveInventoryError as exc:
+        raise HTTPException(400, str(exc)) from exc
+    except Exception as exc:
+        raise HTTPException(502, f"旺店通实时库存查询失败：{exc}") from exc
+
+
 @app.get("/api/fx/inventory/fulfillment")
 def fx_inventory_fulfillment(order_id: int, as_of: str = "", db: Session = Depends(get_db)):
-    """一张出库单的满足率三态：满足库存 / 到仓待入库 / 库存不足。
-
-    实际可用 = 昨天库存 + 今日已入库；与每行需求量比，给出逐行状态与整单总状态。
-    """
+    """订单按其选定 warehouse_no + 商品 spec_no 即时核验可发库存。"""
     try:
-        return fulfillment_for_order(db, order_id, as_of=as_of)
-    except ValueError as exc:
-        raise HTTPException(404, str(exc)) from exc
+        return fulfillment_live_for_order(db, order_id)
+    except LiveInventoryError as exc:
+        raise HTTPException(400, str(exc)) from exc
     except Exception as exc:
-        raise HTTPException(500, f"满足率计算失败：{exc}") from exc
+        raise HTTPException(502, f"旺店通实时库存查询失败：{exc}") from exc
 
 
 
@@ -1391,6 +1413,8 @@ def fx_order_create(payload: FxOrderPayload, db: Session = Depends(get_db)):
         return {"ok": True, "order": row, "pushed": False, "push_error": ""}
     except ValueError as exc:
         raise HTTPException(400, str(exc)) from exc
+    except RuntimeError as exc:
+        raise HTTPException(502, f"旺店通实时库存核验失败：{exc}") from exc
 
 
 @app.put("/api/fx/orders/{order_id}")
